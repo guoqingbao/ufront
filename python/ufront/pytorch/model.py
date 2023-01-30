@@ -22,7 +22,7 @@ from typing import List
 
 import numpy as np
 
-from ufront import (OpType, ActiMode, AggrMode, PoolType, TensorF32, DataType, ParamSyncType, Initializer, InitializerType, OptimizerType, Optimizer)
+from ..ufront import (OpType, ActiMode, AggrMode, PoolType, TensorF32, DataType, ParamSyncType, Initializer, InitializerType, OptimizerType, Optimizer)
 
 try:
     import torch

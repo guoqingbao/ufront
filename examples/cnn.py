@@ -1,10 +1,7 @@
 import torch.nn as nn
 import numpy as np
 import torch
-import sys
-sys.path.append('..')
-sys.path.append('.')
-from python.torch.model import PyTorchModel
+from ufront.pytorch.model import PyTorchModel
 from ufront import Model, PyOperator, TensorF32, Optimizer, OptimizerType, LossType, MetricsType
 
 class CNN(nn.Module):
