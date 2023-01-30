@@ -1,26 +1,27 @@
 use pyo3::prelude::*;
-pub mod prelude;
-pub mod types;
-pub mod model;
-pub mod operator;
-pub mod tensor;
-pub mod graph;
 pub mod databuffer;
 pub mod error;
+pub mod graph;
+pub mod model;
+pub mod operator;
+pub mod prelude;
+pub mod tensor;
+pub mod types;
 // use crate::prelude::*;
 // use prelude::*;
 use model::Model;
-use tensor::TensorF32;
-use types::{OpType, ActiMode, AggrMode, PoolType, DataType, Initializer, InitializerType, ParamSyncType, Optimizer, OptimizerType, LossType, MetricsType};
 use operator::PyOperator;
+use tensor::TensorF32;
+use types::{
+    ActiMode, AggrMode, DataType, Initializer, InitializerType, LossType, MetricsType, OpType,
+    Optimizer, OptimizerType, ParamSyncType, PoolType,
+};
 
 /// Formats the sum of two numbers as string.
 #[pyfunction]
 fn sum_as_string(a: usize, b: usize) -> PyResult<String> {
     Ok((a + b).to_string())
-    
 }
-
 
 /// A Python module implemented in Rust.
 #[pymodule]
@@ -45,4 +46,3 @@ fn ufront(_py: Python, m: &PyModule) -> PyResult<()> {
 
     Ok(())
 }
-

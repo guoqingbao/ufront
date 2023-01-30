@@ -1,11 +1,11 @@
 use half::f16;
 use num_enum::TryFromPrimitive;
+use pyo3::prelude::*;
+use pyo3::prelude::{pymodule, PyModule, PyResult};
+use pyo3::pyclass;
 use pyo3::IntoPy;
 use pyo3::PyObject;
 use pyo3::Python;
-use pyo3::prelude::{pymodule, PyModule, PyResult};
-use pyo3::prelude::*;
-use pyo3::pyclass;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
@@ -35,9 +35,9 @@ pub enum DataType {
 //                 _ => panic!("Invalid data type!"),
 //             },
 //             _ => panic!()
-            
+
 //         }
-        
+
 //     }
 // }
 
@@ -51,7 +51,7 @@ pub enum DataType {
 
 #[pymethods]
 impl DataType {
-       pub fn bytes(&self) -> usize {
+    pub fn bytes(&self) -> usize {
         match self {
             DataType::Int32 => 4,
             DataType::Int64 => 8,
@@ -70,7 +70,7 @@ pub enum DeviceType {
 }
 
 impl DeviceType {
-       pub fn as_str(self) -> &'static str {
+    pub fn as_str(self) -> &'static str {
         match self {
             DeviceType::CPU => "cpu",
             DeviceType::GPU => "gpu",
@@ -84,59 +84,59 @@ impl DeviceType {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, TryFromPrimitive)]
 #[repr(u32)]
 pub enum OpType {
-        CONV2D = 2011,
-        EMBEDDING,
-        POOL2D,
-        LINEAR,
-        SOFTMAX,
-        CONCAT,
-        FLAT,
-        MSELOSS,
-        BATCH_NORM,
-        RELU,
-        SIGMOID,
-        TANH,
-        ELU,
-        DROPOUT,
-        BATCH_MATMUL,
-        SPLIT,
-        RESHAPE,
-        TRANSPOSE,
-        REVERSE,
-        EXP,
-        ADD,
-        SUBTRACT,
-        MULTIPLY,
-        DIVIDE,
-        POW,
-        MEAN,
-        RSQRT,
-        SIN,
-        COS,
-        INPUT,
-        OUTPUT,
-        MULTIHEAD_ATTENTION,
-        GETITEM,
-        GETATTR,
-        EXPAND,
-        LAYER_NORM,
-        FLOOR_DIVIDE,
-        IDENTITY,
-        GELU,
-        PERMUTE,
-        SCALAR_MULTIPLY,
-        SCALAR_FLOORDIV,
-        SCALAR_ADD,
-        SCALAR_SUB,
-        SCALAR_TRUEDIV,
-        INIT_PARAM,
-        FLOAT,
-        CONTIGUOUS,
-        TO,
-        UNSQUEEZE,
-        TYPE_AS ,
-        VIEW,
-        ATTRIBUTE,
+    CONV2D = 2011,
+    EMBEDDING,
+    POOL2D,
+    LINEAR,
+    SOFTMAX,
+    CONCAT,
+    FLAT,
+    MSELOSS,
+    BATCH_NORM,
+    RELU,
+    SIGMOID,
+    TANH,
+    ELU,
+    DROPOUT,
+    BATCH_MATMUL,
+    SPLIT,
+    RESHAPE,
+    TRANSPOSE,
+    REVERSE,
+    EXP,
+    ADD,
+    SUBTRACT,
+    MULTIPLY,
+    DIVIDE,
+    POW,
+    MEAN,
+    RSQRT,
+    SIN,
+    COS,
+    INPUT,
+    OUTPUT,
+    MULTIHEAD_ATTENTION,
+    GETITEM,
+    GETATTR,
+    EXPAND,
+    LAYER_NORM,
+    FLOOR_DIVIDE,
+    IDENTITY,
+    GELU,
+    PERMUTE,
+    SCALAR_MULTIPLY,
+    SCALAR_FLOORDIV,
+    SCALAR_ADD,
+    SCALAR_SUB,
+    SCALAR_TRUEDIV,
+    INIT_PARAM,
+    FLOAT,
+    CONTIGUOUS,
+    TO,
+    UNSQUEEZE,
+    TYPE_AS,
+    VIEW,
+    ATTRIBUTE,
 }
 
 #[pymethods]
@@ -191,9 +191,9 @@ impl OpType {
             OpType::INIT_PARAM => "init_param",
             OpType::FLOAT => "float",
             OpType::CONTIGUOUS => "contigeous",
-            OpType::TO => "to", 
+            OpType::TO => "to",
             OpType::UNSQUEEZE => "unsqueeze",
-            OpType::TYPE_AS  => "type_as",
+            OpType::TYPE_AS => "type_as",
             OpType::VIEW => "view",
             OpType::ATTRIBUTE => "attribute",
             _ => panic!("Not supported operator!"),
@@ -201,62 +201,64 @@ impl OpType {
     }
 
     #[staticmethod]
-    pub fn as_enum(id : &str) -> OpType {
+    pub fn as_enum(id: &str) -> OpType {
         match id {
-            "conv2d"  => OpType::CONV2D ,
+            "conv2d" => OpType::CONV2D,
             "embedding" => OpType::EMBEDDING,
             "pool2d" => OpType::POOL2D,
-            "linear"  => OpType::LINEAR,
+            "linear" => OpType::LINEAR,
             "softmax" => OpType::SOFTMAX,
             "concat" => OpType::CONCAT,
             "flat" => OpType::FLAT,
-            "mseloss" => OpType::MSELOSS ,
+            "mseloss" => OpType::MSELOSS,
             "batchnorm" => OpType::BATCH_NORM,
-            "relu"  => OpType::RELU,
-            "sigmoid"  => OpType::SIGMOID,
-            "tanh"  => OpType::TANH,
-            "elu"  => OpType::ELU,
-            "dropout"  => OpType::DROPOUT,
-            "batch_matmul" =>  OpType::BATCH_MATMUL,
-            "split"  => OpType::SPLIT,
-            "reshape"  => OpType::RESHAPE,
-            "transpose"  => OpType::TRANSPOSE,
-            "reverse"  => OpType::REVERSE,
-            "exp"  => OpType::EXP,
-            "add"  => OpType::ADD,
-            "subtract"  => OpType::SUBTRACT,
-            "multiply"  => OpType::MULTIPLY,
-            "divide"  => OpType::DIVIDE,
-            "pow"  => OpType::POW,
-            "mean"  => OpType::MEAN,
-            "rsqrt"  => OpType::RSQRT,
-            "sin"  => OpType::SIN,
-            "cos"  => OpType::COS,
-            "input"  => OpType::INPUT,
-            "output"  => OpType::OUTPUT,
-            "multihead_attention"  => OpType::MULTIHEAD_ATTENTION,
-            "getitem"  => OpType::GETITEM,
-            "getattr"  => OpType::GETATTR,
-            "expand"  => OpType::EXPAND,
-            "layer_norm"  => OpType::LAYER_NORM,
-            "floor_divide"  => OpType::FLOOR_DIVIDE,
-            "identity"  => OpType::IDENTITY,
+            "relu" => OpType::RELU,
+            "sigmoid" => OpType::SIGMOID,
+            "tanh" => OpType::TANH,
+            "elu" => OpType::ELU,
+            "dropout" => OpType::DROPOUT,
+            "batch_matmul" => OpType::BATCH_MATMUL,
+            "split" => OpType::SPLIT,
+            "reshape" => OpType::RESHAPE,
+            "transpose" => OpType::TRANSPOSE,
+            "reverse" => OpType::REVERSE,
+            "exp" => OpType::EXP,
+            "add" => OpType::ADD,
+            "subtract" => OpType::SUBTRACT,
+            "multiply" => OpType::MULTIPLY,
+            "divide" => OpType::DIVIDE,
+            "pow" => OpType::POW,
+            "mean" => OpType::MEAN,
+            "rsqrt" => OpType::RSQRT,
+            "sin" => OpType::SIN,
+            "cos" => OpType::COS,
+            "input" => OpType::INPUT,
+            "output" => OpType::OUTPUT,
+            "multihead_attention" => OpType::MULTIHEAD_ATTENTION,
+            "getitem" => OpType::GETITEM,
+            "getattr" => OpType::GETATTR,
+            "expand" => OpType::EXPAND,
+            "layer_norm" => OpType::LAYER_NORM,
+            "floor_divide" => OpType::FLOOR_DIVIDE,
+            "identity" => OpType::IDENTITY,
             "gelu" => OpType::GELU,
-            "permute"  => OpType::PERMUTE,
-            "smultiply"  => OpType::SCALAR_MULTIPLY,
-            "sfloordiv"  => OpType::SCALAR_FLOORDIV,
-            "sadd"  => OpType::SCALAR_ADD,
+            "permute" => OpType::PERMUTE,
+            "smultiply" => OpType::SCALAR_MULTIPLY,
+            "sfloordiv" => OpType::SCALAR_FLOORDIV,
+            "sadd" => OpType::SCALAR_ADD,
             "ssub" => OpType::SCALAR_SUB,
-            "struediv" =>  OpType::SCALAR_TRUEDIV,
-            "init_param" =>  OpType::INIT_PARAM,
-            "float"  => OpType::FLOAT,
-            "contigeous" =>  OpType::CONTIGUOUS,
-            "to"  => OpType::TO, 
-            "unsqueeze"  => OpType::UNSQUEEZE,
+            "struediv" => OpType::SCALAR_TRUEDIV,
+            "init_param" => OpType::INIT_PARAM,
+            "float" => OpType::FLOAT,
+            "contigeous" => OpType::CONTIGUOUS,
+            "to" => OpType::TO,
+            "unsqueeze" => OpType::UNSQUEEZE,
             "type_as" => OpType::TYPE_AS,
-            "view"  => OpType::VIEW,
-            "attribute" =>  OpType::ATTRIBUTE,
-            _ => {panic!("Not supported type!");}
+            "view" => OpType::VIEW,
+            "attribute" => OpType::ATTRIBUTE,
+            _ => {
+                panic!("Not supported type!");
+            }
         }
     }
 }
@@ -271,11 +273,11 @@ impl OpType {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, TryFromPrimitive)]
 #[repr(u32)]
 pub enum ActiMode {
-  AC_MODE_NONE = 10,
-  AC_MODE_RELU,
-  AC_MODE_SIGMOID,
-  AC_MODE_TANH,
-  AC_MODE_GELU,
+    AC_MODE_NONE = 10,
+    AC_MODE_RELU,
+    AC_MODE_SIGMOID,
+    AC_MODE_TANH,
+    AC_MODE_GELU,
 }
 
 #[pymethods]
@@ -286,31 +288,32 @@ impl ActiMode {
             ActiMode::AC_MODE_RELU => 11,
             ActiMode::AC_MODE_SIGMOID => 12,
             ActiMode::AC_MODE_TANH => 13,
-            ActiMode::AC_MODE_GELU => 14
+            ActiMode::AC_MODE_GELU => 14,
         }
     }
 
     #[staticmethod]
-    pub fn as_enum(id : i32) -> ActiMode {
+    pub fn as_enum(id: i32) -> ActiMode {
         match id {
             10 => ActiMode::AC_MODE_NONE,
             11 => ActiMode::AC_MODE_RELU,
             12 => ActiMode::AC_MODE_SIGMOID,
             13 => ActiMode::AC_MODE_TANH,
             14 => ActiMode::AC_MODE_GELU,
-            _ => {panic!("Not supported type!");}
+            _ => {
+                panic!("Not supported type!");
+            }
         }
     }
 }
-
 
 #[pyclass]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, TryFromPrimitive)]
 #[repr(u32)]
 pub enum AggrMode {
-  AGGR_MODE_NONE = 20,
-  AGGR_MODE_SUM,
-  AGGR_MODE_AVG,
+    AGGR_MODE_NONE = 20,
+    AGGR_MODE_SUM,
+    AGGR_MODE_AVG,
 }
 
 #[pymethods]
@@ -324,23 +327,24 @@ impl AggrMode {
     }
 
     #[staticmethod]
-    pub fn as_enum(id : i32) -> AggrMode {
+    pub fn as_enum(id: i32) -> AggrMode {
         match id {
             20 => AggrMode::AGGR_MODE_NONE,
             21 => AggrMode::AGGR_MODE_SUM,
             22 => AggrMode::AGGR_MODE_AVG,
-            _ => {panic!("Not supported type!");}
+            _ => {
+                panic!("Not supported type!");
+            }
         }
     }
 }
-
 
 #[pyclass]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, TryFromPrimitive)]
 #[repr(u32)]
 pub enum PoolType {
-  POOL_MAX = 30,
-  POOL_AVG,
+    POOL_MAX = 30,
+    POOL_AVG,
 }
 
 #[pymethods]
@@ -353,14 +357,15 @@ impl PoolType {
     }
 
     #[staticmethod]
-    pub fn as_enum(id : i32) -> PoolType {
+    pub fn as_enum(id: i32) -> PoolType {
         match id {
             30 => PoolType::POOL_MAX,
             31 => PoolType::POOL_AVG,
-            _ => {panic!("Not supported type!");}
+            _ => {
+                panic!("Not supported type!");
+            }
         }
     }
-
 }
 
 #[pyclass]
@@ -379,13 +384,13 @@ pub enum InitializerType {
     ZeroInit,
     NormInit,
     UniformInit,
-    GlorotUniformInit
+    GlorotUniformInit,
 }
 
 #[pyclass]
 pub struct Initializer {
     #[pyo3(get, set)]
-    init_type : InitializerType,
+    init_type: InitializerType,
     // #[pyo3(get, set)]
     // seed : u32,
     // #[pyo3(get, set)]
@@ -393,15 +398,21 @@ pub struct Initializer {
     // #[pyo3(get, set)]
     // maxv : u32,
     #[pyo3(get, set)]
-    pub params : HashMap<String, String>,
+    pub params: HashMap<String, String>,
 }
 
 #[pymethods]
 impl Initializer {
     #[new]
-    pub fn new(init_type : InitializerType, params : HashMap<String, String>) -> PyResult<PyClassInitializer<Self>> {
+    pub fn new(
+        init_type: InitializerType,
+        params: HashMap<String, String>,
+    ) -> PyResult<PyClassInitializer<Self>> {
         println!("Initializer::new");
-        let op = Initializer { init_type : init_type, params : params};
+        let op = Initializer {
+            init_type: init_type,
+            params: params,
+        };
         Ok(PyClassInitializer::from(op))
     }
 }
@@ -418,17 +429,23 @@ pub enum OptimizerType {
 #[derive(Debug, Clone)]
 pub struct Optimizer {
     #[pyo3(get, set)]
-    pub optim_type : OptimizerType,
+    pub optim_type: OptimizerType,
     #[pyo3(get, set)]
-    pub params : HashMap<String, String>,
+    pub params: HashMap<String, String>,
 }
 
 #[pymethods]
 impl Optimizer {
     #[new]
-    pub fn new(optim_type : OptimizerType, params : HashMap<String, String>) -> PyResult<PyClassInitializer<Self>> {
+    pub fn new(
+        optim_type: OptimizerType,
+        params: HashMap<String, String>,
+    ) -> PyResult<PyClassInitializer<Self>> {
         println!("Optimizer::new");
-        let op = Optimizer { optim_type : optim_type, params : params};
+        let op = Optimizer {
+            optim_type: optim_type,
+            params: params,
+        };
         Ok(PyClassInitializer::from(op))
     }
 }
@@ -437,20 +454,20 @@ impl Optimizer {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, TryFromPrimitive)]
 #[repr(u32)]
 pub enum LossType {
-  CATEGORICAL_CROSSENTROPY = 50,
-  SPARSE_CATEGORICAL_CROSSENTROPY,
-  MEAN_SQUARED_ERROR_AVG_REDUCE,
-  MEAN_SQUARED_ERROR_SUM_REDUCE,
+    CATEGORICAL_CROSSENTROPY = 50,
+    SPARSE_CATEGORICAL_CROSSENTROPY,
+    MEAN_SQUARED_ERROR_AVG_REDUCE,
+    MEAN_SQUARED_ERROR_SUM_REDUCE,
 }
 
 #[pyclass]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, TryFromPrimitive)]
 #[repr(u32)]
 pub enum MetricsType {
-  ACCURACY = 1001,
-  CATEGORICAL_CROSSENTROPY,
-  SPARSE_CATEGORICAL_CROSSENTROPY,
-  MEAN_SQUARED_ERROR,
-  ROOT_MEAN_SQUARED_ERROR,
-  MEAN_ABSOLUTE_ERROR,
+    ACCURACY = 1001,
+    CATEGORICAL_CROSSENTROPY,
+    SPARSE_CATEGORICAL_CROSSENTROPY,
+    MEAN_SQUARED_ERROR,
+    ROOT_MEAN_SQUARED_ERROR,
+    MEAN_ABSOLUTE_ERROR,
 }

@@ -9,7 +9,7 @@ pub trait GraphTrait {
 }
 
 pub struct Graph {
-    pub operators : Vec<Box<Operator>>,
+    pub operators: Vec<Box<Operator>>,
 }
 
 impl GraphTrait for Graph {
@@ -18,18 +18,14 @@ impl GraphTrait for Graph {
     }
     fn forward(&self) {
         println!("Graph::forward");
-
     }
     fn backward(&self) {
-
         println!("Graph::backward");
     }
     fn update(&self) {
         println!("Graph::update");
-
     }
     fn zero_gradients(&self) {
         println!("Graph::zero_gradients");
-
     }
 }
