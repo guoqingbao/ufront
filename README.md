@@ -22,11 +22,8 @@ _(This project is under development)_
 import torch.nn as nn
 import numpy as np
 import torch
-import sys
-sys.path.append('..')
-sys.path.append('.')
-from python.torch.model import PyTorchModel #Flexflow-like PytorchModel wrapper
 
+from ufront.pytorch.model import PyTorchModel #Flexflow-like PytorchModel wrapper
 from ufront import Model, PyOperator, TensorF32, Optimizer, OptimizerType, LossType, MetricsType #Rust frontend
 
 # A sample pytorch model definition
