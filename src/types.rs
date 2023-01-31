@@ -1,11 +1,8 @@
 use half::f16;
 use num_enum::TryFromPrimitive;
 use pyo3::prelude::*;
-use pyo3::prelude::{pymodule, PyModule, PyResult};
+// use pyo3::prelude::{pymodule, PyModule, PyResult};
 use pyo3::pyclass;
-use pyo3::IntoPy;
-use pyo3::PyObject;
-use pyo3::Python;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
@@ -75,7 +72,7 @@ impl DeviceType {
             DeviceType::CPU => "cpu",
             DeviceType::GPU => "gpu",
             DeviceType::GCU => "gcu",
-            _ => panic!("Invalid device type!"),
+            // _ => panic!("Invalid device type!"),
         }
     }
 }
@@ -83,6 +80,7 @@ impl DeviceType {
 #[pyclass]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, TryFromPrimitive)]
 #[repr(u32)]
+#[allow(non_camel_case_types)]
 pub enum OpType {
     CONV2D = 2011,
     EMBEDDING,
@@ -196,7 +194,7 @@ impl OpType {
             OpType::TYPE_AS => "type_as",
             OpType::VIEW => "view",
             OpType::ATTRIBUTE => "attribute",
-            _ => panic!("Not supported operator!"),
+            // _ => panic!("Not supported operator!"),
         }
     }
 
@@ -272,6 +270,7 @@ impl OpType {
 #[pyclass]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, TryFromPrimitive)]
 #[repr(u32)]
+#[allow(non_camel_case_types)]
 pub enum ActiMode {
     AC_MODE_NONE = 10,
     AC_MODE_RELU,
@@ -310,6 +309,7 @@ impl ActiMode {
 #[pyclass]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, TryFromPrimitive)]
 #[repr(u32)]
+#[allow(non_camel_case_types)]
 pub enum AggrMode {
     AGGR_MODE_NONE = 20,
     AGGR_MODE_SUM,
@@ -342,6 +342,7 @@ impl AggrMode {
 #[pyclass]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, TryFromPrimitive)]
 #[repr(u32)]
+#[allow(non_camel_case_types)]
 pub enum PoolType {
     POOL_MAX = 30,
     POOL_AVG,
@@ -399,6 +400,7 @@ pub enum ParamSyncType {
 #[pyclass]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, TryFromPrimitive)]
 #[repr(u32)]
+#[allow(non_camel_case_types)]
 pub enum LossType {
     CATEGORICAL_CROSSENTROPY = 50,
     SPARSE_CATEGORICAL_CROSSENTROPY,
@@ -409,6 +411,7 @@ pub enum LossType {
 #[pyclass]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, TryFromPrimitive)]
 #[repr(u32)]
+#[allow(non_camel_case_types)]
 pub enum MetricsType {
     ACCURACY = 1001,
     CATEGORICAL_CROSSENTROPY,

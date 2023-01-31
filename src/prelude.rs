@@ -5,4 +5,6 @@ pub use crate::model::{FunctionTrait, Model, ModelTrait};
 pub use crate::operator::{Operator, OperatorTrait};
 pub use crate::tensor::{Tensor, TensorTrait};
 pub use crate::types::{DataType, OpType};
+pub use crate::optimizer::{Optimizer};
+pub use crate::initializer::Initializer;
 // }

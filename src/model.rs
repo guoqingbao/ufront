@@ -1,22 +1,19 @@
 use core::panic;
-use pyo3::exceptions::PyOSError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use pyo3::types::PyList;
-use pyo3::wrap_pyfunction;
+// use pyo3::types::PyList;
+// use pyo3::wrap_pyfunction;
 // use pyo3_log;
-use crate::error::RustError;
+// use crate::error::RustError;
 
 use crate::graph::Graph;
 use crate::graph::GraphTrait;
 use crate::operator::Operator;
 use crate::operator::PyOperator;
 use crate::tensor::TensorF32;
-// use crate::types::OptimizerType;
 use crate::types::{OpType};
 
 use crate::optimizer::Optimizer;
-use crate::initializer::Initializer;
 
 use std::collections::HashMap;
 use std::convert::TryFrom;

@@ -5,11 +5,10 @@ use ndarray::ArrayView;
 use ndarray::ArrayViewD;
 use numpy::ndarray::{ArrayD, Zip};
 use numpy::{IntoPyArray, PyArrayDyn, PyReadonlyArrayDyn};
-use pyo3::exceptions::PyOSError;
+// use pyo3::exceptions::PyOSError;
 use pyo3::prelude::*;
-use pyo3::prelude::{pymodule, PyModule, PyResult, Python};
 use pyo3::types::PyList;
-use pyo3::wrap_pyfunction;
+// use pyo3::wrap_pyfunction;
 
 pub trait TensorTrait {
     fn get_dims(&self) -> usize;
