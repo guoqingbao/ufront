@@ -7,15 +7,20 @@ pub mod operator;
 pub mod prelude;
 pub mod tensor;
 pub mod types;
+pub mod initializer;
+pub mod optimizer;
 // use crate::prelude::*;
 // use prelude::*;
 use model::Model;
 use operator::PyOperator;
 use tensor::TensorF32;
+use optimizer::Optimizer;
+use initializer::Initializer;
 use types::{
-    ActiMode, AggrMode, DataType, Initializer, InitializerType, LossType, MetricsType, OpType,
-    Optimizer, OptimizerType, ParamSyncType, PoolType,
+    ActiMode, AggrMode, DataType, LossType, MetricsType, OpType,
+    ParamSyncType, PoolType,
 };
+
 
 /// Formats the sum of two numbers as string.
 #[pyfunction]
@@ -35,10 +40,10 @@ fn ufront(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PoolType>()?;
     m.add_class::<DataType>()?;
     m.add_class::<Initializer>()?;
-    m.add_class::<InitializerType>()?;
+    // m.add_class::<InitializerType>()?;
     m.add_class::<ParamSyncType>()?;
     m.add_class::<Optimizer>()?;
-    m.add_class::<OptimizerType>()?;
+    // m.add_class::<OptimizerType>()?;
     m.add_class::<LossType>()?;
     m.add_class::<MetricsType>()?;
 

@@ -377,78 +377,24 @@ pub enum ParamSyncType {
     NCCL,
 }
 
-#[pyclass]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, TryFromPrimitive)]
-#[repr(u32)]
-pub enum InitializerType {
-    ZeroInit,
-    NormInit,
-    UniformInit,
-    GlorotUniformInit,
-}
+// #[pyclass]
+// #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, TryFromPrimitive)]
+// #[repr(u32)]
+// pub enum InitializerType {
+//     ZeroInit,
+//     NormInit,
+//     UniformInit,
+//     GlorotUniformInit,
+// }
 
-#[pyclass]
-pub struct Initializer {
-    #[pyo3(get, set)]
-    init_type: InitializerType,
-    // #[pyo3(get, set)]
-    // seed : u32,
-    // #[pyo3(get, set)]
-    // minv : u32,
-    // #[pyo3(get, set)]
-    // maxv : u32,
-    #[pyo3(get, set)]
-    pub params: HashMap<String, String>,
-}
 
-#[pymethods]
-impl Initializer {
-    #[new]
-    pub fn new(
-        init_type: InitializerType,
-        params: HashMap<String, String>,
-    ) -> PyResult<PyClassInitializer<Self>> {
-        println!("Initializer::new");
-        let op = Initializer {
-            init_type: init_type,
-            params: params,
-        };
-        Ok(PyClassInitializer::from(op))
-    }
-}
-
-#[pyclass]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, TryFromPrimitive)]
-#[repr(u32)]
-pub enum OptimizerType {
-    SGD,
-    Adam,
-}
-
-#[pyclass]
-#[derive(Debug, Clone)]
-pub struct Optimizer {
-    #[pyo3(get, set)]
-    pub optim_type: OptimizerType,
-    #[pyo3(get, set)]
-    pub params: HashMap<String, String>,
-}
-
-#[pymethods]
-impl Optimizer {
-    #[new]
-    pub fn new(
-        optim_type: OptimizerType,
-        params: HashMap<String, String>,
-    ) -> PyResult<PyClassInitializer<Self>> {
-        println!("Optimizer::new");
-        let op = Optimizer {
-            optim_type: optim_type,
-            params: params,
-        };
-        Ok(PyClassInitializer::from(op))
-    }
-}
+// #[pyclass]
+// #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, TryFromPrimitive)]
+// #[repr(u32)]
+// pub enum OptimizerType {
+//     SGD,
+//     Adam,
+// }
 
 #[pyclass]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, TryFromPrimitive)]

@@ -22,7 +22,7 @@ from typing import List
 
 import numpy as np
 
-from ..ufront import (OpType, ActiMode, AggrMode, PoolType, TensorF32, DataType, ParamSyncType, Initializer, InitializerType, OptimizerType, Optimizer)
+from ..ufront import (OpType, ActiMode, AggrMode, PoolType, TensorF32, DataType, ParamSyncType, Initializer)
 
 try:
     import torch
@@ -835,7 +835,7 @@ class EmbeddingNode(ModuleNode):
         items = data.items
         num_embeddings = int(items[4])
         embedding_dim = int(items[5])
-        init = Initializer(init_type=InitializerType.NormInit, params={"seed":"42", "mean":"0", "stddev":"1"})
+        init = Initializer(params={"type":"norm", "seed":"42", "mean":"0", "stddev":"1"})
         return ffmodel.embedding(
             input=input_tensor,
             num_embeddings=num_embeddings,

@@ -6,17 +6,22 @@ use pyo3::types::PyList;
 use pyo3::wrap_pyfunction;
 // use pyo3_log;
 use crate::error::RustError;
+
 use crate::graph::Graph;
 use crate::graph::GraphTrait;
 use crate::operator::Operator;
 use crate::operator::PyOperator;
 use crate::tensor::TensorF32;
-use crate::types::OptimizerType;
-use crate::types::{OpType, Optimizer};
+// use crate::types::OptimizerType;
+use crate::types::{OpType};
+
+use crate::optimizer::Optimizer;
+use crate::initializer::Initializer;
+
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::rc::Rc;
-// use pyo3::exceptions::PyOSError;
+
 pub trait FunctionTrait {
     fn input(&self);
     fn output(&self);
@@ -100,21 +105,21 @@ impl Model {
     #[new]
     pub fn new() -> Model {
         println!("Model::new");
-        let mut params = HashMap::<String, String>::new();
-        params.insert("seed".to_string(), "42".to_string());
-        params.insert("mean".to_string(), "0".to_string());
-        params.insert("stddev".to_string(), "1".to_string());
-
+        let params = HashMap::from([("type".to_string(),"sgd".to_string()), 
+                                ("lr".to_string(),"0.01".to_string()), 
+                                ("momentum".to_string(),"0".to_string()), 
+                                ("nesterov".to_string(),"False".to_string()), 
+                                ("weight_decay".to_string(),"0".to_string())]);
         Model {
             graph: Graph { operators: vec![] },
             optimizer: Optimizer {
-                optim_type: OptimizerType::SGD,
+                // optim_type: OptimizerType::SGD,
                 params: params,
             },
         }
     }
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn compile(&mut self, kwds: Option<&PyDict>) {
         println!("Model::compile");
 
@@ -356,22 +361,22 @@ impl Model {
         }
     }
     // #[pyfunction(kwds="**")]
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn conv2d(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::CONV2D, kwds)
     }
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn batch_matmul(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::BATCH_MATMUL, kwds)
     }
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn pool2d(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::POOL2D, kwds)
     }
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn batch_norm(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::BATCH_NORM, kwds)
     }
@@ -380,12 +385,12 @@ impl Model {
         self.handle_operator(OpType::LINEAR, kwds)
     }
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn dense(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::LINEAR, kwds)
     }
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn flat(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::FLAT, kwds)
     }
@@ -398,7 +403,7 @@ impl Model {
 
     pub fn expand(&self) {}
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn softmax(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::SOFTMAX, kwds)
     }
@@ -409,121 +414,121 @@ impl Model {
 
     pub fn dropout(&self) {}
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn add(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::ADD, kwds)
     }
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn subtract(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::SUBTRACT, kwds)
     }
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn multiply(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::MULTIPLY, kwds)
     }
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn divide(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::DIVIDE, kwds)
     }
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn pow(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::POW, kwds)
     }
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn exp(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::EXP, kwds)
     }
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn sin(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::SIN, kwds)
     }
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn cos(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::COS, kwds)
     }
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn mean(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::MEAN, kwds)
     }
 
     pub fn reverse(&self) {}
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn rsqrt(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::RSQRT, kwds)
     }
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn floor_divide(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::FLOOR_DIVIDE, kwds)
     }
 
     pub fn mseloss(&self) {}
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn gelu(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::GELU, kwds)
     }
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn relu(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::RELU, kwds)
     }
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn tanh(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::TANH, kwds)
     }
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn elu(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::ELU, kwds)
     }
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn sigmoid(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::SIGMOID, kwds)
     }
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn concat(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::CONCAT, kwds)
     }
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn split(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::SPLIT, kwds)
     }
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn sadd(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::SCALAR_ADD, kwds)
     }
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn ssub(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::SCALAR_SUB, kwds)
     }
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn smultiply(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::SCALAR_MULTIPLY, kwds)
     }
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn sfloordiv(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::SCALAR_FLOORDIV, kwds)
     }
 
-    #[args(kwds = "**")]
+    #[pyo3(signature = (**kwds))]
     pub fn struediv(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::SCALAR_TRUEDIV, kwds)
     }
