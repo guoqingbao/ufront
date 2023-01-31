@@ -1,76 +1,21 @@
-# ufront
-Unified Computing Frontend for Deep Learning 
-
-_(This project is under development)_
-
-
-## Project discription
-1. The objective of this project is to create a **unified frontend** for deep learning computing.
-
-2. The frontend imports Pytorch, Keras, ONNX (and possiblely Tensorflow) models using the FlexFlow-like python scripts and then translate them into the **Unified High-level IR** based on Rust.
-
-3. The frontend was built based on **Rust** and the Rust computing interfaces were exposed to python through PyO3. 
-
-4. The computing nodes (operators) in the Pytorch, Keras, Tensorflow, and ONNX models can be mapped to Rust computing interfaces, in which the Rust frontend will maintain a high-level computation graph.
-
-5. The Rust frontend will then translate the high-level graph into IR and then lower it into TOSA dialect (a standard IR for deep learning computing).
-
-6. In addition to translating Pytorch, Keras, Tensorflow, and ONNX models into the standard computing IR (TOSA), the Rust frontend also provide standard computing workflows including operators, forward, backward, gradient update, etc. for training.
-
-## Sample usage
-``` Python
 import torch.nn as nn
 import numpy as np
 import torch
 
 from ufront.pytorch.model import PyTorchModel #Flexflow-like PytorchModel wrapper
 from ufront import Model, PyOperator, TensorF32, Optimizer, LossType, MetricsType #Rust frontend
-
-# A sample pytorch model definition
-class ComplexCNN(nn.Module):
-  def __init__(self):
-    super().__init__()
-    self.conv1 = nn.Conv2d(3, 32, 3, 1)
-    self.conv2 = nn.Conv2d(64, 64, 3, 1)
-    self.pool1 = nn.MaxPool2d(2, 2)
-    self.conv3 = nn.Conv2d(64, 64, 3, 1)
-    self.conv4 = nn.Conv2d(64, 64, 3, 1)
-    self.pool2 = nn.MaxPool2d(2, 2)
-    self.flat1 = nn.Flatten()
-    self.linear1 = nn.Linear(1600, 512)
-    self.linear2 = nn.Linear(512, 10)
-    self.relu = nn.ReLU(inplace=True)
-
-  def forward(self, input1, input2):
-    y1 = self.conv1(input1)
-    y1 = self.relu(y1)
-    y2 = self.conv1(input2)
-    y2 = self.relu(y2)
-    y = torch.cat((y1, y2), 1)
-    (y1, y2) = torch.split(y, [32, 32], dim=1) # split into [32, 32] in axis 1
-    y = torch.cat((y1, y2), 1)
-    y = self.conv2(y)
-    y = self.relu(y)
-    y = self.pool1(y)
-    y = self.conv3(y)
-    y = self.relu(y)
-    y = self.conv4(y)
-    y = self.relu(y)
-    y = self.pool2(y)
-    y = self.flat1(y)
-    y = self.linear1(y)
-    y = self.relu(y)
-    yo = self.linear2(y)
-    return (yo, y)
-
+from cnn_definition import SimpleCNN, ComplexCNN
 
 if __name__ == "__main__":
+
     torch_model = PyTorchModel(ComplexCNN()) # Intermedium torch model
     ufront_model = Model() # Ufront Rust model
 
+    
     batch_size = 32
+    
     operators = []
-    arr = np.zeros((batch_size, 3, 128, 128), dtype=np.float32)
+    arr = np.zeros((batch_size, 3, 32, 32), dtype=np.float32)
     input_tensor = TensorF32(arr) # convert to Rust f32 tensor
 
     #save model to file (compatible with flexflow)
@@ -112,4 +57,3 @@ if __name__ == "__main__":
     
     #This will be supported later
     #ufront_model.backward()
-```

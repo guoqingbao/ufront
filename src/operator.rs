@@ -6,11 +6,11 @@ use crate::types::OpType;
 use core::panic;
 use ndarray::ArrayD;
 use numpy::{IntoPyArray, PyArrayDyn, PyReadonlyArrayDyn};
-use pyo3::exceptions::PyOSError;
+// use pyo3::exceptions::PyOSError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::collections::HashMap;
-use std::os::raw::c_void;
+// use std::os::raw::c_void;
 pub trait Texualization {
     fn dump(&self) -> String;
 }
@@ -190,7 +190,7 @@ impl Operator {
                             panic!("Invalid inputs!");
                         }
                     }
-                }
+                } else {panic!("Missing important parameters!");}
             }
             OpType::POOL2D => {
                 //formula W/2, H/2
@@ -231,7 +231,8 @@ impl Operator {
             | OpType::SCALAR_FLOORDIV
             | OpType::SCALAR_MULTIPLY
             | OpType::SCALAR_SUB
-            | OpType::SCALAR_TRUEDIV => {
+            | OpType::SCALAR_TRUEDIV
+            | OpType::SOFTMAX => {
                 // let activations = vec![OpType::ELU, OpType::RELU, OpType::GELU, OpType::SIGMOID, OpType::TANH];
                 // let inplace = if self.params.contains_key("inplace") {self.params["inplace"]=="True"} else {false};
                 // if false && activations.iter().any(|&act| act==self.op_type)  {
@@ -302,44 +303,48 @@ impl Operator {
                 // h/sizes for axis 0
                 match &mut self.inputs[0].tensor {
                     Some(v) => {
-                        let sizes = if self.params.contains_key("sizes") {
-                            self.params["sizes"].trim().parse::<usize>().unwrap()
-                        } else {
-                            1
-                        };
-                        let idx = self.params["axis"].trim().parse::<usize>().unwrap();
+                        let params = self.params.clone();
+                        let idx = params["axis"].trim().parse::<usize>().unwrap();
                         assert!(idx < v.shape.len());
                         let mut output_shape = v.shape.clone();
-                        output_shape[idx] /= sizes;
-                        for _ in 0..sizes {
-                            let sz: usize = output_shape.iter().product();
-                            let tensor = Tensor::<f32> {
-                                shape: output_shape.clone(),
-                                data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
-                            };
-                            self.add_output(tensor);
-                            println!("Output tensor with shape {:?} created within Rust for operator {:?}!", output_shape, self.op_type);
-                        }
+                        if params.contains_key("sizes") {
+                            let parts = params["sizes"].replace('[', "").replace(']', "");
+                            println!("{}", parts);
+                            for part in parts.split([',']) {
+                                let size = part.trim().parse::<usize>().unwrap();
+                                output_shape[idx] = size;
+                                let sz: usize = output_shape.iter().product();
+                                let tensor = Tensor::<f32> {
+                                    shape: output_shape.clone(),
+                                    data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
+                                };
+                                self.add_output(tensor);
+                                println!("Output tensor with shape {:?} created within Rust for operator {:?}!", output_shape, self.op_type);
+                            }
+                        } else {
+                            panic!("Missing parameter 'sizes' for split!");
+                        };
                     }
                     _ => {
                         panic!("Invalid tensor for axis {} split!", self.params["axis"]);
                     }
                 }
             }
-            OpType::SOFTMAX | OpType::FLAT => {
+            OpType::FLAT => {
                 //formula
                 // output shape = batch * channel * w * h
                 match &mut self.inputs[0].tensor {
                     Some(v) => {
                         let sz: usize = v.shape.iter().product();
+                        let output_shape = vec![v.shape[0], sz/v.shape[0]];
                         let tensor = Tensor::<f32> {
-                            shape: vec![sz],
+                            shape: output_shape.clone(),
                             data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
                         };
                         self.add_output(tensor);
                         println!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
-                            vec![sz],
+                            output_shape,
                             self.op_type
                         );
                     }
@@ -348,7 +353,6 @@ impl Operator {
                     }
                 }
             }
-
             OpType::LINEAR => {
                 //formula
                 // output shape = output dim

@@ -1286,6 +1286,7 @@ class SplitNode(FunctionNode):
         super().__init__(node)
         # FIXME May be 3
         self.op_type = OpType.SPLIT
+        self.dim = node.kwargs["dim"]
         self.assert_num_args(2, Comparator.EQ)
 
     def parse(self):
@@ -1295,6 +1296,8 @@ class SplitNode(FunctionNode):
         s.append(self.parse_inoutnodes(self.outnodes))
         s.append(self.op_type.as_str())
         s.append(str(self.innodes[1]))
+        s.append(str(self.dim))
+
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
@@ -1302,16 +1305,17 @@ class SplitNode(FunctionNode):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
-        size = len(data.outnodes)
-        axis = int(data.items[4])
+        # sizes = len(data.outnodes)
+        sizes = data.items[4]
+        axis = int(data.items[5])
         return ffmodel.split(
-            input=input_tensor, sizes=size, axis=axis, name=name,
+            input=input_tensor, sizes=sizes, axis=axis, name=name,
         )
 
     def to_ff(self, ffmodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        sizes = len(self.outnodes)
-        axis = self.innodes[1]
+        sizes = self.innodes[1] #len(self.outnodes)
+        axis = self.dim
         assert type(axis) is int
         return ffmodel.split(
             input=input_tensor, sizes=sizes, axis=axis, name=self.name,
@@ -2417,7 +2421,8 @@ class PyTorchModel():
             elif fx_node.op == "placeholder":
                 node = InputNode(fx_node)
             elif fx_node.op == "get_attr":
-                node = AttributeNode(fx_node, self.model)
+                # node = AttributeNode(fx_node, self.model) # not supported yet!
+                continue
             elif fx_node.op == "call_function" or fx_node.op == "call_method":
                 node = FunctionNode.construct_node(fx_node)
             elif fx_node.op == "output":
@@ -2454,7 +2459,7 @@ class PyTorchModel():
         #     i += 1
         # return layer_norm_graph
 
-    def torch_to_ff(self, ffmodel, input_tensors, verbose=False):
+    def apply(self, ffmodel, input_tensors, verbose=False):
         """
         Traces the PyTorch model wrapped by this ``PyTorchModel`` instance,
         and adds operators to ``ffmodel`` coresponding to the computational

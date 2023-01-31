@@ -1,69 +1,32 @@
-import torch.nn as nn
-import numpy as np
-import torch
-
-from ufront.pytorch.model import PyTorchModel #Flexflow-like PytorchModel wrapper
+from ufront.onnx.model import ONNXModel, ONNXModelKeras
 from ufront import Model, PyOperator, TensorF32, Optimizer, LossType, MetricsType #Rust frontend
 
-# A sample pytorch model definition
-class CNN(nn.Module):
-  def __init__(self):
-    super().__init__()
-    self.conv1 = nn.Conv2d(3, 32, 3, 1)
-    self.conv2 = nn.Conv2d(32, 32, 3, 1)
-    self.pool1 = nn.MaxPool2d(2, 2)
-    self.conv3 = nn.Conv2d(32, 64, 3, 1)
-    self.conv4 = nn.Conv2d(64, 64, 3, 1)
-    self.pool2 = nn.MaxPool2d(2, 2)
-    self.flat1 = nn.Flatten()
-    self.linear1 = nn.Linear(512, 512)
-    self.linear2 = nn.Linear(512, 10)
-    self.relu = nn.ReLU(inplace=True)
-
-  def forward(self, input1, input2):
-    y1 = self.conv1(input1)
-    y1 = self.relu(y1)
-    y2 = self.conv1(input2)
-    y2 = self.relu(y2)
-    y = torch.cat((y1, y2), 1)
-    (y1, y2) = torch.split(y, 1) 
-    y = torch.cat((y1, y2), 1)
-    y = self.conv2(y)
-    y = self.relu(y)
-    y = self.pool1(y)
-    y = self.conv3(y)
-    y = self.relu(y)
-    y = self.conv4(y)
-    y = self.relu(y)
-    y = self.pool2(y)
-    y = self.flat1(y)
-    y = self.linear1(y)
-    y = self.relu(y)
-    yo = self.linear2(y)
-    return (yo, y)
-
+import argparse
+import numpy as np
+import onnx
+import torch
+import torch.nn as nn
+from torch.onnx import TrainingMode
+from cnn_definition import SimpleCNN, ComplexCNN
 
 if __name__ == "__main__":
-
-    torch_model = PyTorchModel(CNN()) # Intermedium torch model
-    ufront_model = Model() # Ufront Rust model
-
-    
     batch_size = 32
     
     operators = []
     arr = np.zeros((batch_size, 3, 32, 32), dtype=np.float32)
     input_tensor = TensorF32(arr) # convert to Rust f32 tensor
 
-    #save model to file (compatible with flexflow)
-    # output_tensors, operators = torch_model.torch_to_ff(ufront_model, [input_tensor, input_tensor])
+    torch.onnx.export(model=ComplexCNN(), args=(torch.from_numpy(arr), torch.from_numpy(arr)), f="cifar10_cnn_pt.onnx", export_params=False, training=TrainingMode.TRAINING)
+    
+    onnx_model = onnx.load("cifar10_cnn_pt.onnx")
 
-    #load model from file (compatible with flexflow)
-    # output_tensors, operators = PyTorchModel.file_to_ff('cnn.ff', ufront_model, [input_tensor, input_tensor])
+    dims_input = [batch_size, 3, 32, 32]
+    ufront_model = Model() # Ufront Rust model
+    onnx_model = ONNXModel("cifar10_cnn_pt.onnx")
 
     #torch model to ufront model, this will trigger Rust frontend for building computation graph
     #operators can also be managed by python side (each operator here corresponding to an operator in the Rust computation graph)
-    output_tensors, operators = torch_model.torch_to_ff(ufront_model, [input_tensor, input_tensor])
+    output_tensors, operators = onnx_model.apply(ufront_model, input_tensors=[input_tensor, input_tensor])
 
     softmax_op = ufront_model.softmax(input=output_tensors[0], name="softmax")
     operators.append(softmax_op)
@@ -80,7 +43,7 @@ if __name__ == "__main__":
     print("\r\nTotal memory cached for operators {:.2f}MB".format(total_memory/1024/1024))
 
     #The output of the model (forward pass have not been triggered at the moment!)
-    output = softmax_op.get_output(0)
+    output = output_tensors[0]
     print(output.shape)
     
     #optimizer
@@ -94,3 +57,6 @@ if __name__ == "__main__":
     
     #This will be supported later
     #ufront_model.backward()
+
+
+    
