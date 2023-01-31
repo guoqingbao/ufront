@@ -24,7 +24,7 @@ import numpy as np
 import torch
 
 from ufront.pytorch.model import PyTorchModel #Flexflow-like PytorchModel wrapper
-from ufront import Model, PyOperator, TensorF32, Optimizer, OptimizerType, LossType, MetricsType #Rust frontend
+from ufront import Model, PyOperator, TensorF32, Optimizer, LossType, MetricsType #Rust frontend
 
 # A sample pytorch model definition
 class CNN(nn.Module):
@@ -105,8 +105,7 @@ if __name__ == "__main__":
     print(output.shape)
     
     #optimizer
-    optim = Optimizer(optim_type=OptimizerType.SGD, params={"lr":"0.01", "momentum":"0", "nesterov":"False", "weight_decay":"0"})
-    ufront_model.optimizer = optim
+    ufront_model.optimizer = Optimizer(params={"type":"sgd", "lr":"0.01", "momentum":"0", "nesterov":"False", "weight_decay":"0"})
     
     #This will trigger model compilation, i.e., convert Rust computation graph to a unified high-level IR and lower it to TOSA IR
     ufront_model.compile(loss_type=LossType.SPARSE_CATEGORICAL_CROSSENTROPY, metrics=[MetricsType.ACCURACY, MetricsType.SPARSE_CATEGORICAL_CROSSENTROPY])
