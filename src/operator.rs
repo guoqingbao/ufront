@@ -337,7 +337,7 @@ impl Operator {
             }
             OpType::FLAT => {
                 //formula
-                // output shape = batch * channel * w * h
+                // output shape = [batch, channel * w * h]
                 match &mut self.inputs[0].tensor {
                     Some(v) => {
                         let sz: usize = v.shape.iter().product();
@@ -360,18 +360,31 @@ impl Operator {
             }
             OpType::LINEAR => {
                 //formula
-                // output shape = output dim
+                // output shape = [batch, output dim]
+                if !self.params.contains_key("out_dim") {
+                    panic!("Missing important parameters!");
+                }
+                
                 let output_dim = self.params["out_dim"].trim().parse::<usize>().unwrap();
-                let tensor = Tensor::<f32> {
-                    shape: vec![output_dim],
-                    data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; output_dim]),
-                };
-                self.add_output(tensor);
-                println!(
-                    "Output tensor with shape {:?} created within Rust for operator {:?}!",
-                    vec![output_dim],
-                    self.op_type
-                );
+                match &mut self.inputs[0].tensor {
+                    Some(v) => {
+                        let output_shape = vec![v.shape[0], output_dim];
+                        let tensor = Tensor::<f32> {
+                            shape: output_shape.clone(),
+                            data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; v.shape[0] * output_dim]),
+                        };
+                        self.add_output(tensor);
+                        println!(
+                            "Output tensor with shape {:?} created within Rust for operator {:?}!",
+                            output_shape,
+                            self.op_type
+                        );
+                    }
+                    _ => {
+                        panic!("Invalid tensor for flat!");
+                    }
+                }
+                
             }
             _ => {
                 panic!("Not implemented!");

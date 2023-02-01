@@ -125,28 +125,28 @@ if __name__ == "__main__":
 ## IR Dump Results (for Pytorch)
 ### (Converted from Pytorch model to High-level IR after calling dump_ir(), i.e., TOSA-like dialect IR)
 ``` Python
-func.func @forward(%input1: tensor<32x3x32x32>, %input2: tensor<32x3x32x32>) -> tensor<10>  { 
-        %conv1="ufront.conv2d"(%input1){"stride": "[1, 1]", "kernel_size": "[3, 3]", "groups": "1", "padding": "[0, 0]", "out_channels": "32"}:(tensor<32x3x32x32>) -> tensor<32x32x30x30>
+func.func @forward(%input1: tensor<32x3x32x32>, %input2: tensor<32x3x32x32>) -> tensor<32x10>  { 
+        %conv1="ufront.conv2d"(%input1){"groups": "1", "padding": "[0, 0]", "out_channels": "32", "kernel_size": "[3, 3]", "stride": "[1, 1]"}:(tensor<32x3x32x32>) -> tensor<32x32x30x30>
         %relu_1="ufront.relu"(%conv1):(tensor<32x32x30x30>) -> tensor<32x32x30x30>
-        %conv1_1="ufront.conv2d"(%input2){"padding": "[0, 0]", "stride": "[1, 1]", "groups": "1", "out_channels": "32", "kernel_size": "[3, 3]"}:(tensor<32x3x32x32>) -> tensor<32x32x30x30>
+        %conv1_1="ufront.conv2d"(%input2){"groups": "1", "stride": "[1, 1]", "padding": "[0, 0]", "out_channels": "32", "kernel_size": "[3, 3]"}:(tensor<32x3x32x32>) -> tensor<32x32x30x30>
         %relu_2="ufront.relu"(%conv1_1):(tensor<32x32x30x30>) -> tensor<32x32x30x30>
         %cat_1="ufront.concat"(%relu_1, %relu_2){"axis": "1"}:(tensor<32x32x30x30>, tensor<32x32x30x30>) -> tensor<32x64x30x30>
         %split_1, %split_1_1="ufront.split"(%cat_1){"axis": "1", "sizes": "[32, 32]"}:(tensor<32x64x30x30>) -> tensor<32x32x30x30>, tensor<32x32x30x30>
         %cat_2="ufront.concat"(%split_1, %split_1_1){"axis": "1"}:(tensor<32x32x30x30>, tensor<32x32x30x30>) -> tensor<32x64x30x30>
-        %conv2="ufront.conv2d"(%cat_2){"kernel_size": "[3, 3]", "padding": "[0, 0]", "stride": "[1, 1]", "groups": "1", "out_channels": "64"}:(tensor<32x64x30x30>) -> tensor<32x64x28x28>
+        %conv2="ufront.conv2d"(%cat_2){"kernel_size": "[3, 3]", "stride": "[1, 1]", "out_channels": "64", "padding": "[0, 0]", "groups": "1"}:(tensor<32x64x30x30>) -> tensor<32x64x28x28>
         %relu_3="ufront.relu"(%conv2):(tensor<32x64x28x28>) -> tensor<32x64x28x28>
-        %pool1="ufront.pool2d"(%relu_3){"stride": "[2, 2]", "padding": "[0, 0]", "pool_type": "PoolType.POOL_MAX", "kernel_size": "[2, 2]"}:(tensor<32x64x28x28>) -> tensor<32x64x14x14>
-        %conv3="ufront.conv2d"(%pool1){"out_channels": "64", "kernel_size": "[3, 3]", "stride": "[1, 1]", "padding": "[0, 0]", "groups": "1"}:(tensor<32x64x14x14>) -> tensor<32x64x12x12>
+        %pool1="ufront.pool2d"(%relu_3){"pool_type": "PoolType.POOL_MAX", "stride": "[2, 2]", "padding": "[0, 0]", "kernel_size": "[2, 2]"}:(tensor<32x64x28x28>) -> tensor<32x64x14x14>
+        %conv3="ufront.conv2d"(%pool1){"out_channels": "64", "groups": "1", "stride": "[1, 1]", "kernel_size": "[3, 3]", "padding": "[0, 0]"}:(tensor<32x64x14x14>) -> tensor<32x64x12x12>
         %relu_4="ufront.relu"(%conv3):(tensor<32x64x12x12>) -> tensor<32x64x12x12>
-        %conv4="ufront.conv2d"(%relu_4){"groups": "1", "stride": "[1, 1]", "padding": "[0, 0]", "kernel_size": "[3, 3]", "out_channels": "64"}:(tensor<32x64x12x12>) -> tensor<32x64x10x10>
+        %conv4="ufront.conv2d"(%relu_4){"padding": "[0, 0]", "groups": "1", "stride": "[1, 1]", "kernel_size": "[3, 3]", "out_channels": "64"}:(tensor<32x64x12x12>) -> tensor<32x64x10x10>
         %relu_5="ufront.relu"(%conv4):(tensor<32x64x10x10>) -> tensor<32x64x10x10>
-        %pool2="ufront.pool2d"(%relu_5){"padding": "[0, 0]", "pool_type": "PoolType.POOL_MAX", "kernel_size": "[2, 2]", "stride": "[2, 2]"}:(tensor<32x64x10x10>) -> tensor<32x64x5x5>
+        %pool2="ufront.pool2d"(%relu_5){"pool_type": "PoolType.POOL_MAX", "stride": "[2, 2]", "padding": "[0, 0]", "kernel_size": "[2, 2]"}:(tensor<32x64x10x10>) -> tensor<32x64x5x5>
         %flat1="ufront.flat"(%pool2):(tensor<32x64x5x5>) -> tensor<32x1600>
-        %linear1="ufront.linear"(%flat1):(tensor<32x1600>) -> tensor<512>
-        %relu_6="ufront.relu"(%linear1):(tensor<512>) -> tensor<512>
-        %linear2="ufront.linear"(%relu_6):(tensor<512>) -> tensor<10>
-        %softmax="ufront.softmax"(%linear2):(tensor<10>) -> tensor<10>
-        return %softmax: tensor<10>
+        %linear1="ufront.linear"(%flat1):(tensor<32x1600>) -> tensor<32x512>
+        %relu_6="ufront.relu"(%linear1):(tensor<32x512>) -> tensor<32x512>
+        %linear2="ufront.linear"(%relu_6):(tensor<32x512>) -> tensor<32x10>
+        %softmax="ufront.softmax"(%linear2):(tensor<32x10>) -> tensor<32x10>
+        return %softmax: tensor<32x10>
 }
 ```
 
@@ -224,27 +224,27 @@ if __name__ == "__main__":
 ## IR Dump Results (for ONNX)
 ### (Converted from ONNX model to High-level IR after calling dump_ir(), i.e., TOSA-like dialect IR)
 ``` Python
-func.func @forward(%input1: tensor<32x3x32x32>, %input2: tensor<32x3x32x32>) -> tensor<10>  { 
-        %Conv_0="ufront.conv2d"(%input1){"kernel_size": "[3, 3]", "stride": "[1, 1]", "padding": "[0, 0]", "out_channels": "32", "groups": "1"}:(tensor<32x3x32x32>) -> tensor<32x32x30x30>
+func.func @forward(%input2: tensor<32x3x32x32>, %input1: tensor<32x3x32x32>) -> tensor<32x10>  { 
+        %Conv_0="ufront.conv2d"(%input1){"out_channels": "32", "stride": "[1, 1]", "kernel_size": "[3, 3]", "groups": "1", "padding": "[0, 0]"}:(tensor<32x3x32x32>) -> tensor<32x32x30x30>
         %Relu_1="ufront.relu"(%Conv_0):(tensor<32x32x30x30>) -> tensor<32x32x30x30>
-        %Conv_2="ufront.conv2d"(%input2){"stride": "[1, 1]", "groups": "1", "padding": "[0, 0]", "out_channels": "32", "kernel_size": "[3, 3]"}:(tensor<32x3x32x32>) -> tensor<32x32x30x30>
+        %Conv_2="ufront.conv2d"(%input2){"stride": "[1, 1]", "out_channels": "32", "groups": "1", "kernel_size": "[3, 3]", "padding": "[0, 0]"}:(tensor<32x3x32x32>) -> tensor<32x32x30x30>
         %Relu_3="ufront.relu"(%Conv_2):(tensor<32x32x30x30>) -> tensor<32x32x30x30>
         %Concat_4="ufront.concat"(%Relu_1, %Relu_3){"axis": "1"}:(tensor<32x32x30x30>, tensor<32x32x30x30>) -> tensor<32x64x30x30>
-        %Split_5, %Split_5_1="ufront.split"(%Concat_4){"axis": "1", "sizes": "[32, 32]"}:(tensor<32x64x30x30>) -> tensor<32x32x30x30>, tensor<32x32x30x30>
+        %Split_5, %Split_5_1="ufront.split"(%Concat_4){"sizes": "[32, 32]", "axis": "1"}:(tensor<32x64x30x30>) -> tensor<32x32x30x30>, tensor<32x32x30x30>
         %Concat_6="ufront.concat"(%Split_5, %Split_5_1){"axis": "1"}:(tensor<32x32x30x30>, tensor<32x32x30x30>) -> tensor<32x64x30x30>
-        %Conv_7="ufront.conv2d"(%Concat_6){"groups": "1", "out_channels": "64", "stride": "[1, 1]", "kernel_size": "[3, 3]", "padding": "[0, 0]"}:(tensor<32x64x30x30>) -> tensor<32x64x28x28>
+        %Conv_7="ufront.conv2d"(%Concat_6){"out_channels": "64", "kernel_size": "[3, 3]", "stride": "[1, 1]", "groups": "1", "padding": "[0, 0]"}:(tensor<32x64x30x30>) -> tensor<32x64x28x28>
         %Relu_8="ufront.relu"(%Conv_7):(tensor<32x64x28x28>) -> tensor<32x64x28x28>
-        %MaxPool_9="ufront.pool2d"(%Relu_8){"stride": "[2, 2]", "kernel_size": "[2, 2]", "padding": "[0, 0]"}:(tensor<32x64x28x28>) -> tensor<32x64x14x14>
-        %Conv_10="ufront.conv2d"(%MaxPool_9){"kernel_size": "[3, 3]", "padding": "[0, 0]", "stride": "[1, 1]", "groups": "1", "out_channels": "64"}:(tensor<32x64x14x14>) -> tensor<32x64x12x12>
+        %MaxPool_9="ufront.pool2d"(%Relu_8){"padding": "[0, 0]", "kernel_size": "[2, 2]", "stride": "[2, 2]"}:(tensor<32x64x28x28>) -> tensor<32x64x14x14>
+        %Conv_10="ufront.conv2d"(%MaxPool_9){"stride": "[1, 1]", "groups": "1", "out_channels": "64", "padding": "[0, 0]", "kernel_size": "[3, 3]"}:(tensor<32x64x14x14>) -> tensor<32x64x12x12>
         %Relu_11="ufront.relu"(%Conv_10):(tensor<32x64x12x12>) -> tensor<32x64x12x12>
-        %Conv_12="ufront.conv2d"(%Relu_11){"kernel_size": "[3, 3]", "out_channels": "64", "groups": "1", "padding": "[0, 0]", "stride": "[1, 1]"}:(tensor<32x64x12x12>) -> tensor<32x64x10x10>
+        %Conv_12="ufront.conv2d"(%Relu_11){"stride": "[1, 1]", "out_channels": "64", "padding": "[0, 0]", "kernel_size": "[3, 3]", "groups": "1"}:(tensor<32x64x12x12>) -> tensor<32x64x10x10>
         %Relu_13="ufront.relu"(%Conv_12):(tensor<32x64x10x10>) -> tensor<32x64x10x10>
         %MaxPool_14="ufront.pool2d"(%Relu_13){"kernel_size": "[2, 2]", "stride": "[2, 2]", "padding": "[0, 0]"}:(tensor<32x64x10x10>) -> tensor<32x64x5x5>
         %Flatten_15="ufront.flat"(%MaxPool_14):(tensor<32x64x5x5>) -> tensor<32x1600>
-        %Dense_1="ufront.linear"(%Flatten_15):(tensor<32x1600>) -> tensor<512>
-        %Relu_17="ufront.relu"(%Dense_1):(tensor<512>) -> tensor<512>
-        %Dense_2="ufront.linear"(%Relu_17):(tensor<512>) -> tensor<10>
-        %softmax="ufront.softmax"(%Dense_2):(tensor<10>) -> tensor<10>
-        return %softmax: tensor<10>
+        %Dense_1="ufront.linear"(%Flatten_15):(tensor<32x1600>) -> tensor<32x512>
+        %Relu_17="ufront.relu"(%Dense_1):(tensor<32x512>) -> tensor<32x512>
+        %Dense_2="ufront.linear"(%Relu_17):(tensor<32x512>) -> tensor<32x10>
+        %softmax="ufront.softmax"(%Dense_2):(tensor<32x10>) -> tensor<32x10>
+        return %softmax: tensor<32x10>
 }
 ```
