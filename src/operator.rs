@@ -364,7 +364,7 @@ impl Operator {
                 if !self.params.contains_key("out_dim") {
                     panic!("Missing important parameters!");
                 }
-                
+
                 let output_dim = self.params["out_dim"].trim().parse::<usize>().unwrap();
                 match &mut self.inputs[0].tensor {
                     Some(v) => {
@@ -421,7 +421,7 @@ impl Operator {
         let name = self.op_type.as_str();
         let mut params = self.params.clone();
         if params.contains_key("kernel_w") && params.contains_key("kernel_h") {
-            params.insert("kernel_size".to_string(), format!("[{}, {}]", params["kernel_w"], params["kernel_h"]));
+            params.insert("kernel".to_string(), format!("[{}, {}]", params["kernel_w"], params["kernel_h"]));
             params.remove("kernel_w");
             params.remove("kernel_h");
         }
@@ -440,6 +440,7 @@ impl Operator {
         params.remove("name");
         params.remove("tensors");
         params.remove("out_dim");
+        params.remove("out_channels");
 
         params.remove("activation"); //fused activation not supported at the moment
         params.remove("inplace"); //inplace not supported at the moment

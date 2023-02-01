@@ -109,8 +109,8 @@ impl TensorF32 {
     pub fn get_ir(&self) -> String {
         match &self.tensor {
             Some(v) => {
-                let joined: Vec<String> = v.shape.iter().map( |&dim| dim.to_string()).collect();
-
+                let mut joined: Vec<String> = v.shape.iter().map( |&dim| dim.to_string()).collect();
+                joined.extend(["f32".to_string()]);
                 format!("tensor<{}>",joined.join("x"))
             }
             _ => panic!("Not initialized tensor!"),
