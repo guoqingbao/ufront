@@ -95,6 +95,8 @@ pub struct Model {
     pub graph: Graph,
     #[pyo3(get, set)]
     pub optimizer: Optimizer,
+    args : HashMap<String, String>,
+    argshapes: HashMap<String, String>,
 }
 
 #[pymethods]
@@ -113,6 +115,8 @@ impl Model {
                 // optim_type: OptimizerType::SGD,
                 params: params,
             },
+            args: HashMap::new(),
+            argshapes: HashMap::new(),
         }
     }
 
@@ -229,6 +233,54 @@ impl Model {
         self.graph.operators.len()
     }
 
+    pub fn dump_ir(&self) -> String {
+        let mut argstr = "".to_string();
+        for arg in self.argshapes.keys() {
+            argstr += "%";
+            argstr += arg;
+            argstr += ": ";
+            argstr += self.argshapes[arg].as_str();
+            argstr += ", ";
+        }
+        
+        argstr = argstr.trim().to_string();
+        if &argstr[argstr.len()-1..] == "," {argstr.pop();}
+
+        let mut output_shapes = "".to_string();
+        let mut last_outname = "".to_string();
+
+        match &self.graph.operators.last() {
+            Some(op) => {
+                for output in &op.outputs {        
+                    output_shapes += output.get_ir().as_str();
+                    output_shapes += ", ";
+
+                    last_outname += "%";
+                    last_outname += output.name.as_str();
+                    last_outname += ", ";
+                }
+            }
+            _ => {}
+        }
+        output_shapes = output_shapes.trim().to_string();
+        if &output_shapes[output_shapes.len()-1..] == "," {output_shapes.pop();}
+
+        last_outname = last_outname.trim().to_string();
+        if &last_outname[last_outname.len()-1..] == "," {last_outname.pop();}
+
+        let header = format!{"func.func @forward({}) -> {} ", argstr, output_shapes};
+
+        // println!("{:?}", self.args);
+        let mut op_ir = "".to_string();
+        for op in &self.graph.operators {
+            op_ir += "\t";
+            op_ir += op.get_ir().as_str();
+            op_ir += "\n";
+        }
+
+        format!("{} {{ \n{}\treturn {}: {}\n}}", header, op_ir, last_outname, output_shapes)
+
+    }
     // pub fn num_of_op_inputs(&self, id : usize) -> usize {
     //     for i in 0..self.graph.operators.len() {
     //         if self.graph.operators[i].id == id {
@@ -279,13 +331,15 @@ impl Model {
             params: HashMap::<String, String>::new(),
             raw_ptr: 0,
         };
-
+        let mut argstr = "".to_string();
         match args {
             Some(para) => {
                 for key in para.keys() {
                     if key.to_string() != "input" {
                         op.params
                             .insert(key.to_string(), para.get_item(key).unwrap().to_string());
+                    } else {
+                        argstr = para.get_item(key).unwrap().to_string();
                     }
                 }
 
@@ -295,11 +349,17 @@ impl Model {
                     if key.to_string() == "input" {
                         let ret = para.get_item(key).unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
                         match ret {
-                            Ok(v) => match op.add_input(&v) {
-                                Ok(_) => {
-                                    op.calculate_output();
+                            Ok(v) => {
+                                    if v.name.find("input") == Some(0) {
+                                        self.args.insert(v.name.clone(), argstr.clone());
+                                        self.argshapes.insert(v.name.clone(), v.get_ir());
+                                    }
+                                    match op.add_input(&v) {
+                                    Ok(_) => {
+                                        op.calculate_output();
+                                    }
+                                    _ => {}
                                 }
-                                _ => {}
                             },
                             _ => {
                                 panic! {"Not a valid input type!"};
@@ -342,7 +402,9 @@ impl Model {
         // return &op;
     }
     // impl FunctionTrait for Model {
-    pub fn input(&self) {}
+    pub fn input(&mut self){
+                
+    }
     pub fn output(&self) {}
 
     fn handle_operator(&mut self, op_type: OpType, kwds: Option<&PyDict>) -> Py<PyOperator> {

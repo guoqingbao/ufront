@@ -37,7 +37,7 @@ fn main() {
     Python::with_gil(|py| {
         let arr = array![[1.0f32, 2.0], [3.0, 4.0]].to_pyarray(py);
         // vec![1.0f32, 2.0, 3.0].into_pyarray(py)
-        operator.add_input_ndarray(arr.to_dyn().readonly());
+        operator.add_input_ndarray(arr.to_dyn().readonly(), "input".to_string());
     });
 
     println!("{}", operator.raw_ptr);
