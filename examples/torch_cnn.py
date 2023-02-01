@@ -16,7 +16,8 @@ if __name__ == "__main__":
     
     operators = []
     arr = np.zeros((batch_size, 3, 32, 32), dtype=np.float32)
-    input_tensor = TensorF32(arr) # convert to Rust f32 tensor
+    input_tensor1 = TensorF32(arr, "input1") # convert to Rust f32 tensor
+    input_tensor2 = TensorF32(arr, "input2") # convert to Rust f32 tensor
 
     #save model to file (compatible with flexflow)
     # torch_model.torch_to_file('cnn.ff')
@@ -26,7 +27,7 @@ if __name__ == "__main__":
 
     #torch model to ufront model, this will trigger Rust frontend for building computation graph
     #operators can also be managed by python side (each operator here corresponding to an operator in the Rust computation graph)
-    output_tensors, operators = torch_model.apply(ufront_model, [input_tensor, input_tensor])
+    output_tensors, operators = torch_model.apply(ufront_model, [input_tensor1, input_tensor2])
 
     softmax_op = ufront_model.softmax(input=output_tensors[0], name="softmax")
     operators.append(softmax_op)
@@ -52,8 +53,16 @@ if __name__ == "__main__":
     #This will trigger model compilation, i.e., convert Rust computation graph to a unified high-level IR and lower it to TOSA IR
     ufront_model.compile(loss_type=LossType.SPARSE_CATEGORICAL_CROSSENTROPY, metrics=[MetricsType.ACCURACY, MetricsType.SPARSE_CATEGORICAL_CROSSENTROPY])
     
+    print("\r\n\r\n")
+
+    # for operator in operators:
+    #   print(operator.ir) #show ir for each operator
+
+    print(ufront_model.dump_ir())
+
     #This will be supported later
     #ufront_model.forward()
     
     #This will be supported later
     #ufront_model.backward()
+    

@@ -134,12 +134,17 @@ impl Operator {
         // return Err(PyOSError::new_err("Failed to obtain tensor!".to_string()))
     }
 
-    pub fn add_input(&mut self, x: Tensor<f32>) {
-        self.inputs.push(TensorF32 { tensor: Some(x) });
+    pub fn add_input(&mut self, x: Tensor<f32>, name: String) {
+        self.inputs.push(TensorF32 { tensor: Some(x), name: name });
     }
 
     pub fn add_output(&mut self, x: Tensor<f32>) {
-        self.outputs.push(TensorF32 { tensor: Some(x) });
+        if self.outputs.len() > 0 {
+            let name = format!("{}_{}", self.params["name"].to_string(), self.outputs.len());
+            self.outputs.push(TensorF32 { tensor: Some(x), name: name });
+        }else {
+            self.outputs.push(TensorF32 { tensor: Some(x), name: self.params["name"].to_string() });
+        }
     }
 
     pub fn calculate_output(&mut self) {
@@ -397,6 +402,81 @@ impl Operator {
 
         memory_size * 4 //float32
     }
+
+    
+    pub fn get_ir(&self) -> String {
+        let name = self.op_type.as_str();
+        let mut params = self.params.clone();
+        if params.contains_key("kernel_w") && params.contains_key("kernel_h") {
+            params.insert("kernel_size".to_string(), format!("[{}, {}]", params["kernel_w"], params["kernel_h"]));
+            params.remove("kernel_w");
+            params.remove("kernel_h");
+        }
+
+        if params.contains_key("stride_w") && params.contains_key("stride_h") {
+            params.insert("stride".to_string(), format!("[{}, {}]", params["stride_w"], params["stride_h"]));
+            params.remove("stride_w");
+            params.remove("stride_h");
+        }
+
+        if params.contains_key("padding_w") && params.contains_key("padding_h") {
+            params.insert("padding".to_string(), format!("[{}, {}]", params["padding_w"], params["padding_h"]));
+            params.remove("padding_w");
+            params.remove("padding_h");
+        }
+        params.remove("name");
+        params.remove("tensors");
+        params.remove("out_dim");
+
+        params.remove("activation"); //fused activation not supported at the moment
+        params.remove("inplace"); //inplace not supported at the moment
+        params.remove("use_bias");//bias supported at the moment
+
+        let mut input_names = "".to_string();
+        let mut input_shapes = "".to_string();
+
+        for input in &self.inputs {
+            input_names += "%";
+            input_names += input.name.as_str();
+            input_names += ", ";
+
+            input_shapes += input.get_ir().as_str();
+            input_shapes += ", ";
+        }
+
+        input_names = input_names.trim().to_string();
+        if &input_names[input_names.len()-1..] == "," {input_names.pop();}
+
+        input_shapes = input_shapes.trim().to_string();
+        if &input_shapes[input_shapes.len()-1..] == "," {input_shapes.pop();}
+
+        let mut output_names = "".to_string();
+        let mut output_shapes = "".to_string();
+
+        for output in &self.outputs {
+            output_names += "%";
+            output_names += output.name.as_str();
+            output_names += ", ";
+
+            output_shapes += output.get_ir().as_str();
+            output_shapes += ", ";
+        }
+        
+        output_names = output_names.trim().to_string();
+        if &output_names[output_names.len()-1..] == "," {output_names.pop();}
+
+        output_shapes = output_shapes.trim().to_string();
+        if &output_shapes[output_shapes.len()-1..] == "," {output_shapes.pop();}
+
+        if params.is_empty() {
+            let ir = format!("{}=\"ufront.{}\"({}):({}) -> {}", output_names, name, input_names, input_shapes, output_shapes);
+            return ir;
+        }
+        else {
+            let ir = format!("{}=\"ufront.{}\"({}){:?}:({}) -> {}", output_names, name, input_names, params, input_shapes, output_shapes);
+            return ir;
+        }
+    }
 }
 
 #[pyclass]
@@ -494,7 +574,7 @@ impl PyOperator {
         }
     }
 
-    pub fn add_input_ndarray(&mut self, x: PyReadonlyArrayDyn<f32>) {
+    pub fn add_input_ndarray(&mut self, x: PyReadonlyArrayDyn<f32>, name: String) {
         let x = x.as_array();
         match x.as_slice() {
             Some(v) => {
@@ -506,7 +586,7 @@ impl PyOperator {
                 if self.raw_ptr > 0 {
                     unsafe {
                         let operator = std::mem::transmute::<u64, *mut Operator>(self.raw_ptr);
-                        (*operator).add_input(tensor);
+                        (*operator).add_input(tensor, name);
                     }
                 } else {
                     println!("Input not added to the graph!");
@@ -532,7 +612,7 @@ impl PyOperator {
                             shape: v.shape.to_vec(),
                             data_buffer: v.data_buffer.clone(),
                         };
-                        (*operator).add_input(tensor);
+                        (*operator).add_input(tensor, x.name.clone());
                         Ok(())
                     }
                     _ => {
@@ -577,7 +657,7 @@ impl PyOperator {
             let operator = self.raw_ptr as *const Operator;
             unsafe {
                 match (*operator).get_output(idx) {
-                    Ok(tensor) => match &tensor.tensor {
+                    Ok(tensorf32) => match &tensorf32.tensor {
                         Some(v) => {
                             let tensor = Tensor::<f32> {
                                 shape: v.shape.to_vec(),
@@ -589,6 +669,7 @@ impl PyOperator {
                                     py,
                                     TensorF32 {
                                         tensor: Some(tensor),
+                                        name : tensorf32.name.clone(),
                                     },
                                 )
                                 .unwrap()
@@ -598,9 +679,11 @@ impl PyOperator {
                             panic!("Unable to obtain output!");
                         }
                     },
+               
                     _ => {
                         panic!("Unable to obtain output!");
                     }
+                
                 }
             }
         } else {
@@ -612,6 +695,16 @@ impl PyOperator {
         if self.raw_ptr > 0 {
             let operator = self.raw_ptr as *mut Operator;
             unsafe { (*operator).memory_usage() }
+        } else {
+            panic!("Invalid operator pointer!");
+        }
+    }
+
+    #[getter]
+    pub fn get_ir(&self) -> PyResult<String> {
+        if self.raw_ptr > 0 {
+            let operator = self.raw_ptr as *mut Operator;
+            unsafe { Ok((*operator).get_ir()) }
         } else {
             panic!("Invalid operator pointer!");
         }

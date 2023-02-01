@@ -40,14 +40,15 @@ impl<T> TensorTrait for Tensor<T> {
 #[pyclass]
 pub struct TensorF32 {
     pub tensor: Option<Tensor<f32>>,
+    pub name: String,
 }
 
 #[pymethods]
 impl TensorF32 {
     #[new]
-    pub fn new(x: PyReadonlyArrayDyn<f32>) -> PyResult<PyClassInitializer<Self>> {
+    pub fn new(x: PyReadonlyArrayDyn<f32>, name: String) -> PyResult<PyClassInitializer<Self>> {
         println!("PyTensor::new");
-        let mut tensor = TensorF32 { tensor: None };
+        let mut tensor = TensorF32 { tensor: None, name: name };
         tensor.set_ndarray(x);
         Ok(PyClassInitializer::from(tensor))
     }
@@ -99,6 +100,18 @@ impl TensorF32 {
             Some(v) => {
                 let lst = PyList::new(py, v.shape.clone());
                 lst.into()
+            }
+            _ => panic!("Not initialized tensor!"),
+        }
+    }
+
+    #[getter]
+    pub fn get_ir(&self) -> String {
+        match &self.tensor {
+            Some(v) => {
+                let joined: Vec<String> = v.shape.iter().map( |&dim| dim.to_string()).collect();
+
+                format!("tensor<{}>",joined.join("x"))
             }
             _ => panic!("Not initialized tensor!"),
         }
