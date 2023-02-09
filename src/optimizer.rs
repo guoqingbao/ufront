@@ -21,7 +21,7 @@ impl Optimizer {
         println!("Optimizer::new");
         let op = Optimizer {
             // optim_type: optim_type,
-            params: params,
+            params,
         };
         Ok(PyClassInitializer::from(op))
     }

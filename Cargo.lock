@@ -358,8 +358,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "tuple-conv"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fd6314683350324c1bb3d71a65fbeacb4e870cb4faf30b28d8a7787fb8116dd"
+
+[[package]]
 name = "ufront"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "dict_derive",
  "half",
@@ -367,6 +373,7 @@ dependencies = [
  "num_enum",
  "numpy",
  "pyo3",
+ "tuple-conv",
 ]
 
 [[package]]

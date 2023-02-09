@@ -23,8 +23,8 @@ import torch.nn as nn
 import numpy as np
 import torch
 
-from ufront.pytorch.model import PyTorchModel #Flexflow-like PytorchModel wrapper
-from ufront import Model, PyOperator, TensorF32, Optimizer, LossType, MetricsType #Rust frontend
+# from ufront import Model, PyOperator, TensorF32, Optimizer, LossType, MetricsType #Rust frontend
+from ufront.pytorch.model import UFrontTorch #Pytorch wrapper
 
 # A sample pytorch model definition
 class ComplexCNN(nn.Module):
@@ -65,31 +65,27 @@ class ComplexCNN(nn.Module):
 
 
 if __name__ == "__main__":
-    torch_model = PyTorchModel(ComplexCNN()) # Intermedium torch model
-    ufront_model = Model() # Ufront Rust model
-
     batch_size = 32
-    operators = []
-    arr = np.zeros((batch_size, 3, 128, 128), dtype=np.float32)
-    input_tensor1 = TensorF32(arr, "input1") # convert to Rust f32 tensor
-    input_tensor2 = TensorF32(arr, "input2") # convert to Rust f32 tensor
+    input = np.zeros((batch_size, 3, 32, 32), dtype=np.float32)
+    model = UFrontTorch(ComplexCNN(), batch_size=batch_size) # convert torch model to ufront model
 
     #save model to file (compatible with flexflow)
-    # torch_model.torch_to_file('cnn.ff')
+    # model.torch_to_file('cnn.ff')
 
     #load model from file (compatible with flexflow)
-    # output_tensors, operators = PyTorchModel.file_to_ff('cnn.ff', ufront_model, [input_tensor, input_tensor])
+    # output_tensors = UFrontTorch.file_to_ff('cnn.ff', [input_tensor, input_tensor])
 
-    #torch model to ufront model, this will trigger Rust frontend for building computation graph
+    #This will trigger Rust frontend for actual model conversion and graph building
     #operators can also be managed by python side (each operator here corresponding to an operator in the Rust computation graph)
-    output_tensors, operators = torch_model.apply(ufront_model, [input_tensor1, input_tensor2])
+    output_tensors = model(inputs = [input, input])
 
-    softmax_op = ufront_model.softmax(input=output_tensors[0], name="softmax")
-    operators.append(softmax_op)
+    #The output of the model (forward pass have not been triggered at the moment!)
+    output = model.softmax(input=output_tensors[0], name="softmax")
+    print(output.shape)
 
     #The Rust frontend will build computation graph and initialize temporary inputs and outputs for each operator
     total_memory = 0
-    for operator in operators:
+    for operator in model.operators: # access operators in the ufront computation graph
       sz = operator.memory_usage()
       total_memory += sz
       print("{0} > name: {1}, raw_ptr: {2:#06x}, No. of outputs: {3}, memory used:{4:.5f}MB".format(operator.op_type, operator.params['name'], 
@@ -98,34 +94,28 @@ if __name__ == "__main__":
     #Total memory cached for inputs/outputs of all operators (in Rust)
     print("\r\nTotal memory cached for operators {:.2f}MB".format(total_memory/1024/1024))
 
-    #The output of the model (forward pass have not been triggered at the moment!)
-    output = softmax_op.get_output(0)
-    print(output.shape)
-    
-    #optimizer
-    ufront_model.optimizer = Optimizer(params={"type":"sgd", "lr":"0.01", "momentum":"0", "nesterov":"False", "weight_decay":"0"})
-    
     #This will trigger model compilation, i.e., convert Rust computation graph to a unified high-level IR and lower it to TOSA IR
-    ufront_model.compile(loss_type=LossType.SPARSE_CATEGORICAL_CROSSENTROPY, metrics=[MetricsType.ACCURACY, MetricsType.SPARSE_CATEGORICAL_CROSSENTROPY])
+    model.compile(optimizer={"type":"sgd", "lr":"0.01", "momentum":"0", "nesterov":"False", "weight_decay":"0"},
+                         loss='sparse_categorical_crossentropy', metrics=['accuracy', 'sparse_categorical_crossentropy'])
     
     print("\r\n\r\n")
 
     # for operator in operators:
     #   print(operator.ir) #show ir for each operator
 
-    print(ufront_model.dump_ir()) # see below results
+    print(model.dump_ir()) # TOSA IR
 
     #This will be supported later
-    #ufront_model.forward()
+    #model.forward()
     
     #This will be supported later
-    #ufront_model.backward()
-```
+    #model.backward()
 
-## IR Dump Results (for Pytorch)
-### (Converted from Pytorch model to High-level IR after calling dump_ir(), i.e., TOSA-like dialect IR)
-``` Python
-func.func @forward(%input1: tensor<32x3x32x32>, %input2: tensor<32x3x32x32>) -> tensor<32x10>  { 
+
+  ## IR Dump Results (for Pytorch)
+  ### (Converted from Pytorch model to TOSA-like IR after calling dump_ir())
+
+  func.func @forward(%input1: tensor<32x3x32x32>, %input2: tensor<32x3x32x32>) -> tensor<32x10>  { 
         %conv1="ufront.conv2d"(%input1){"groups": "1", "padding": "[0, 0]", "out_channels": "32", "kernel_size": "[3, 3]", "stride": "[1, 1]"}:(tensor<32x3x32x32>) -> tensor<32x32x30x30>
         %relu_1="ufront.relu"(%conv1):(tensor<32x32x30x30>) -> tensor<32x32x30x30>
         %conv1_1="ufront.conv2d"(%input2){"groups": "1", "stride": "[1, 1]", "padding": "[0, 0]", "out_channels": "32", "kernel_size": "[3, 3]"}:(tensor<32x3x32x32>) -> tensor<32x32x30x30>
@@ -152,42 +142,31 @@ func.func @forward(%input1: tensor<32x3x32x32>, %input2: tensor<32x3x32x32>) -> 
 
 ## Sample usage for ONNX Models
 ``` Python
-from ufront.onnx.model import ONNXModel, ONNXModelKeras
-from ufront import Model, PyOperator, TensorF32, Optimizer, LossType, MetricsType #Rust frontend
+# from ufront import Model, PyOperator, TensorF32, Optimizer, LossType, MetricsType #Rust frontend
+from ufront.onnx.model import ONNXModel, ONNXModelKeras, UFrontONNX #ONNX wrapper
 
-import argparse
 import numpy as np
-import onnx
 import torch
-import torch.nn as nn
 from torch.onnx import TrainingMode
 
 if __name__ == "__main__":
     batch_size = 32
+    input = np.zeros((batch_size, 3, 32, 32), dtype=np.float32)
+    torch.onnx.export(model=ComplexCNN(), args=(torch.from_numpy(input), torch.from_numpy(input)), f="cifar10_cnn_pt.onnx", export_params=False, training=TrainingMode.TRAINING)
     
-    operators = []
-    arr = np.zeros((batch_size, 3, 32, 32), dtype=np.float32)
-    input_tensor1 = TensorF32(arr, "input1") # convert to Rust f32 tensor
-    input_tensor2 = TensorF32(arr, "input2") # convert to Rust f32 tensor
+    model = UFrontONNX(onnx_model="cifar10_cnn_pt.onnx", batch_size=batch_size)
 
-    torch.onnx.export(model=ComplexCNN(), args=(torch.from_numpy(arr), torch.from_numpy(arr)), f="cifar10_cnn_pt.onnx", export_params=False, training=TrainingMode.TRAINING)
-    
-    onnx_model = onnx.load("cifar10_cnn_pt.onnx")
-
-    dims_input = [batch_size, 3, 32, 32]
-    ufront_model = Model() # Ufront Rust model
-    onnx_model = ONNXModel("cifar10_cnn_pt.onnx")
-
-    #torch model to ufront model, this will trigger Rust frontend for building computation graph
+    #This will trigger Rust frontend for model conversion and graph building
     #operators can also be managed by python side (each operator here corresponding to an operator in the Rust computation graph)
-    output_tensors, operators = onnx_model.apply(ufront_model, input_tensors=[input_tensor1, input_tensor2])
+    output_tensors = model(inputs=[input, input])
 
-    softmax_op = ufront_model.softmax(input=output_tensors[0], name="softmax")
-    operators.append(softmax_op)
+    #The output of the model (forward pass have not been triggered at the moment!)
+    output = model.softmax(input=output_tensors[0], name="softmax")
+    print(output.shape)
 
     #The Rust frontend will build computation graph and initialize temporary inputs and outputs for each operator
     total_memory = 0
-    for operator in operators:
+    for operator in model.operators:
       sz = operator.memory_usage()
       total_memory += sz
       print("{0} > name: {1}, raw_ptr: {2:#06x}, No. of outputs: {3}, memory used:{4:.5f}MB".format(operator.op_type, operator.params['name'], 
@@ -196,35 +175,25 @@ if __name__ == "__main__":
     #Total memory cached for inputs/outputs of all operators (in Rust)
     print("\r\nTotal memory cached for operators {:.2f}MB".format(total_memory/1024/1024))
 
-    #The output of the model (forward pass have not been triggered at the moment!)
-    output = output_tensors[0]
-    print(output.shape)
-    
-    #optimizer
-    ufront_model.optimizer = Optimizer(params={"type":"sgd", "lr":"0.01", "momentum":"0", "nesterov":"False", "weight_decay":"0"})
-    
     #This will trigger model compilation, i.e., convert Rust computation graph to a unified high-level IR and lower it to TOSA IR
-    ufront_model.compile(loss_type=LossType.SPARSE_CATEGORICAL_CROSSENTROPY, metrics=[MetricsType.ACCURACY, MetricsType.SPARSE_CATEGORICAL_CROSSENTROPY])
-    
+    model.compile(optimizer={"type":"sgd", "lr":"0.01", "momentum":"0", "nesterov":"False", "weight_decay":"0"},
+                         loss='sparse_categorical_crossentropy', metrics=['accuracy', 'sparse_categorical_crossentropy'])
     print("\r\n\r\n")
 
     # for operator in operators:
     #   print(operator.ir) #show ir for each operator
 
-    print(ufront_model.dump_ir())
+    print(model.dump_ir())
 
     #This will be supported later
-    #ufront_model.forward()
+    #model.forward()
     
     #This will be supported later
-    #ufront_model.backward()
+    #model.backward()
 
-```
-
-## IR Dump Results (for ONNX)
-### (Converted from ONNX model to High-level IR after calling dump_ir(), i.e., TOSA-like dialect IR)
-``` Python
-func.func @forward(%input2: tensor<32x3x32x32>, %input1: tensor<32x3x32x32>) -> tensor<32x10>  { 
+  ## IR Dump Results (for ONNX)
+  ### (Converted from ONNX model to High-level IR after calling dump_ir(), i.e., TOSA-like dialect IR)
+  func.func @forward(%input2: tensor<32x3x32x32>, %input1: tensor<32x3x32x32>) -> tensor<32x10>  { 
         %Conv_0="ufront.conv2d"(%input1){"out_channels": "32", "stride": "[1, 1]", "kernel_size": "[3, 3]", "groups": "1", "padding": "[0, 0]"}:(tensor<32x3x32x32>) -> tensor<32x32x30x30>
         %Relu_1="ufront.relu"(%Conv_0):(tensor<32x32x30x30>) -> tensor<32x32x30x30>
         %Conv_2="ufront.conv2d"(%input2){"stride": "[1, 1]", "out_channels": "32", "groups": "1", "kernel_size": "[3, 3]", "padding": "[0, 0]"}:(tensor<32x3x32x32>) -> tensor<32x32x30x30>

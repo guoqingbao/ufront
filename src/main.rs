@@ -29,7 +29,7 @@ fn main() {
     params.insert("kernel_size".to_string(), "[3,3]".to_string());
     let mut operator = PyOperator {
         op_type: OpType::CONV2D,
-        params: params,
+        params,
         raw_ptr: 0,
     };
 
@@ -54,7 +54,7 @@ fn main() {
     // a = tensorf32.get_ndarray()
     Python::with_gil(|py| {
         let a = operator.get_input_ndarray(0, py);
-        println!("Retrive tensor from Rust: {:?} \n ", a);
+        println!("Retrive tensor from Rust: {a:?}");
     });
 
     model.remove_operator(&mut operator);

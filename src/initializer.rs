@@ -27,7 +27,7 @@ impl Initializer {
         println!("Initializer::new");
         let op = Initializer {
             // init_type: init_type,
-            params: params,
+            params,
         };
         Ok(PyClassInitializer::from(op))
     }

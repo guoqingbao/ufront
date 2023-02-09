@@ -1,16 +1,21 @@
 use core::panic;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+use pyo3::types::PyTuple;
+use tuple_conv::RepeatedTuple;
 // use pyo3::types::PyList;
 // use pyo3::wrap_pyfunction;
 // use pyo3_log;
 // use crate::error::RustError;
 
+use crate::databuffer::DataBuffer;
 use crate::graph::Graph;
 use crate::graph::GraphTrait;
 use crate::operator::Operator;
 use crate::operator::PyOperator;
+use crate::prelude::Tensor;
 use crate::tensor::TensorF32;
+use crate::types::DataType;
 use crate::types::{OpType};
 
 use crate::optimizer::Optimizer;
@@ -113,7 +118,7 @@ impl Model {
             graph: Graph { operators: vec![] },
             optimizer: Optimizer {
                 // optim_type: OptimizerType::SGD,
-                params: params,
+                params,
             },
             args: HashMap::new(),
             argshapes: HashMap::new(),
@@ -126,7 +131,7 @@ impl Model {
 
         match kwds {
             Some(args) => {
-                println!("\r\n{:?}", args);
+                println!("\r\n{args:?}");
             }
             _ => {
                 panic!("No arguments for compile!");
@@ -159,13 +164,13 @@ impl Model {
     #[pyo3(text_signature = "($self, pyop)")]
     pub fn add_operator(&mut self, pyop: &mut PyOperator) {
         // let _optype = OpType::try_from(optype as u32);
-        let idx = self.num_of_operators();
+        // let idx = self.num_of_operators();
         // pyop.id = id;
         print!("Op: {}, ", pyop.op_type.as_str());
         for (key, value) in &pyop.params {
-            print!("{}:{}, ", key, value)
+            print!("{key}:{value}, ")
         }
-        print!("\n");
+        println!();
         // let mut params_ : args;
         // params_.extend(args.into_iter());
         let operator = Box::new(Operator::new(pyop.op_type, pyop.params.clone()));
@@ -249,18 +254,15 @@ impl Model {
         let mut output_shapes = "".to_string();
         let mut last_outname = "".to_string();
 
-        match &self.graph.operators.last() {
-            Some(op) => {
-                for output in &op.outputs {        
-                    output_shapes += output.get_ir().as_str();
-                    output_shapes += ", ";
+        if let Some(op) = &self.graph.operators.last() {
+            for output in &op.outputs {        
+                output_shapes += output.get_ir().as_str();
+                output_shapes += ", ";
 
-                    last_outname += "%";
-                    last_outname += output.name.as_str();
-                    last_outname += ", ";
-                }
+                last_outname += "%";
+                last_outname += output.name.as_str();
+                last_outname += ", ";
             }
-            _ => {}
         }
         output_shapes = output_shapes.trim().to_string();
         if &output_shapes[output_shapes.len()-1..] == "," {output_shapes.pop();}
@@ -268,7 +270,7 @@ impl Model {
         last_outname = last_outname.trim().to_string();
         if &last_outname[last_outname.len()-1..] == "," {last_outname.pop();}
 
-        let header = format!{"func.func @forward({}) -> {} ", argstr, output_shapes};
+        let header = format!{"func.func @forward({argstr}) -> {output_shapes} "};
 
         // println!("{:?}", self.args);
         let mut op_ir = "".to_string();
@@ -278,7 +280,7 @@ impl Model {
             op_ir += "\n";
         }
 
-        format!("{} {{ \n{}\treturn {}: {}\n}}", header, op_ir, last_outname, output_shapes)
+        format!("{header} {{ \n{op_ir}\treturn {last_outname}: {output_shapes}\n}}")
 
     }
     // pub fn num_of_op_inputs(&self, id : usize) -> usize {
@@ -327,7 +329,7 @@ impl Model {
     pub fn add_layer(&mut self, op_type: OpType, args: Option<&PyDict>) -> Py<PyOperator> {
         // let mut params = HashMap::<String, String>::new();
         let mut op = PyOperator {
-            op_type: op_type,
+            op_type,
             params: HashMap::<String, String>::new(),
             raw_ptr: 0,
         };
@@ -345,42 +347,19 @@ impl Model {
 
                 self.add_operator(&mut op);
 
-                for key in para.keys() {
-                    if key.to_string() == "input" {
-                        let ret = para.get_item(key).unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
-                        match ret {
-                            Ok(v) => {
-                                    if v.name.find("input") == Some(0) {
-                                        self.args.insert(v.name.clone(), argstr.clone());
-                                        self.argshapes.insert(v.name.clone(), v.get_ir());
-                                    }
-                                    match op.add_input(&v) {
-                                    Ok(_) => {
-                                        op.calculate_output();
-                                    }
-                                    _ => {}
-                                }
-                            },
-                            _ => {
-                                panic! {"Not a valid input type!"};
-                            }
-                        }
-                    } else if op_type == OpType::CONCAT && key.to_string() == "tensors" {
+                if op_type == OpType::CONCAT {
+                    if para.contains("tensors").is_ok() {
                         let ret = para
-                            .get_item(key)
-                            .unwrap()
-                            .extract::<Vec<PyRef<TensorF32>>>(); // .downcast::<TensorF32>();
+                        .get_item("tensors")
+                        .unwrap()
+                        .extract::<Vec<PyRef<TensorF32>>>(); // .downcast::<TensorF32>();
                         match ret {
                             Ok(vlist) => {
                                 for v in vlist {
-                                    match op.add_input(&v) {
-                                        Ok(_) => {
-                                            println!(
-                                                "A list of input tensors added for operator {:?}!",
-                                                op_type
-                                            );
-                                        }
-                                        _ => {}
+                                    if op.add_input(&v).is_ok() {
+                                        println!(
+                                            "A list of input tensors added for operator {op_type:?}!"
+                                        );
                                     }
                                 }
                                 op.calculate_output();
@@ -389,8 +368,61 @@ impl Model {
                                 panic! {"Not a valid input type!"};
                             }
                         }
+                    } else { panic! {"Missing important arguments (tensors?)"}; }
+
+                } else if op_type == OpType::ADD {
+                    
+                    if para.contains("x").is_ok() && para.contains("y").is_ok() {
+                        let x = para.get_item("x").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
+                        let y = para.get_item("y").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
+                        match (x, y) {
+                            (Ok(v1), Ok(v2)) => {
+                                    if op.add_input(&v1).is_ok() && op.add_input(&v2).is_ok(){
+                                        op.calculate_output();
+                                    }
+                            },
+                            _ => {
+                                panic! {"Not a valid input type!"};
+                            }
+                        }
+                    }else { panic! {"Missing important arguments (x, or y?)"}; }
+                    
+                } else if op_type == OpType::MULTIHEAD_ATTENTION {
+                    
+                    if para.contains("q").is_ok() && para.contains("k").is_ok() && para.contains("v").is_ok() {
+                        let q = para.get_item("q").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
+                        let k = para.get_item("k").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
+                        let v = para.get_item("v").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
+    
+                        match (q, k, v) {
+                            (Ok(q1), Ok(k1), Ok(v1)) => {
+                                    if op.add_input(&q1).is_ok() && op.add_input(&k1).is_ok() && op.add_input(&v1).is_ok(){
+                                        op.calculate_output();
+                                    }
+                            },
+                            _ => {
+                                panic! {"Not a valid input type!"};
+                            }
+                        }
+                    } else { panic! {"Missing important arguments (q, k, or v?)"}; }
+                    
+                }else if para.contains("input").is_ok() {
+                    let ret = para.get_item("input").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
+                    match ret {
+                        Ok(v) => {
+                                if v.name.find("input") == Some(0) {
+                                    self.args.insert(v.name.clone(), argstr.clone());
+                                    self.argshapes.insert(v.name.clone(), v.get_ir());
+                                }
+                                if op.add_input(&v).is_ok() {
+                                    op.calculate_output();
+                                }
+                        },
+                        _ => {
+                            panic! {"Not a valid input type!"};
+                        }
                     }
-                }
+                }  
 
                 Python::with_gil(|py| Py::new(py, op).unwrap())
             }
@@ -402,17 +434,47 @@ impl Model {
         // return &op;
     }
     // impl FunctionTrait for Model {
+
+    pub fn create_tensor(&mut self, shape: Vec<usize>, tp: DataType, requires_grad: bool, name: String) -> Py<TensorF32> {
+        // let sp = shape.as_slice().to_vec();
+        match tp {
+            DataType::Float => {
+                let shape = shape.to_vec();
+                let tensor = Some(Tensor::<f32> {
+                    shape: shape.clone(),
+                    data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; shape.iter().product()]),
+                });
+                println!("Tensor initialized with {shape:?} dimension within Rust");
+                Python::with_gil(|py| {
+                    Py::new(
+                        py,
+                        TensorF32 {
+                            tensor,
+                            name : name.clone(),
+                        },
+                    )
+                    .unwrap()
+                })
+            }
+            _=> {panic!("Not supported type at the moment!");}
+        }
+
+    }
+
     pub fn input(&mut self){
                 
     }
     pub fn output(&self) {}
 
+    #[pyo3(signature = (**kwds))]
+    pub fn eq(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
+        self.handle_operator(OpType::EQ, kwds)
+    }
     fn handle_operator(&mut self, op_type: OpType, kwds: Option<&PyDict>) -> Py<PyOperator> {
         match kwds {
             Some(args) => {
-                println!("\r\n{:?}", args);
-
-                return self.add_layer(op_type, kwds);
+                println!("\r\n{args:?}");
+                self.add_layer(op_type, kwds)
             }
             _ => {
                 panic!("No arguments for {:?}!", op_type);
@@ -454,24 +516,42 @@ impl Model {
         self.handle_operator(OpType::FLAT, kwds)
     }
 
-    pub fn multihead_attention(&self) {}
+    #[pyo3(signature = (**kwds))]
+    pub fn multihead_attention(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
+        self.handle_operator(OpType::MULTIHEAD_ATTENTION, kwds)
+    }
 
-    pub fn layer_norm(&self) {}
+    #[pyo3(signature = (**kwds))]
+    pub fn layer_norm(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
+        self.handle_operator(OpType::LAYER_NORM, kwds)
+    }
 
     pub fn embedding(&self) {}
 
-    pub fn expand(&self) {}
+    #[pyo3(signature = (**kwds))]
+    pub fn expand(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
+        self.handle_operator(OpType::EXPAND, kwds)
+    }
 
     #[pyo3(signature = (**kwds))]
     pub fn softmax(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::SOFTMAX, kwds)
     }
 
-    pub fn transpose(&self) {}
+    #[pyo3(signature = (**kwds))]
+    pub fn transpose(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
+        self.handle_operator(OpType::TRANSPOSE, kwds)
+    }
 
-    pub fn reshape(&self) {}
+    #[pyo3(signature = (**kwds))]
+    pub fn reshape(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
+        self.handle_operator(OpType::RESHAPE, kwds)
+    }
 
-    pub fn dropout(&self) {}
+    #[pyo3(signature = (**kwds))]
+    pub fn dropout(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
+        self.handle_operator(OpType::DROPOUT, kwds)
+    }
 
     #[pyo3(signature = (**kwds))]
     pub fn add(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {

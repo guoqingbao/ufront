@@ -135,6 +135,7 @@ pub enum OpType {
     TYPE_AS,
     VIEW,
     ATTRIBUTE,
+    EQ,
 }
 
 #[pymethods]
@@ -194,6 +195,7 @@ impl OpType {
             OpType::TYPE_AS => "type_as",
             OpType::VIEW => "view",
             OpType::ATTRIBUTE => "attribute",
+            OpType::EQ => "eq",
             // _ => panic!("Not supported operator!"),
         }
     }
@@ -254,6 +256,7 @@ impl OpType {
             "type_as" => OpType::TYPE_AS,
             "view" => OpType::VIEW,
             "attribute" => OpType::ATTRIBUTE,
+            "eq" => OpType::EQ,
             _ => {
                 panic!("Not supported type!");
             }
@@ -346,6 +349,7 @@ impl AggrMode {
 pub enum PoolType {
     POOL_MAX = 30,
     POOL_AVG,
+    POOL_ADAPTIVE,
 }
 
 #[pymethods]
@@ -354,6 +358,7 @@ impl PoolType {
         match self {
             PoolType::POOL_MAX => 30,
             PoolType::POOL_AVG => 31,
+            PoolType::POOL_ADAPTIVE => 32,
         }
     }
 
@@ -362,6 +367,7 @@ impl PoolType {
         match id {
             30 => PoolType::POOL_MAX,
             31 => PoolType::POOL_AVG,
+            32 => PoolType::POOL_ADAPTIVE,
             _ => {
                 panic!("Not supported type!");
             }

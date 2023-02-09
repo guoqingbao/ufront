@@ -48,10 +48,12 @@ impl TensorF32 {
     #[new]
     pub fn new(x: PyReadonlyArrayDyn<f32>, name: String) -> PyResult<PyClassInitializer<Self>> {
         println!("PyTensor::new");
-        let mut tensor = TensorF32 { tensor: None, name: name };
+        let mut tensor = TensorF32 { tensor: None, name };
         tensor.set_ndarray(x);
         Ok(PyClassInitializer::from(tensor))
     }
+
+    #[setter]
     pub fn set_ndarray(&mut self, x: PyReadonlyArrayDyn<f32>) {
         let x = x.as_array();
         match x.as_slice() {
@@ -69,6 +71,7 @@ impl TensorF32 {
         }
     }
 
+    #[getter]
     pub fn get_dims(&self) -> usize {
         match &self.tensor {
             Some(v) => v.shape.len(),
@@ -76,6 +79,7 @@ impl TensorF32 {
         }
     }
 
+    #[getter]
     pub fn get_ndarray<'py>(&self, py: Python<'py>) -> &'py PyArrayDyn<f32> {
         match &self.tensor {
             Some(v) => match &v.data_buffer {
@@ -90,8 +94,10 @@ impl TensorF32 {
         }
     }
 
+    #[getter]
     pub fn get_gradients(&self) {}
 
+    #[getter]
     pub fn get_owner(&self) {}
 
     #[getter]
@@ -115,5 +121,15 @@ impl TensorF32 {
             }
             _ => panic!("Not initialized tensor!"),
         }
+    }
+
+    #[getter]
+    pub fn get_data_type(&self) -> DataType {
+        DataType::Float
+    }
+
+    #[getter]
+    pub fn get_name(&self) -> String {
+        self.name.clone()
     }
 }

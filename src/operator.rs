@@ -72,21 +72,21 @@ impl Operator {
             inputs: Vec::new(),
             outputs: Vec::new(),
             op_type: op,
-            params: params.clone(),
+            params,
         }
     }
 
     pub fn num_of_inputs(&self) -> usize {
         //
-        let num = self.inputs.len() as usize;
-        println!("Operator::num_of_inputs {}", num);
-        return num;
+        let num = self.inputs.len();
+        println!("Operator::num_of_inputs {num}");
+        num
     }
 
     pub fn num_of_outputs(&self) -> usize {
-        let num = self.outputs.len() as usize;
-        println!("Operator::num_of_outputs {}", num);
-        return num;
+        let num = self.outputs.len();
+        println!("Operator::num_of_outputs {num}");
+        num
     }
 
     // pub fn get_input_ndarray<'py>(&self, idx : usize, py: Python<'py>) -> &'py PyArrayDyn<f32>{
@@ -115,7 +115,7 @@ impl Operator {
     // }
 
     pub fn get_input(&self, idx: usize) -> Result<&TensorF32, ()> {
-        println!("Operator::get_input idx {}", idx);
+        println!("Operator::get_input idx {idx}");
         if idx < self.num_of_inputs() {
             return Ok(&self.inputs[idx]);
         }
@@ -125,7 +125,7 @@ impl Operator {
     }
 
     pub fn get_output(&self, idx: usize) -> Result<&TensorF32, ()> {
-        println!("Operator::get_output idx {}", idx);
+        println!("Operator::get_output idx {idx}");
         if idx < self.num_of_outputs() {
             return Ok(&self.outputs[idx]);
         }
@@ -135,13 +135,13 @@ impl Operator {
     }
 
     pub fn add_input(&mut self, x: Tensor<f32>, name: String) {
-        self.inputs.push(TensorF32 { tensor: Some(x), name: name });
+        self.inputs.push(TensorF32 { tensor: Some(x), name });
     }
 
     pub fn add_output(&mut self, x: Tensor<f32>) {
-        if self.outputs.len() > 0 {
-            let name = format!("{}_{}", self.params["name"].to_string(), self.outputs.len());
-            self.outputs.push(TensorF32 { tensor: Some(x), name: name });
+        if !self.outputs.is_empty() {
+            let name = format!("{}_{}", self.params["name"], self.outputs.len());
+            self.outputs.push(TensorF32 { tensor: Some(x), name });
         }else {
             self.outputs.push(TensorF32 { tensor: Some(x), name: self.params["name"].to_string() });
         }
@@ -149,7 +149,7 @@ impl Operator {
 
     pub fn calculate_output(&mut self) {
         println!("Operator::calculate_output for {:?}", self.op_type);
-        assert!(self.inputs.len() > 0);
+        assert!(!self.inputs.is_empty());
         match self.op_type {
             OpType::CONV2D => {
                 //formula [(W−K+2P)/S]+1
@@ -198,27 +198,55 @@ impl Operator {
                 } else {panic!("Missing important parameters!");}
             }
             OpType::POOL2D => {
-                //formula W/2, H/2
-                match &self.inputs[0].tensor {
-                    Some(v) => {
-                        let w = v.shape[2] / 2;
-                        let h = v.shape[3] / 2;
-                        let output_shape = vec![v.shape[0], v.shape[1], w, h];
-                        println!(
-                            "Output tensor with shape {:?} created within Rust for operator {:?}!",
-                            output_shape, self.op_type
-                        );
-                        let sz: usize = output_shape.iter().product();
-                        let tensor = Tensor::<f32> {
-                            shape: output_shape,
-                            data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
-                        };
-                        self.add_output(tensor);
-                    }
-                    _ => {
-                        panic!("Invalid inputs!");
+                if self.params.contains_key("pool_type") && self.params["pool_type"].trim() == "PoolType.POOL_ADAPTIVE" {
+                    //formula (w,h)=output_size
+                    match &self.inputs[0].tensor {
+                        Some(v) => {
+                            assert!(self.params.contains_key("output_size"));
+
+                            let output_size : Vec<usize> = self.params["output_size"].replace(['(', ')'], "").split(",").map(|x| x.trim().parse::<usize>().unwrap()).collect();
+
+                            let output_shape = vec![v.shape[0], v.shape[1], output_size[0], output_size[1]];
+                            println!(
+                                "Output tensor with shape {:?} created within Rust for operator {:?}!",
+                                output_shape, self.op_type
+                            );
+                            let sz: usize = output_shape.iter().product();
+                            let tensor = Tensor::<f32> {
+                                shape: output_shape,
+                                data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
+                            };
+                            self.add_output(tensor);
+                        }
+                        _ => {
+                            panic!("Invalid inputs!");
+                        }
                     }
                 }
+                else {
+                    //formula W/2, H/2
+                    match &self.inputs[0].tensor {
+                        Some(v) => {
+                            let w = v.shape[2] / 2;
+                            let h = v.shape[3] / 2;
+                            let output_shape = vec![v.shape[0], v.shape[1], w, h];
+                            println!(
+                                "Output tensor with shape {:?} created within Rust for operator {:?}!",
+                                output_shape, self.op_type
+                            );
+                            let sz: usize = output_shape.iter().product();
+                            let tensor = Tensor::<f32> {
+                                shape: output_shape,
+                                data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
+                            };
+                            self.add_output(tensor);
+                        }
+                        _ => {
+                            panic!("Invalid inputs!");
+                        }
+                    }
+                }
+                
             }
 
             OpType::EXP
@@ -237,7 +265,11 @@ impl Operator {
             | OpType::SCALAR_MULTIPLY
             | OpType::SCALAR_SUB
             | OpType::SCALAR_TRUEDIV
-            | OpType::SOFTMAX => {
+            | OpType::SOFTMAX 
+            | OpType::BATCH_NORM 
+            | OpType::LAYER_NORM 
+            | OpType:: MULTIHEAD_ATTENTION //output shape of multiheaded attention is equal to shape of input "q" (first item in input list) when batch_first=True
+             => {
                 // let activations = vec![OpType::ELU, OpType::RELU, OpType::GELU, OpType::SIGMOID, OpType::TANH];
                 // let inplace = if self.params.contains_key("inplace") {self.params["inplace"]=="True"} else {false};
                 // if false && activations.iter().any(|&act| act==self.op_type)  {
@@ -271,23 +303,15 @@ impl Operator {
                 // let (mut batch, mut channel, mut w, mut h, mut batch_out, mut channel_out) = (0, 0, 0, 0, 0, 0);
                 // let mut out_dim = 0;
                 let mut output_shape = vec![0, 0, 0, 0];
-                match &mut self.inputs[0].tensor {
-                    Some(v) => {
-                        output_shape = v.shape.clone();
-                    }
-                    _ => {}
+                if let Some(v) = &mut self.inputs[0].tensor {
+                    output_shape = v.shape.clone();
                 }
                 let idx = self.params["axis"].trim().parse::<usize>().unwrap();
                 output_shape[idx] = 0;
 
                 for tensor in &self.inputs {
-                    match &tensor.tensor {
-                        Some(v) => {
-                            output_shape[idx] += v.shape[idx];
-                        }
-                        _ => {
-                            panic!("Invalid tensor for axis {} concat!", self.params["axis"]);
-                        }
+                    if let Some(v) = &tensor.tensor {
+                        output_shape[idx] += v.shape[idx];
                     }
                 }
 
@@ -313,8 +337,8 @@ impl Operator {
                         assert!(idx < v.shape.len());
                         let mut output_shape = v.shape.clone();
                         if params.contains_key("sizes") {
-                            let parts = params["sizes"].replace('[', "").replace(']', "");
-                            println!("{}", parts);
+                            let parts = params["sizes"].replace(['[',']'], "");
+                            println!("{parts}");
                             for part in parts.split([',']) {
                                 let size = part.trim().parse::<usize>().unwrap();
                                 output_shape[idx] = size;
@@ -358,6 +382,97 @@ impl Operator {
                     }
                 }
             }
+            OpType::RESHAPE => {
+                //formula
+                // output shape = [batch, channel * w * h]
+                match &mut self.inputs[0].tensor {
+                    Some(v) => {
+                        assert!(self.params.contains_key("shape"));
+
+                        let output_shape : Vec<usize> = self.params["shape"].replace(['(', ')'], "").split(",").map(|x| x.trim().parse::<usize>().unwrap()).collect();
+                        let sz: usize = v.shape.iter().product();
+                        let tensor = Tensor::<f32> {
+                            shape: output_shape.clone(),
+                            data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
+                        };
+                        self.add_output(tensor);
+                        println!(
+                            "Output tensor with shape {:?} created within Rust for operator {:?}!",
+                            output_shape,
+                            self.op_type
+                        );
+                    }
+                    _ => {
+                        panic!("Invalid tensor for flat!");
+                    }
+                }
+            }
+
+            OpType::TRANSPOSE => {
+                //formula
+                // output shape = input_shape[perm2, perm1, perm0, ...]
+                match &mut self.inputs[0].tensor {
+                    Some(v) => {
+                        assert!(self.params.contains_key("perm"));
+
+                        let output_idx : Vec<usize> = self.params["perm"].replace(['(', ')'], "").split(",").map(|x| x.trim().parse::<usize>().unwrap()).collect();
+                        let mut output_shape : Vec<usize>  = vec![];
+                        for i in 0..v.shape.len() {
+                            let idx = output_idx[i];
+                            output_shape.extend([v.shape.get(idx).unwrap()]);
+                        }
+                        let sz: usize = v.shape.iter().product();
+                        let tensor = Tensor::<f32> {
+                            shape: output_shape.clone(),
+                            data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
+                        };
+                        self.add_output(tensor);
+                        println!(
+                            "Output tensor with shape {:?} created within Rust for operator {:?}!",
+                            output_shape,
+                            self.op_type
+                        );
+                    }
+                    _ => {
+                        panic!("Invalid tensor for flat!");
+                    }
+                }
+            }
+
+            OpType::EXPAND => {
+                //formula
+                //input_shape = [1, 3, 224]
+                //sizes = [5, -1, -1]
+                //outpus_shape = [4, 3, 224]
+
+                match &mut self.inputs[0].tensor {
+                    Some(v) => {
+                        assert!(self.params.contains_key("sizes"));
+
+                        let output_idx : Vec<i32> = self.params["sizes"].replace(['[', ']'], "").split(",").map(|x| x.trim().parse::<i32>().unwrap()).collect();
+                        let mut output_shape : Vec<usize>  = v.shape.clone();
+                        for i in 0..v.shape.len() {
+                            let dim = output_idx[i];
+                            output_shape[i]= if dim!=-1 {dim as usize} else {v.shape[i]};
+                        }
+                        let sz: usize = v.shape.iter().product();
+                        let tensor = Tensor::<f32> {
+                            shape: output_shape.clone(),
+                            data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
+                        };
+                        self.add_output(tensor);
+                        println!(
+                            "Output tensor with shape {:?} created within Rust for operator {:?}!",
+                            output_shape,
+                            self.op_type
+                        );
+                    }
+                    _ => {
+                        panic!("Invalid tensor for flat!");
+                    }
+                }
+            }
+
             OpType::LINEAR => {
                 //formula
                 // output shape = [batch, output dim]
@@ -395,21 +510,15 @@ impl Operator {
     pub fn memory_usage(&self) -> usize {
         let mut memory_size: usize = 0;
         for input in &self.inputs {
-            match &input.tensor {
-                Some(tensor) => {
-                    let sz: usize = tensor.shape.iter().product();
-                    memory_size += sz;
-                }
-                _ => {}
+            if let Some(tensor) = &input.tensor {
+                let sz: usize = tensor.shape.iter().product();
+                memory_size += sz;
             }
         }
         for output in &self.outputs {
-            match &output.tensor {
-                Some(tensor) => {
-                    let sz: usize = tensor.shape.iter().product();
-                    memory_size += sz;
-                }
-                _ => {}
+            if let Some(tensor) = &output.tensor {
+                let sz: usize = tensor.shape.iter().product();
+                memory_size += sz;
             }
         }
 
@@ -441,6 +550,8 @@ impl Operator {
         params.remove("tensors");
         params.remove("out_dim");
         params.remove("out_channels");
+        params.remove("x"); //for add
+        params.remove("y"); //for add
 
         params.remove("activation"); //fused activation not supported at the moment
         params.remove("inplace"); //inplace not supported at the moment
@@ -483,12 +594,12 @@ impl Operator {
         if &output_shapes[output_shapes.len()-1..] == "," {output_shapes.pop();}
 
         if params.is_empty() {
-            let ir = format!("{}=\"ufront.{}\"({}):({}) -> {}", output_names, name, input_names, input_shapes, output_shapes);
-            return ir;
+            let ir = format!("{output_names}=\"ufront.{name}\"({input_names}):({input_shapes}) -> {output_shapes}");
+            ir
         }
         else {
-            let ir = format!("{}=\"ufront.{}\"({}){:?}:({}) -> {}", output_names, name, input_names, params, input_shapes, output_shapes);
-            return ir;
+            let ir = format!("{output_names}=\"ufront.{name}\"({input_names}){params:?}:({input_shapes}) -> {output_shapes}");
+            ir
         }
     }
 }
@@ -514,8 +625,8 @@ impl PyOperator {
     ) -> PyResult<PyClassInitializer<Self>> {
         println!("PyOperator::new");
         let op = PyOperator {
-            op_type: op_type,
-            params: params,
+            op_type,
+            params,
             raw_ptr: 0,
         };
         Ok(PyClassInitializer::from(op))
@@ -525,7 +636,7 @@ impl PyOperator {
             let operator = self.raw_ptr as *const Operator;
             unsafe { (*operator).num_of_inputs() }
         } else {
-            return 0;
+            0
         }
     }
 
@@ -534,12 +645,12 @@ impl PyOperator {
             let operator = self.raw_ptr as *const Operator;
             unsafe { (*operator).num_of_outputs() }
         } else {
-            return 0;
+            0
         }
     }
 
     pub fn get_input_ndarray<'py>(&self, idx: usize, py: Python<'py>) -> &'py PyArrayDyn<f32> {
-        println!("Operator::get_input_ndarray idx {}", idx);
+        println!("Operator::get_input_ndarray idx {idx}");
         if self.raw_ptr > 0 && idx < self.num_of_inputs() {
             let operator = self.raw_ptr as *const Operator;
             unsafe {
@@ -564,7 +675,7 @@ impl PyOperator {
     }
 
     pub fn get_output_ndarray<'py>(&self, idx: usize, py: Python<'py>) -> &'py PyArrayDyn<f32> {
-        println!("Operator::get_output_ndarray {}", idx);
+        println!("Operator::get_output_ndarray {idx}");
         if self.raw_ptr > 0 && idx < self.num_of_outputs() {
             let operator = self.raw_ptr as *const Operator;
             unsafe {
