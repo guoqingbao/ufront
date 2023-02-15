@@ -29,7 +29,7 @@ fn main() {
     params.insert("kernel_size".to_string(), "[3,3]".to_string());
     let mut operator = PyOperator {
         op_type: OpType::CONV2D,
-        params,
+        params: params.clone(),
         raw_ptr: 0,
     };
 
@@ -40,6 +40,31 @@ fn main() {
         operator.add_input_ndarray(arr.to_dyn().readonly(), "input".to_string());
     });
 
+
+    let mut operator = PyOperator {
+        op_type: OpType::RELU,
+        params: HashMap::from([("name".to_string(), "".to_string())]),
+        raw_ptr: 0,
+    };
+
+    model.add_operator(&mut operator);
+
+
+    let mut operator = PyOperator {
+        op_type: OpType::CONV2D,
+        params: params.clone(),
+        raw_ptr: 0,
+    };
+
+    model.add_operator(&mut operator);
+
+    let mut operator = PyOperator {
+        op_type: OpType::CONV2D,
+        params: params.clone(),
+        raw_ptr: 0,
+    };
+
+    model.add_operator(&mut operator);
     println!("{}", operator.raw_ptr);
     println!("{}", operator.num_of_inputs());
 

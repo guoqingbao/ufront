@@ -13,9 +13,9 @@ if __name__ == "__main__":
     y_train = y_train.astype('int32')
     print("shape: ", x_train.shape)
     
-    # inputs, outputs = SequentialCNN(shape=(3, 32, 32), dtype="float32", num_classes=10)
-    # inputs, outputs = ConcatenatedCNN(shape=(3, 32, 32), dtype="float32", num_classes=10)
-    inputs, outputs = NestedCNN(shape=(3, 32, 32), dtype="float32", num_classes=10)
+    # inputs, outputs, model_name = SequentialCNN(shape=(3, 32, 32), dtype="float32", num_classes=10)
+    # inputs, outputs, model_name = ConcatenatedCNN(shape=(3, 32, 32), dtype="float32", num_classes=10)
+    inputs, outputs, model_name = NestedCNN(shape=(3, 32, 32), dtype="float32", num_classes=10)
 
     model = UFrontKeras(inputs = inputs, outputs = outputs, batch_size = 32)
 
@@ -27,6 +27,16 @@ if __name__ == "__main__":
     
     print(model.summary()) 
 
-    print(model.dump_ir())
-    # model.fit(x_train, y_train, epochs=1)
+    print("\r\n\r\nIR for ", model_name)
+
+    # for operator in operators:
+    #   print(operator.ir) #show ir for each operator
+    modelir= model.dump_ir()
+    print(modelir)
+
+    import pathlib
+    path = str(pathlib.Path(__file__).parent.resolve()) + "/output_ir/keras_" + model_name + ".ir"
+    f = open(path, "w")
+    f.write(modelir)
+    f.close()
 

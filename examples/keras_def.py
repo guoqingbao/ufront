@@ -16,7 +16,7 @@ def SequentialCNN(shape=(3, 32, 32), dtype="float32", num_classes = 10):
     output_tensor = Dense(num_classes)(output_tensor)
     output_tensor = Activation("softmax")(output_tensor)
 
-    return {1: input_tensor1}, output_tensor
+    return {1: input_tensor1}, output_tensor, "SequentialCNN"
 
 def ConcatenatedCNN(shape=(3, 32, 32), dtype="float32", num_classes = 10):
     input_tensor1 = Input(shape=shape, dtype=dtype)
@@ -34,7 +34,7 @@ def ConcatenatedCNN(shape=(3, 32, 32), dtype="float32", num_classes = 10):
     output_tensor = Dense(num_classes)(output_tensor)
     output_tensor = Activation("softmax")(output_tensor)
 
-    return {1: input_tensor1}, output_tensor
+    return {1: input_tensor1}, output_tensor, "ConcatenatedCNN"
 
 def NestedCNN(shape=(3, 32, 32), dtype="float32", num_classes = 10):
     input_tensor1 = Input(shape=shape, dtype=dtype)
@@ -57,4 +57,4 @@ def NestedCNN(shape=(3, 32, 32), dtype="float32", num_classes = 10):
     output_tensor3 = model1(input_tensor3)
     output_tensor3 = model2(output_tensor3)
     
-    return {3: input_tensor3}, output_tensor3
+    return {3: input_tensor3}, output_tensor3, "NestedCNN"

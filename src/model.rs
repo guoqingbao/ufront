@@ -1,5 +1,6 @@
 use core::panic;
 use pyo3::prelude::*;
+use pyo3::types::IntoPyDict;
 use pyo3::types::PyDict;
 use pyo3::types::PyTuple;
 use tuple_conv::RepeatedTuple;
@@ -102,6 +103,8 @@ pub struct Model {
     pub optimizer: Optimizer,
     args : HashMap<String, String>,
     argshapes: HashMap<String, String>,
+    ssa_ids: HashMap<String, i32>,
+    op_names: Vec<String>,
 }
 
 #[pymethods]
@@ -122,7 +125,27 @@ impl Model {
             },
             args: HashMap::new(),
             argshapes: HashMap::new(),
+            ssa_ids: HashMap::new(),
+            op_names: Vec::new(),
         }
+    }
+
+    fn build_ssa_ids(&mut self) {
+        let mut idx = 1;
+        for operator in &self.graph.operators {
+            for output in &operator.outputs {
+                if !self.ssa_ids.contains_key(&output.name) {
+                    self.ssa_ids.insert(output.name.clone(), idx);
+                    idx += 1;
+                }
+
+            }
+        }
+    }
+
+    #[getter]
+    pub fn get_ssa_ids<'py>(&self, py: Python<'py>) -> &'py PyDict {
+        self.ssa_ids.clone().into_py_dict(py)
     }
 
     #[pyo3(signature = (**kwds))]
@@ -139,6 +162,7 @@ impl Model {
         }
 
         self.graph.compile(kwds);
+        self.build_ssa_ids();
     }
 
     pub fn forward(&self) {
@@ -163,21 +187,37 @@ impl Model {
 
     #[pyo3(text_signature = "($self, pyop)")]
     pub fn add_operator(&mut self, pyop: &mut PyOperator) {
-        // let _optype = OpType::try_from(optype as u32);
-        // let idx = self.num_of_operators();
-        // pyop.id = id;
+        if !pyop.params.contains_key("name") || pyop.params["name"].is_empty() || self.op_names.contains(&pyop.params["name"]) {
+            let mut name: String = if pyop.params.contains_key("name") && !pyop.params["name"].is_empty() {pyop.params["name"].clone()} else {pyop.op_type.as_str().to_string()};
+            for opname in self.op_names.iter().rev() {
+                if opname.find(&name) != None {
+                    match opname.find("_") {
+                        Some(pos) => {
+                            name += "_";
+                            name += (opname[pos+1..].parse::<usize>().unwrap() + 1).to_string().as_str();
+                        }
+                        _ => { name += "_1"; }
+                    }
+                    break;
+                }
+            }
+            pyop.params.remove("name");
+            pyop.params.insert("name".to_string(), name.clone());
+            self.op_names.push(name);
+        }
+
         print!("Op: {}, ", pyop.op_type.as_str());
         for (key, value) in &pyop.params {
             print!("{key}:{value}, ")
         }
         println!();
-        // let mut params_ : args;
-        // params_.extend(args.into_iter());
+
         let operator = Box::new(Operator::new(pyop.op_type, pyop.params.clone()));
 
         let handle_ptr: *const Operator = &*operator;
 
         self.graph.operators.push(operator);
+
 
         // let ptr = &mut self.graph.operators[idx];
         pyop.raw_ptr = handle_ptr as u64;
@@ -260,7 +300,14 @@ impl Model {
                 output_shapes += ", ";
 
                 last_outname += "%";
-                last_outname += output.name.as_str();
+
+                if self.ssa_ids.contains_key(&output.name) {
+                    last_outname += &self.ssa_ids[&output.name].to_string();
+                }
+                else {
+                    last_outname += output.name.as_str();
+                }
+
                 last_outname += ", ";
             }
         }
@@ -276,7 +323,7 @@ impl Model {
         let mut op_ir = "".to_string();
         for op in &self.graph.operators {
             op_ir += "\t";
-            op_ir += op.get_ir().as_str();
+            op_ir += op.dump_ir(Some(&self.ssa_ids)).as_str();
             op_ir += "\n";
         }
 
@@ -461,6 +508,11 @@ impl Model {
 
     }
 
+    #[pyo3(signature = (**kwds))]
+    pub fn slice_tensor(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
+        self.handle_operator(OpType::SLICE, kwds)
+    }
+    
     pub fn input(&mut self){
                 
     }
@@ -501,7 +553,8 @@ impl Model {
     pub fn batch_norm(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::BATCH_NORM, kwds)
     }
-
+    
+    #[pyo3(signature = (**kwds))]
     pub fn linear(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::LINEAR, kwds)
     }

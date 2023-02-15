@@ -8,6 +8,7 @@ from torch_def import SimpleCNN, ComplexCNN
 if __name__ == "__main__":
     batch_size = 32
     input = np.zeros((batch_size, 3, 32, 32), dtype=np.float32)
+    model_name = "ComplexCNN"
     torch.onnx.export(model=ComplexCNN(), args=(torch.from_numpy(input), torch.from_numpy(input)), f="cifar10_cnn_pt.onnx", export_params=False, training=TrainingMode.TRAINING)
     
     model = UFrontONNX(onnx_model="cifar10_cnn_pt.onnx", batch_size=batch_size)
@@ -39,7 +40,19 @@ if __name__ == "__main__":
     # for operator in operators:
     #   print(operator.ir) #show ir for each operator
 
-    print(model.dump_ir())
+    print("\r\n\r\nIR for ", model_name)
+
+    # for operator in operators:
+    #   print(operator.ir) #show ir for each operator
+    modelir= model.dump_ir()
+    print(modelir)
+
+    import pathlib
+    path = str(pathlib.Path(__file__).parent.resolve()) + "/output_ir/onnx_" + model_name + ".ir"
+    f = open(path, "w")
+    f.write(modelir)
+    f.close()
+
 
     #This will be supported later
     #model.forward()

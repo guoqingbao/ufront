@@ -155,22 +155,30 @@ impl Operator {
                 //formula [(W−K+2P)/S]+1
                 let mut padding_w = 0;
                 let mut padding_h = 0;
-                if self.params.contains_key("padding_w") {
-                    padding_w = self.params["padding_w"].trim().parse::<usize>().unwrap();
+                if self.params.contains_key("padding") {
+                    // padding_w = self.params["padding_w"].trim().parse::<usize>().unwrap();
+                    let padding : Vec<usize> = self.params["padding"].replace(['[', ']'], "").split(",").map(|x| x.trim().parse::<usize>().unwrap()).collect();
+                    padding_h = padding[0];
+                    padding_w = padding[1];
                 }
-                if self.params.contains_key("padding_h") {
-                    padding_h = self.params["padding_h"].trim().parse::<usize>().unwrap();
-                }
+                // if self.params.contains_key("padding_h") {
+                //     padding_h = self.params["padding_h"].trim().parse::<usize>().unwrap();
+                // }
 
-                if self.params.contains_key("kernel_h")
-                    && self.params.contains_key("kernel_w")
-                    && self.params.contains_key("stride_h")
-                    && self.params.contains_key("stride_w")
+                if self.params.contains_key("kernel")
+                    && self.params.contains_key("stride")
                 {
-                    let kernel_h = self.params["kernel_h"].trim().parse::<usize>().unwrap();
-                    let kernel_w = self.params["kernel_w"].trim().parse::<usize>().unwrap();
-                    let stride_h = self.params["stride_h"].trim().parse::<usize>().unwrap();
-                    let stride_w = self.params["stride_w"].trim().parse::<usize>().unwrap();
+                    let kernel : Vec<usize> = self.params["kernel"].replace(['[', ']'], "").split(",").map(|x| x.trim().parse::<usize>().unwrap()).collect();
+                    let kernel_h = kernel[0];
+                    let kernel_w  = kernel[1];
+                    let stride : Vec<usize> = self.params["stride"].replace(['[', ']'], "").split(",").map(|x| x.trim().parse::<usize>().unwrap()).collect();
+                    let stride_h = stride[0];
+                    let stride_w  = stride[1];
+
+                    // let kernel_h = self.params["kernel_h"].trim().parse::<usize>().unwrap();
+                    // let kernel_w = self.params["kernel_w"].trim().parse::<usize>().unwrap();
+                    // let stride_h = self.params["stride_h"].trim().parse::<usize>().unwrap();
+                    // let stride_w = self.params["stride_w"].trim().parse::<usize>().unwrap();
                     match &self.inputs[0].tensor {
                         Some(v) => {
                             println!("Input tensor shape {:?}", v.shape);
@@ -501,6 +509,34 @@ impl Operator {
                 }
                 
             }
+
+            OpType::SLICE => {
+                //formula
+                //output_shape = input_shape[slices]
+                match &mut self.inputs[0].tensor {
+                    Some(v) => {
+                        assert!(self.params.contains_key("output_shape"));
+
+                        let output_shape : Vec<usize> = self.params["output_shape"].replace(['(', ')'], "").split(",").map(|x| x.trim().parse::<usize>().unwrap()).collect();
+
+                        let sz: usize = output_shape.iter().product();
+                        let tensor = Tensor::<f32> {
+                            shape: output_shape.clone(),
+                            data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
+                        };
+                        self.add_output(tensor);
+                        println!(
+                            "Output tensor with shape {:?} created within Rust for operator {:?}!",
+                            output_shape,
+                            self.op_type
+                        );
+                    }
+                    _ => {
+                        panic!("Invalid tensor for flat!");
+                    }
+                }
+            }
+
             _ => {
                 panic!("Not implemented!");
             }
@@ -525,33 +561,43 @@ impl Operator {
         memory_size * 4 //float32
     }
 
-    
     pub fn get_ir(&self) -> String {
+        return self.dump_ir(None);
+    }
+    
+    pub fn dump_ir(&self, ssa_ids: Option<&HashMap<String, i32>>) -> String {
         let name = self.op_type.as_str();
         let mut params = self.params.clone();
-        if params.contains_key("kernel_w") && params.contains_key("kernel_h") {
-            params.insert("kernel".to_string(), format!("[{}, {}]", params["kernel_w"], params["kernel_h"]));
-            params.remove("kernel_w");
-            params.remove("kernel_h");
-        }
+        // if params.contains_key("kernel_w") && params.contains_key("kernel_h") {
+        //     params.insert("kernel".to_string(), format!("[{}, {}]", params["kernel_w"], params["kernel_h"]));
+        //     params.remove("kernel_w");
+        //     params.remove("kernel_h");
+        // }
 
-        if params.contains_key("stride_w") && params.contains_key("stride_h") {
-            params.insert("stride".to_string(), format!("[{}, {}]", params["stride_w"], params["stride_h"]));
-            params.remove("stride_w");
-            params.remove("stride_h");
-        }
+        // if params.contains_key("stride_w") && params.contains_key("stride_h") {
+        //     params.insert("stride".to_string(), format!("[{}, {}]", params["stride_w"], params["stride_h"]));
+        //     params.remove("stride_w");
+        //     params.remove("stride_h");
+        // }
 
-        if params.contains_key("padding_w") && params.contains_key("padding_h") {
-            params.insert("padding".to_string(), format!("[{}, {}]", params["padding_w"], params["padding_h"]));
-            params.remove("padding_w");
-            params.remove("padding_h");
-        }
+        // if params.contains_key("padding_w") && params.contains_key("padding_h") {
+        //     params.insert("padding".to_string(), format!("[{}, {}]", params["padding_w"], params["padding_h"]));
+        //     params.remove("padding_w");
+        //     params.remove("padding_h");
+        // }
         params.remove("name");
-        params.remove("tensors");
+        params.remove("tensors"); //for concat
         params.remove("out_dim");
         params.remove("out_channels");
         params.remove("x"); //for add
         params.remove("y"); //for add
+
+        if self.op_type == OpType::MULTIHEAD_ATTENTION {
+            params.remove("q"); 
+            params.remove("k"); 
+            params.remove("v"); 
+
+        }
 
         params.remove("activation"); //fused activation not supported at the moment
         params.remove("inplace"); //inplace not supported at the moment
@@ -562,7 +608,19 @@ impl Operator {
 
         for input in &self.inputs {
             input_names += "%";
-            input_names += input.name.as_str();
+            match ssa_ids {
+                Some(ssa) => {
+                    if ssa.contains_key(&input.name) {
+                        input_names += &ssa[&input.name].to_string();
+                    }
+                    else {
+                        input_names += input.name.as_str();
+                    }
+                    
+                }
+                _=> { input_names += input.name.as_str(); }
+            }
+            
             input_names += ", ";
 
             input_shapes += input.get_ir().as_str();
@@ -580,7 +638,19 @@ impl Operator {
 
         for output in &self.outputs {
             output_names += "%";
-            output_names += output.name.as_str();
+            match ssa_ids {
+                Some(ssa) => {
+                    if ssa.contains_key(&output.name) {
+                        output_names += &ssa[&output.name].to_string();
+                    }
+                    else {
+                        output_names += output.name.as_str();
+                    }
+                    
+                }
+                _=> { output_names += output.name.as_str(); }
+            }
+            
             output_names += ", ";
 
             output_shapes += output.get_ir().as_str();

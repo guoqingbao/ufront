@@ -11,11 +11,16 @@ from torch_def import SimpleCNN, ComplexCNN
 if __name__ == "__main__":
     batch_size = 1
     # input = np.zeros((batch_size, 3, 32, 32), dtype=np.float32)
-    input = np.zeros((batch_size, 3, 224, 224), dtype=np.float32)
+    # input = np.zeros((batch_size, 3, 224, 224), dtype=np.float32)
+    input = torch.ones((batch_size, 3, 224, 224), dtype=torch.float32)
+    input = input.numpy()
+    
 
     net = resnet50(pretrained=False)
+
     # net = models.vision_transformer.vit_b_16(pretrained=False)
     # net.train(False)
+    # a, b = net(input)
 
     # resnet.train(mode=False)
     model = UFrontTorch(net, batch_size=batch_size) # convert torch model to ufront model
@@ -51,12 +56,20 @@ if __name__ == "__main__":
     model.compile(optimizer={"type":"sgd", "lr":"0.01", "momentum":"0", "nesterov":"False", "weight_decay":"0"},
                          loss='sparse_categorical_crossentropy', metrics=['accuracy', 'sparse_categorical_crossentropy'])
     
-    print("\r\n\r\n")
+    print("\r\n\r\nIR for ", model.model.__class__.__name__)
 
     # for operator in operators:
     #   print(operator.ir) #show ir for each operator
+    modelir= model.dump_ir()
+    print(modelir)
 
-    print(model.dump_ir())
+    import pathlib
+    path = str(pathlib.Path(__file__).parent.resolve()) + "/output_ir/torch_" + model.model.__class__.__name__ + ".ir"
+    # path = str(pathlib.Path(__file__).parent.resolve()) + "/output_ir/torch_Resnet18.ir"
+
+    f = open(path, "w")
+    f.write(modelir)
+    f.close()
 
     #This will be supported later
     #model.forward()

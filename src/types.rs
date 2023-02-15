@@ -136,6 +136,7 @@ pub enum OpType {
     VIEW,
     ATTRIBUTE,
     EQ,
+    SLICE,
 }
 
 #[pymethods]
@@ -196,6 +197,7 @@ impl OpType {
             OpType::VIEW => "view",
             OpType::ATTRIBUTE => "attribute",
             OpType::EQ => "eq",
+            OpType::SLICE => "slice",
             // _ => panic!("Not supported operator!"),
         }
     }

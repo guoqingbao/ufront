@@ -342,9 +342,9 @@ class Conv2dNode(ModuleNode):
         use_bias = bool(int(items[13]))
         return ffmodel.conv2d(
             input=input_tensor, out_channels=out_channels,
-            kernel_h=kernel_h, kernel_w=kernel_w,
-            stride_h=stride_h, stride_w=stride_w,
-            padding_h=padding_h, padding_w=padding_w,
+            kernel=[kernel_h, kernel_w],
+            stride=[stride_h, stride_w],
+            padding=[padding_h, padding_w],
             activation=activation, groups=groups,
             use_bias=use_bias, name=name,
         )
@@ -354,12 +354,9 @@ class Conv2dNode(ModuleNode):
         return ffmodel.conv2d(
             input=input_tensor,
             out_channels=self.module.out_channels,
-            kernel_h=self.module.kernel_size[0],
-            kernel_w=self.module.kernel_size[1],
-            stride_h=self.module.stride[0],
-            stride_w=self.module.stride[1],
-            padding_h=self.module.padding[0],
-            padding_w=self.module.padding[1],
+            kernel=[self.module.kernel_size[0], self.module.kernel_size[1]],
+            stride=[self.module.stride[0], self.module.stride[1]],
+            padding=[self.module.padding[0], self.module.padding[1]],
             activation=self.acti_mode,
             groups=self.module.groups,
             use_bias=(self.module.bias is not None),
@@ -401,9 +398,9 @@ class Pool2dNode(ModuleNode):
         activation = ActiMode.as_enum(int(items[8]))
         return ffmodel.pool2d(
             input=input_tensor,
-            kernel_h=kernel_h, kernel_w=kernel_h,
-            stride_h=stride_h, stride_w=stride_h,
-            padding_h=padding_h, padding_w=padding_h,
+            kernel=[kernel_h, kernel_h],
+            stride=[stride_h, stride_h],
+            padding=[padding_h, padding_h],
             pool_type=pool_type, activation=activation,
             name=name,
         )
@@ -1489,18 +1486,17 @@ class GetItemNode(FunctionNode):
             # Get item from a tensor by slicing
             slice_strings = data.items[4:]
             slices = GetItemNode.strings_to_slices(slice_strings)
-            return GetItemNode.slice_tensor(
-                ffmodel, input_tensor, slices, data.name,
-            )
+            output_shape = np.zeros(shape=input_tensor.shape, dtype=np.float)[slices].shape
+            return ffmodel.slice_tensor(input=input_tensor, output_shape=output_shape, slices=slices, name=data.items[0])
 
     def to_ff(self, ffmodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         if type(input_tensor) is TensorF32:
             slices = self.innodes[1]
             assert type(slices) is tuple, f"Expected tuple slices but got {type(slices)}"
-            return GetItemNode.slice_tensor(
-                ffmodel, input_tensor, slices, self.name,
-            )
+            output_shape = np.zeros(shape=input_tensor.shape, dtype=np.float)[slices].shape
+            return ffmodel.slice_tensor(input=input_tensor, output_shape=output_shape, slices=slices, name=self.name)
+
         assert type(input_tensor) is list or \
             type(input_tensor) is tuple, \
             f"Expected list or tuple but got {type(input_tensor)}"
@@ -2750,21 +2746,26 @@ class UFrontTorch():
                 #     node_output = node.to_ff(self.ufront_model, node_to_output)
                 if type(node) in [GetItemNode, GetAttrNode, AttributeNode, EqNode, ScalarAddNode, ScalarFloorDivNode, ScalarMulNode, ScalarSubNode, ScalarTrueDivNode]:
                     print(type(node))
-                    node_output = node.to_ff(self.ufront_model, node_to_output)
-                else:
-                    operator = node.to_ff(self.ufront_model, node_to_output)
-                    if type(operator) == PyOperator:
-                        self.operators.append(operator)
-                        if isinstance(node, SplitNode):
-                            node_output = []
-                            for i in range(operator.num_of_outputs()):
-                                node_output.append(operator.get_output(i))
-                        elif isinstance(node, MultiheadAttentionNode):
-                            node_output = [operator.get_output(0), None] #multiheaded attention return tensor output and weights
-                        else:
-                            node_output = operator.get_output(0)
+                #     operator = node.to_ff(self.ufront_model, node_to_output)
+                #     if type(operator) == PyOperator:
+                #         self.operators.append(operator)
+                #         node_output = operator.get_output(0)
+                #     else:
+                #         node_output = operator
+                # else:
+                operator = node.to_ff(self.ufront_model, node_to_output)
+                if type(operator) == PyOperator:
+                    self.operators.append(operator)
+                    if isinstance(node, SplitNode):
+                        node_output = []
+                        for i in range(operator.num_of_outputs()):
+                            node_output.append(operator.get_output(i))
+                    elif isinstance(node, MultiheadAttentionNode):
+                        node_output = [operator.get_output(0), None] #multiheaded attention return tensor output and weights
                     else:
-                        node_output = operator
+                        node_output = operator.get_output(0)
+                else:
+                    node_output = operator
 
             # Save the node output for later nodes
             if node_output is not None:

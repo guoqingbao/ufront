@@ -28,15 +28,15 @@ from ..ufront import Model, PyOperator, TensorF32, Optimizer, LossType, MetricsT
 
 def onnx_to_ff_dt(datatype):
     if datatype == onnx.TensorProto.FLOAT:
-        return DataType.FLOAT
+        return DataType.Float
     elif datatype == onnx.TensorProto.DOUBLE:
-        return DataType.DOUBLE
+        return DataType.Double
     elif datatype == onnx.TensorProto.INT32:
-        return DataType.INT32
+        return DataType.Int32
     elif datatype == onnx.TensorProto.INT64:
-        return DataType.INT64
+        return DataType.Int64
     elif datatype == onnx.TensorProto.FLOAT16:
-        return DataType.HALF
+        return DataType.Half
     else:
         assert 0, "Unsupported datatype"
 
@@ -61,6 +61,7 @@ class ONNXTensor(object):
             self.dims[i] = dims[i]
 
 class ONNXModel(object):
+    const_tensor_idx = 1
     def __init__(self, onnx_model, ufront_model=None):
         if ufront_model != None:
             self.ufront_model = ufront_model
@@ -106,7 +107,11 @@ class ONNXModel(object):
     def handleSplit(self, node, node_to_output):
         input = node_to_output[node.input[0]]
         attribute = {x.name: x for x in node.attribute}
-        split = list(attribute['split'].ints)
+
+        if "split" in attribute:
+            split = list(attribute['split'].ints)
+        elif len(node.input) > 1:
+            split = node_to_output[node.input[1]]
         if 'axis' in attribute:
             axis = attribute['axis'].i
         else:
@@ -130,14 +135,14 @@ class ONNXModel(object):
                 assert 0, "Unknown auto_pad"
         else:
             padding = [0, 0]
-        return self.ufront_model.pool2d(input=input, kernel_h=kernel[0], kernel_w=kernel[1], 
-                        stride_h=stride[0], stride_w=stride[1], padding_h=padding[0], padding_w=padding[1], 
+        return self.ufront_model.pool2d(input=input, kernel=[kernel[0], kernel[1]], 
+                        stride=[stride[0], stride[1]], padding=[padding[0], padding[1]], 
                         pool_type=PoolType.POOL_AVG, name=node.name)
 
     def handleGlobalAveragePool(self, node, node_to_output):
         input = node_to_output[node.input[0]]
-        return self.ufront_model.pool2d(input=input, kernel_h=input.dims[2], kernel_w=input.dims[3], 
-                            stride_h=1, stride_w=1, padding_h=0, padding_w=0, pool_type=PoolType.POOL_AVG, name=node.name)
+        return self.ufront_model.pool2d(input=input, kernel=[input.dims[2], input.dims[3]], 
+                            stride=[1, 1], padding=[0, 0], pool_type=PoolType.POOL_AVG, name=node.name)
 
     def handleBatchNormalization(self, node, node_to_output):
         input = node_to_output[node.input[0]]
@@ -162,9 +167,10 @@ class ONNXModel(object):
             padding = [0, 0]
         group = attribute["group"].i
         out_channels = self.inputs[node.input[1]].dims[0]
-        return self.ufront_model.conv2d(input=input, out_channels=out_channels, kernel_h=kernel[0], 
-                kernel_w=kernel[1], stride_h=stride[0], stride_w=stride[1], 
-                padding_h=padding[0], padding_w=padding[1], 
+        return self.ufront_model.conv2d(input=input, out_channels=out_channels, 
+                kernel=[kernel[0], kernel[1]],
+                stride=[stride[0], stride[1]], 
+                padding=[padding[0], padding[1]], 
                 activation=ActiMode.AC_MODE_NONE, groups=group, name=node.name)
 
     def handleDropout(self, node, node_to_output):
@@ -208,9 +214,9 @@ class ONNXModel(object):
                 assert 0, "Unknown auto_pad"
         else:
             padding = [0, 0]
-        return self.ufront_model.pool2d(input=input, kernel_h=kernel[0], kernel_w=kernel[1], 
-                            stride_h=stride[0], stride_w=stride[1], 
-                            padding_h=padding[0], padding_w=padding[1], name=node.name)
+        return self.ufront_model.pool2d(input=input, kernel=[kernel[0], kernel[1]], 
+                            stride=[stride[0], stride[1]], 
+                            padding=[padding[0], padding[1]], name=node.name)
 
     def handleRelu(self, node, node_to_output):
         input = node_to_output[node.input[0]]
@@ -248,16 +254,26 @@ class ONNXModel(object):
         tensor = attribute["value"].t
         data_type = onnx_to_ff_dt(tensor.data_type)
         raw_data = tensor.raw_data
-        if data_type == DataType.FLOAT:
-            value = struct.unpack('f', raw_data)
+        
+        if len(tensor.dims) > 1: #TODO set raw_data array to constant tensor
+            output = self.ufront_model.create_tensor(tensor.dims, DataType.Float, True, "constant_tensor" + str(ONNXModel.const_tensor_idx))
+            ONNXModel.const_tensor_idx += 1
         else:
-            assert 0, "not implemented"
-        if len(tensor.dims) != 0:
-            #TODO: this path has not tested
-            output = self.ufront_model.create_constant(tensor,dims, value[0], data_type)
-            logging.warning("self.ufront_model.create_constant: {}, {}, {}".format(dims, value[0], data_type))
-        else:
-            output = value[0]
+            values = []
+            for i in range(tensor.dims[0]):
+                if data_type == DataType.Float:
+                    value = struct.unpack('f', raw_data[i*4:(i+1)*4])
+                elif data_type == DataType.Int32:
+                    value = struct.unpack('i', raw_data[i*4:(i+1)*4])
+                if data_type == DataType.Int64:
+                    value = struct.unpack('l', raw_data[i*8:(i+1)*8])
+                elif data_type == DataType.Double:
+                    value = struct.unpack('d', raw_data[i*8:(i+1)*8])
+                elif data_type == DataType.Half:
+                    value = struct.unpack('e', raw_data[i*2:(i+1)*2])
+                values.append(value[0])
+            output = values
+
         return output
         
     def handleRange(self, node, node_to_output):
@@ -294,14 +310,16 @@ class ONNXModel(object):
             outputs[output.name] = output
 
         node_to_output.update(inputs)
-        
+        # for node in self.model.graph.node:
+        #     print(node.name)
+
         for node in self.model.graph.node:
             handler_name = 'handle' + node.op_type
             if hasattr(self, handler_name):
                 handler = getattr(self, handler_name)
                 operator = handler(node, node_to_output)
                 
-                if node.op_type == "Transpose":
+                if node.op_type == "Transpose" or node.op_type == "Constant":
                     node_output = operator
                 elif node.op_type == "Split":
                     self.operators.append(operator)
@@ -398,7 +416,8 @@ class ONNXModelKeras(ONNXModel):
             print("dims", dims)
         else:
             assert 0
-        tensor = self.ufront_model.create_constant(dims, 0.0, DataType.FLOAT)
+        tensor = self.ufront_model.create_tensor(dims, DataType.Float, True, "constant_tensor"+str(ONNXModel.const_tensor_idx))
+        ONNXModel.const_tensor_idx += 1
         print("create constant", input.name)
         return tensor
 
