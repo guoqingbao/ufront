@@ -136,13 +136,13 @@ class ONNXModel(object):
         else:
             padding = [0, 0]
         return self.ufront_model.pool2d(input=input, kernel=[kernel[0], kernel[1]], 
-                        stride=[stride[0], stride[1]], padding=[padding[0], padding[1]], 
+                        stride=[stride[0], stride[1]], pad=[padding[0], padding[1]], 
                         pool_type=PoolType.POOL_AVG, name=node.name)
 
     def handleGlobalAveragePool(self, node, node_to_output):
         input = node_to_output[node.input[0]]
         return self.ufront_model.pool2d(input=input, kernel=[input.dims[2], input.dims[3]], 
-                            stride=[1, 1], padding=[0, 0], pool_type=PoolType.POOL_AVG, name=node.name)
+                            stride=[1, 1], pad=[0, 0], pool_type=PoolType.POOL_AVG, name=node.name)
 
     def handleBatchNormalization(self, node, node_to_output):
         input = node_to_output[node.input[0]]
@@ -170,7 +170,7 @@ class ONNXModel(object):
         return self.ufront_model.conv2d(input=input, out_channels=out_channels, 
                 kernel=[kernel[0], kernel[1]],
                 stride=[stride[0], stride[1]], 
-                padding=[padding[0], padding[1]], 
+                pad=[padding[0], padding[1]], 
                 activation=ActiMode.AC_MODE_NONE, groups=group, name=node.name)
 
     def handleDropout(self, node, node_to_output):
@@ -215,8 +215,8 @@ class ONNXModel(object):
         else:
             padding = [0, 0]
         return self.ufront_model.pool2d(input=input, kernel=[kernel[0], kernel[1]], 
-                            stride=[stride[0], stride[1]], 
-                            padding=[padding[0], padding[1]], name=node.name)
+                            stride=[stride[0], stride[1]], pool_type=PoolType.POOL_MAX,
+                            pad=[padding[0], padding[1]], name=node.name)
 
     def handleRelu(self, node, node_to_output):
         input = node_to_output[node.input[0]]

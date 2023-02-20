@@ -115,29 +115,29 @@ if __name__ == "__main__":
   ## IR Dump Results (for Pytorch)
   ### (Converted from Pytorch model to TOSA-like IR after calling dump_ir())
 
-  func.func @forward(%input1: tensor<32x3x32x32>, %input2: tensor<32x3x32x32>) -> tensor<32x10>  { 
-        %conv1="ufront.conv2d"(%input1){"groups": "1", "padding": "[0, 0]", "out_channels": "32", "kernel_size": "[3, 3]", "stride": "[1, 1]"}:(tensor<32x3x32x32>) -> tensor<32x32x30x30>
-        %relu_1="ufront.relu"(%conv1):(tensor<32x32x30x30>) -> tensor<32x32x30x30>
-        %conv1_1="ufront.conv2d"(%input2){"groups": "1", "stride": "[1, 1]", "padding": "[0, 0]", "out_channels": "32", "kernel_size": "[3, 3]"}:(tensor<32x3x32x32>) -> tensor<32x32x30x30>
-        %relu_2="ufront.relu"(%conv1_1):(tensor<32x32x30x30>) -> tensor<32x32x30x30>
-        %cat_1="ufront.concat"(%relu_1, %relu_2){"axis": "1"}:(tensor<32x32x30x30>, tensor<32x32x30x30>) -> tensor<32x64x30x30>
-        %split_1, %split_1_1="ufront.split"(%cat_1){"axis": "1", "sizes": "[32, 32]"}:(tensor<32x64x30x30>) -> tensor<32x32x30x30>, tensor<32x32x30x30>
-        %cat_2="ufront.concat"(%split_1, %split_1_1){"axis": "1"}:(tensor<32x32x30x30>, tensor<32x32x30x30>) -> tensor<32x64x30x30>
-        %conv2="ufront.conv2d"(%cat_2){"kernel_size": "[3, 3]", "stride": "[1, 1]", "out_channels": "64", "padding": "[0, 0]", "groups": "1"}:(tensor<32x64x30x30>) -> tensor<32x64x28x28>
-        %relu_3="ufront.relu"(%conv2):(tensor<32x64x28x28>) -> tensor<32x64x28x28>
-        %pool1="ufront.pool2d"(%relu_3){"pool_type": "PoolType.POOL_MAX", "stride": "[2, 2]", "padding": "[0, 0]", "kernel_size": "[2, 2]"}:(tensor<32x64x28x28>) -> tensor<32x64x14x14>
-        %conv3="ufront.conv2d"(%pool1){"out_channels": "64", "groups": "1", "stride": "[1, 1]", "kernel_size": "[3, 3]", "padding": "[0, 0]"}:(tensor<32x64x14x14>) -> tensor<32x64x12x12>
-        %relu_4="ufront.relu"(%conv3):(tensor<32x64x12x12>) -> tensor<32x64x12x12>
-        %conv4="ufront.conv2d"(%relu_4){"padding": "[0, 0]", "groups": "1", "stride": "[1, 1]", "kernel_size": "[3, 3]", "out_channels": "64"}:(tensor<32x64x12x12>) -> tensor<32x64x10x10>
-        %relu_5="ufront.relu"(%conv4):(tensor<32x64x10x10>) -> tensor<32x64x10x10>
-        %pool2="ufront.pool2d"(%relu_5){"pool_type": "PoolType.POOL_MAX", "stride": "[2, 2]", "padding": "[0, 0]", "kernel_size": "[2, 2]"}:(tensor<32x64x10x10>) -> tensor<32x64x5x5>
-        %flat1="ufront.flat"(%pool2):(tensor<32x64x5x5>) -> tensor<32x1600>
-        %linear1="ufront.linear"(%flat1):(tensor<32x1600>) -> tensor<32x512>
-        %relu_6="ufront.relu"(%linear1):(tensor<32x512>) -> tensor<32x512>
-        %linear2="ufront.linear"(%relu_6):(tensor<32x512>) -> tensor<32x10>
-        %softmax="ufront.softmax"(%linear2):(tensor<32x10>) -> tensor<32x10>
-        return %softmax: tensor<32x10>
-}
+func.func @forward(%input2: tensor<1x3x32x32xf32>, %input1: tensor<1x3x32x32xf32>) -> tensor<1x10xf32>  { 
+   	%1="ufront.conv2d"(%input1){kernel: [3, 3], pad: [0, 0], groups: 1, stride: [1, 1]}:(tensor<1x3x32x32xf32>) -> tensor<1x32x30x30xf32>
+   	%2="ufront.relu"(%1):(tensor<1x32x30x30xf32>) -> tensor<1x32x30x30xf32>
+   	%3="ufront.conv2d"(%input2){stride: [1, 1], kernel: [3, 3], pad: [0, 0], groups: 1}:(tensor<1x3x32x32xf32>) -> tensor<1x32x30x30xf32>
+   	%4="ufront.relu"(%3):(tensor<1x32x30x30xf32>) -> tensor<1x32x30x30xf32>
+   	%5="ufront.concat"(%2, %4){axis: 1}:(tensor<1x32x30x30xf32>, tensor<1x32x30x30xf32>) -> tensor<1x64x30x30xf32>
+   	%6, %7="ufront.split"(%5){axis: 1, sizes: [32, 32]}:(tensor<1x64x30x30xf32>) -> tensor<1x32x30x30xf32>, tensor<1x32x30x30xf32>
+   	%8="ufront.concat"(%6, %7){axis: 1}:(tensor<1x32x30x30xf32>, tensor<1x32x30x30xf32>) -> tensor<1x64x30x30xf32>
+   	%9="ufront.conv2d"(%8){pad: [0, 0], groups: 1, kernel: [3, 3], stride: [1, 1]}:(tensor<1x64x30x30xf32>) -> tensor<1x64x28x28xf32>
+   	%10="ufront.relu"(%9):(tensor<1x64x28x28xf32>) -> tensor<1x64x28x28xf32>
+   	%11="ufront.pool2d"(%10){pad: [0, 0], kernel: [2, 2], pool_type: PoolType.POOL_MAX, stride: [2, 2]}:(tensor<1x64x28x28xf32>) -> tensor<1x64x14x14xf32>
+   	%12="ufront.conv2d"(%11){kernel: [3, 3], groups: 1, stride: [1, 1], pad: [0, 0]}:(tensor<1x64x14x14xf32>) -> tensor<1x64x12x12xf32>
+   	%13="ufront.relu"(%12):(tensor<1x64x12x12xf32>) -> tensor<1x64x12x12xf32>
+   	%14="ufront.conv2d"(%13){stride: [1, 1], groups: 1, pad: [0, 0], kernel: [3, 3]}:(tensor<1x64x12x12xf32>) -> tensor<1x64x10x10xf32>
+   	%15="ufront.relu"(%14):(tensor<1x64x10x10xf32>) -> tensor<1x64x10x10xf32>
+   	%16="ufront.pool2d"(%15){pool_type: PoolType.POOL_MAX, kernel: [2, 2], stride: [2, 2], pad: [0, 0]}:(tensor<1x64x10x10xf32>) -> tensor<1x64x5x5xf32>
+   	%17="ufront.flat"(%16):(tensor<1x64x5x5xf32>) -> tensor<1x1600xf32>
+   	%18="ufront.linear"(%17):(tensor<1x1600xf32>) -> tensor<1x512xf32>
+   	%19="ufront.relu"(%18):(tensor<1x512xf32>) -> tensor<1x512xf32>
+   	%20="ufront.linear"(%19):(tensor<1x512xf32>) -> tensor<1x10xf32>
+   	%21="ufront.softmax"(%20):(tensor<1x10xf32>) -> tensor<1x10xf32>
+   	return %21: tensor<1x10xf32>
+   }
 ```
 
 ## Sample usage for ONNX Models
@@ -193,27 +193,195 @@ if __name__ == "__main__":
 
   ## IR Dump Results (for ONNX)
   ### (Converted from ONNX model to High-level IR after calling dump_ir(), i.e., TOSA-like dialect IR)
-  func.func @forward(%input2: tensor<32x3x32x32>, %input1: tensor<32x3x32x32>) -> tensor<32x10>  { 
-        %Conv_0="ufront.conv2d"(%input1){"out_channels": "32", "stride": "[1, 1]", "kernel_size": "[3, 3]", "groups": "1", "padding": "[0, 0]"}:(tensor<32x3x32x32>) -> tensor<32x32x30x30>
-        %Relu_1="ufront.relu"(%Conv_0):(tensor<32x32x30x30>) -> tensor<32x32x30x30>
-        %Conv_2="ufront.conv2d"(%input2){"stride": "[1, 1]", "out_channels": "32", "groups": "1", "kernel_size": "[3, 3]", "padding": "[0, 0]"}:(tensor<32x3x32x32>) -> tensor<32x32x30x30>
-        %Relu_3="ufront.relu"(%Conv_2):(tensor<32x32x30x30>) -> tensor<32x32x30x30>
-        %Concat_4="ufront.concat"(%Relu_1, %Relu_3){"axis": "1"}:(tensor<32x32x30x30>, tensor<32x32x30x30>) -> tensor<32x64x30x30>
-        %Split_5, %Split_5_1="ufront.split"(%Concat_4){"sizes": "[32, 32]", "axis": "1"}:(tensor<32x64x30x30>) -> tensor<32x32x30x30>, tensor<32x32x30x30>
-        %Concat_6="ufront.concat"(%Split_5, %Split_5_1){"axis": "1"}:(tensor<32x32x30x30>, tensor<32x32x30x30>) -> tensor<32x64x30x30>
-        %Conv_7="ufront.conv2d"(%Concat_6){"out_channels": "64", "kernel_size": "[3, 3]", "stride": "[1, 1]", "groups": "1", "padding": "[0, 0]"}:(tensor<32x64x30x30>) -> tensor<32x64x28x28>
-        %Relu_8="ufront.relu"(%Conv_7):(tensor<32x64x28x28>) -> tensor<32x64x28x28>
-        %MaxPool_9="ufront.pool2d"(%Relu_8){"padding": "[0, 0]", "kernel_size": "[2, 2]", "stride": "[2, 2]"}:(tensor<32x64x28x28>) -> tensor<32x64x14x14>
-        %Conv_10="ufront.conv2d"(%MaxPool_9){"stride": "[1, 1]", "groups": "1", "out_channels": "64", "padding": "[0, 0]", "kernel_size": "[3, 3]"}:(tensor<32x64x14x14>) -> tensor<32x64x12x12>
-        %Relu_11="ufront.relu"(%Conv_10):(tensor<32x64x12x12>) -> tensor<32x64x12x12>
-        %Conv_12="ufront.conv2d"(%Relu_11){"stride": "[1, 1]", "out_channels": "64", "padding": "[0, 0]", "kernel_size": "[3, 3]", "groups": "1"}:(tensor<32x64x12x12>) -> tensor<32x64x10x10>
-        %Relu_13="ufront.relu"(%Conv_12):(tensor<32x64x10x10>) -> tensor<32x64x10x10>
-        %MaxPool_14="ufront.pool2d"(%Relu_13){"kernel_size": "[2, 2]", "stride": "[2, 2]", "padding": "[0, 0]"}:(tensor<32x64x10x10>) -> tensor<32x64x5x5>
-        %Flatten_15="ufront.flat"(%MaxPool_14):(tensor<32x64x5x5>) -> tensor<32x1600>
-        %Dense_1="ufront.linear"(%Flatten_15):(tensor<32x1600>) -> tensor<32x512>
-        %Relu_17="ufront.relu"(%Dense_1):(tensor<32x512>) -> tensor<32x512>
-        %Dense_2="ufront.linear"(%Relu_17):(tensor<32x512>) -> tensor<32x10>
-        %softmax="ufront.softmax"(%Dense_2):(tensor<32x10>) -> tensor<32x10>
-        return %softmax: tensor<32x10>
+  func.func @forward(%input.5: tensor<32x3x32x32xf32>, %input.1: tensor<32x3x32x32xf32>) -> tensor<32x10xf32>  { 
+   	%1="ufront.conv2d"(%input.1){groups: 1, kernel: [3, 3], pad: [0, 0], stride: [1, 1]}:(tensor<32x3x32x32xf32>) -> tensor<32x32x30x30xf32>
+   	%2="ufront.relu"(%1):(tensor<32x32x30x30xf32>) -> tensor<32x32x30x30xf32>
+   	%3="ufront.conv2d"(%input.5){pad: [0, 0], stride: [1, 1], groups: 1, kernel: [3, 3]}:(tensor<32x3x32x32xf32>) -> tensor<32x32x30x30xf32>
+   	%4="ufront.relu"(%3):(tensor<32x32x30x30xf32>) -> tensor<32x32x30x30xf32>
+   	%5="ufront.concat"(%2, %4){axis: 1}:(tensor<32x32x30x30xf32>, tensor<32x32x30x30xf32>) -> tensor<32x64x30x30xf32>
+   	%6, %7="ufront.split"(%5){sizes: [32, 32], axis: 1}:(tensor<32x64x30x30xf32>) -> tensor<32x32x30x30xf32>, tensor<32x32x30x30xf32>
+   	%8="ufront.concat"(%6, %7){axis: 1}:(tensor<32x32x30x30xf32>, tensor<32x32x30x30xf32>) -> tensor<32x64x30x30xf32>
+   	%9="ufront.conv2d"(%8){groups: 1, kernel: [3, 3], pad: [0, 0], stride: [1, 1]}:(tensor<32x64x30x30xf32>) -> tensor<32x64x28x28xf32>
+   	%10="ufront.relu"(%9):(tensor<32x64x28x28xf32>) -> tensor<32x64x28x28xf32>
+   	%11="ufront.pool2d"(%10){kernel: [2, 2], pad: [0, 0], stride: [2, 2], pool_type: PoolType.POOL_MAX}:(tensor<32x64x28x28xf32>) -> tensor<32x64x14x14xf32>
+   	%12="ufront.conv2d"(%11){stride: [1, 1], kernel: [3, 3], pad: [0, 0], groups: 1}:(tensor<32x64x14x14xf32>) -> tensor<32x64x12x12xf32>
+   	%13="ufront.relu"(%12):(tensor<32x64x12x12xf32>) -> tensor<32x64x12x12xf32>
+   	%14="ufront.conv2d"(%13){kernel: [3, 3], groups: 1, stride: [1, 1], pad: [0, 0]}:(tensor<32x64x12x12xf32>) -> tensor<32x64x10x10xf32>
+   	%15="ufront.relu"(%14):(tensor<32x64x10x10xf32>) -> tensor<32x64x10x10xf32>
+   	%16="ufront.pool2d"(%15){pad: [0, 0], stride: [2, 2], kernel: [2, 2], pool_type: PoolType.POOL_MAX}:(tensor<32x64x10x10xf32>) -> tensor<32x64x5x5xf32>
+   	%17="ufront.flat"(%16):(tensor<32x64x5x5xf32>) -> tensor<32x1600xf32>
+   	%18="ufront.linear"(%17):(tensor<32x1600xf32>) -> tensor<32x512xf32>
+   	%19="ufront.relu"(%18):(tensor<32x512xf32>) -> tensor<32x512xf32>
+   	%20="ufront.linear"(%19):(tensor<32x512xf32>) -> tensor<32x10xf32>
+   	%21="ufront.softmax"(%20):(tensor<32x10xf32>) -> tensor<32x10xf32>
+   	return %21: tensor<32x10xf32>
+   }
+```
+## Sample usage for Keras Models
+``` Python
+from tensorflow.keras import backend
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Activation, Input, Concatenate
+from tensorflow.keras import Model
+from tensorflow.keras.datasets import cifar10
+
+from ufront.keras.model import UFrontKeras
+
+def NestedCNN(shape=(3, 32, 32), dtype="float32", num_classes = 10):
+    input_tensor1 = Input(shape=shape, dtype=dtype)
+    output_tensor1 = Conv2D(filters=32, kernel_size=(3,3), strides=(1,1), padding="valid", activation="relu")(input_tensor1)
+    output_tensor1 = Conv2D(filters=32, kernel_size=(3,3), strides=(1,1), padding="valid", activation="relu")(output_tensor1)
+    output_tensor1 = MaxPooling2D(pool_size=(2,2), strides=(2,2), padding="valid")(output_tensor1)
+    model1 = Model(input_tensor1, output_tensor1)
+    
+    input_tensor2 = Input(shape=(32, 14, 14), dtype="float32")
+    output_tensor2 = Conv2D(filters=64, kernel_size=(3,3), strides=(1,1), padding="valid", activation="relu")(input_tensor2)
+    output_tensor2 = Conv2D(filters=64, kernel_size=(3,3), strides=(1,1), padding="valid", activation="relu")(output_tensor2)
+    output_tensor2 = MaxPooling2D(pool_size=(2,2), strides=(2,2), padding="valid")(output_tensor2)
+    output_tensor2 = Flatten()(output_tensor2)
+    output_tensor2 = Dense(512, activation="relu")(output_tensor2)
+    output_tensor2 = Dense(num_classes)(output_tensor2)
+    output_tensor2 = Activation("softmax")(output_tensor2)
+    model2 = Model(input_tensor2, output_tensor2)
+    
+    input_tensor3 = Input(shape=(3, 32, 32), dtype="float32")
+    output_tensor3 = model1(input_tensor3)
+    output_tensor3 = model2(output_tensor3)
+    
+    return {3: input_tensor3}, output_tensor3, "NestedCNN"
+
+if __name__ == "__main__":
+    backend.set_image_data_format('channels_first')
+    num_classes = 10
+    (x_train, y_train), (x_test, y_test) = cifar10.load_data()
+    x_train = x_train.astype('float32') / 255
+    y_train = y_train.astype('int32')
+    print("shape: ", x_train.shape)
+    
+    # inputs, outputs, model_name = SequentialCNN(shape=(3, 32, 32), dtype="float32", num_classes=10)
+    # inputs, outputs, model_name = ConcatenatedCNN(shape=(3, 32, 32), dtype="float32", num_classes=10)
+    inputs, outputs, model_name = NestedCNN(shape=(3, 32, 32), dtype="float32", num_classes=10)
+
+    model = UFrontKeras(inputs = inputs, outputs = outputs, batch_size = 32)
+
+    model.compile(optimizer={"type":"sgd", "lr":"0.01", "momentum":"0", "nesterov":"False", "weight_decay":"0"},
+                         loss='sparse_categorical_crossentropy', metrics=['accuracy', 'sparse_categorical_crossentropy'])
+
+    # opt = optimizers.SGD(learning_rate=0.01)
+    # model.compile(optimizer=opt, loss='sparse_categorical_crossentropy', metrics=['accuracy', 'sparse_categorical_crossentropy'])
+    
+    print(model.summary()) 
+
+    # for operator in operators:
+    #   print(operator.ir) #show ir for each operator
+    print(model.dump_ir())
+
+    #This will be supported later
+    #model.forward()
+    
+    #This will be supported later
+    #model.backward()
+
+  ## IR Dump Results (for Keras)
+  ### (Converted from Keras model to High-level IR after calling dump_ir(), i.e., TOSA-like dialect IR)
+  func.func @forward(%input1: tensor<32x3x32x32xf32>) -> tensor<32x10xf32>  { 
+   	%1="ufront.conv2d"(%input1){kernel: [3, 3], stride: [1, 1], pad: [0, 0], groups: 1}:(tensor<32x3x32x32xf32>) -> tensor<32x32x30x30xf32>
+   	%2="ufront.relu"(%1):(tensor<32x32x30x30xf32>) -> tensor<32x32x30x30xf32>
+   	%3="ufront.conv2d"(%2){stride: [1, 1], groups: 1, pad: [0, 0], kernel: [3, 3]}:(tensor<32x32x30x30xf32>) -> tensor<32x32x28x28xf32>
+   	%4="ufront.relu"(%3):(tensor<32x32x28x28xf32>) -> tensor<32x32x28x28xf32>
+   	%5="ufront.pool2d"(%4){pool_type: PoolType.POOL_MAX, stride: [2, 2], pad: [0, 0], kernel: [2, 2]}:(tensor<32x32x28x28xf32>) -> tensor<32x32x14x14xf32>
+   	%6="ufront.conv2d"(%5){pad: [0, 0], groups: 1, kernel: [3, 3], stride: [1, 1]}:(tensor<32x32x14x14xf32>) -> tensor<32x64x12x12xf32>
+   	%7="ufront.relu"(%6):(tensor<32x64x12x12xf32>) -> tensor<32x64x12x12xf32>
+   	%8="ufront.conv2d"(%7){groups: 1, kernel: [3, 3], pad: [0, 0], stride: [1, 1]}:(tensor<32x64x12x12xf32>) -> tensor<32x64x10x10xf32>
+   	%9="ufront.relu"(%8):(tensor<32x64x10x10xf32>) -> tensor<32x64x10x10xf32>
+   	%10="ufront.pool2d"(%9){pad: [0, 0], pool_type: PoolType.POOL_MAX, kernel: [2, 2], stride: [2, 2]}:(tensor<32x64x10x10xf32>) -> tensor<32x64x5x5xf32>
+   	%11="ufront.flat"(%10):(tensor<32x64x5x5xf32>) -> tensor<32x1600xf32>
+   	%12="ufront.linear"(%11):(tensor<32x1600xf32>) -> tensor<32x512xf32>
+   	%13="ufront.relu"(%12):(tensor<32x512xf32>) -> tensor<32x512xf32>
+   	%14="ufront.linear"(%13):(tensor<32x512xf32>) -> tensor<32x10xf32>
+   	%15="ufront.softmax"(%14):(tensor<32x10xf32>) -> tensor<32x10xf32>
+   	return %15: tensor<32x10xf32>
+   }   
+```
+
+## Sample native usage
+``` Python
+import ufront
+import numpy as np;
+from ufront import OpType, PoolType, LossType, MetricsType, Optimizer
+
+if __name__ == "__main__":
+   model = ufront.Model()
+   batch_size = 1
+
+   input = np.ones((batch_size,3,32,32), dtype=np.float32)
+
+   tensor_input1 = ufront.TensorF32(input, name="input1")
+   tensor_input2 = ufront.TensorF32(input, name="input2")
+
+   x = model.conv2d(input=tensor_input1, out_channels=32, kernel=[3, 3], stride=[1, 1], pad=[0, 0], groups=1)
+   x1 = model.relu(input=x.get_output(0))
+
+   x = model.conv2d(input=tensor_input2, out_channels=32, kernel=[3, 3], stride=[1, 1], pad=[0, 0], groups=1)
+   x2 = model.relu(input=x.get_output(0))
+
+   x = model.concat(tensors=[x1.get_output(0), x2.get_output(0)], axis=1)
+   x = model.split(input=x.get_output(0), sizes = [32, 32], axis=1)
+   x = model.concat(tensors=[x.get_output(0), x.get_output(1)], axis=1)
+
+   x = model.conv2d(input=x.get_output(0), out_channels=64, kernel=[3, 3], stride=[1, 1], pad=[0, 0], groups=1)
+   x = model.relu(input=x.get_output(0))
+   x = model.pool2d(input=x.get_output(0), kernel=[2, 2], stride=[2, 2], pad=[0, 0], pool_type=PoolType.POOL_MAX)
+
+   x = model.conv2d(input=x.get_output(0), out_channels=64, kernel=[3, 3], stride=[1, 1], pad=[0, 0], groups=1)
+   x = model.relu(input=x.get_output(0))
+
+   x = model.conv2d(input=x.get_output(0), out_channels=64, kernel=[3, 3], stride=[1, 1], pad=[0, 0], groups=1)
+   x = model.relu(input=x.get_output(0))
+   x = model.pool2d(input=x.get_output(0), kernel=[2, 2], stride=[2, 2], pad=[0, 0], pool_type=PoolType.POOL_MAX)
+
+   x = model.flat(input=x.get_output(0))
+   x = model.dense(input=x.get_output(0), out_dim=512)
+
+   x = model.relu(input=x.get_output(0))
+   x = model.dense(input=x.get_output(0), out_dim=10)
+   x = model.softmax(input=x.get_output(0))
+
+   model.optimizer = Optimizer(params={"type":"sgd", "lr":"0.01", "momentum":"0", "nesterov":"False", "weight_decay":"0"})
+
+   model.compile(loss=LossType.CATEGORICAL_CROSSENTROPY, metrics=[MetricsType.ACCURACY, MetricsType.SPARSE_CATEGORICAL_CROSSENTROPY])
+   
+   print(model.dump_ir())
+   
+   #This will be supported later
+   #model.forward()
+    
+   #This will be supported later
+   #model.backward()
+
+  ## IR Dump Results (for Native usage)
+  ### (Converted from natively defined model to High-level IR after calling dump_ir(), i.e., TOSA-like dialect IR)
+  func.func @forward(%input1: tensor<1x3x32x32xf32>, %input2: tensor<1x3x32x32xf32>) -> tensor<1x10xf32>  { 
+   	%1="ufront.conv2d"(%input1){kernel: [3, 3], stride: [1, 1], pad: [0, 0], groups: 1}:(tensor<1x3x32x32xf32>) -> tensor<1x32x30x30xf32>
+   	%2="ufront.relu"(%1):(tensor<1x32x30x30xf32>) -> tensor<1x32x30x30xf32>
+   	%3="ufront.conv2d"(%input2){kernel: [3, 3], stride: [1, 1], groups: 1, pad: [0, 0]}:(tensor<1x3x32x32xf32>) -> tensor<1x32x30x30xf32>
+   	%4="ufront.relu"(%3):(tensor<1x32x30x30xf32>) -> tensor<1x32x30x30xf32>
+   	%5="ufront.concat"(%2, %4){axis: 1}:(tensor<1x32x30x30xf32>, tensor<1x32x30x30xf32>) -> tensor<1x64x30x30xf32>
+   	%6, %7="ufront.split"(%5){axis: 1, sizes: [32, 32]}:(tensor<1x64x30x30xf32>) -> tensor<1x32x30x30xf32>, tensor<1x32x30x30xf32>
+   	%8="ufront.concat"(%6, %7){axis: 1}:(tensor<1x32x30x30xf32>, tensor<1x32x30x30xf32>) -> tensor<1x64x30x30xf32>
+   	%9="ufront.conv2d"(%8){groups: 1, pad: [0, 0], kernel: [3, 3], stride: [1, 1]}:(tensor<1x64x30x30xf32>) -> tensor<1x64x28x28xf32>
+   	%10="ufront.relu"(%9):(tensor<1x64x28x28xf32>) -> tensor<1x64x28x28xf32>
+   	%11="ufront.pool2d"(%10){kernel: [2, 2], pad: [0, 0], stride: [2, 2], pool_type: PoolType.POOL_MAX}:(tensor<1x64x28x28xf32>) -> tensor<1x64x14x14xf32>
+   	%12="ufront.conv2d"(%11){kernel: [3, 3], stride: [1, 1], pad: [0, 0], groups: 1}:(tensor<1x64x14x14xf32>) -> tensor<1x64x12x12xf32>
+   	%13="ufront.relu"(%12):(tensor<1x64x12x12xf32>) -> tensor<1x64x12x12xf32>
+   	%14="ufront.conv2d"(%13){stride: [1, 1], kernel: [3, 3], pad: [0, 0], groups: 1}:(tensor<1x64x12x12xf32>) -> tensor<1x64x10x10xf32>
+   	%15="ufront.relu"(%14):(tensor<1x64x10x10xf32>) -> tensor<1x64x10x10xf32>
+   	%16="ufront.pool2d"(%15){pool_type: PoolType.POOL_MAX, stride: [2, 2], kernel: [2, 2], pad: [0, 0]}:(tensor<1x64x10x10xf32>) -> tensor<1x64x5x5xf32>
+   	%17="ufront.flat"(%16):(tensor<1x64x5x5xf32>) -> tensor<1x1600xf32>
+   	%18="ufront.linear"(%17):(tensor<1x1600xf32>) -> tensor<1x512xf32>
+   	%19="ufront.relu"(%18):(tensor<1x512xf32>) -> tensor<1x512xf32>
+   	%20="ufront.linear"(%19):(tensor<1x512xf32>) -> tensor<1x10xf32>
+   	%21="ufront.softmax"(%20):(tensor<1x10xf32>) -> tensor<1x10xf32>
+   	return %21: tensor<1x10xf32>
+   }
 }
 ```

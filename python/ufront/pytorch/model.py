@@ -344,7 +344,7 @@ class Conv2dNode(ModuleNode):
             input=input_tensor, out_channels=out_channels,
             kernel=[kernel_h, kernel_w],
             stride=[stride_h, stride_w],
-            padding=[padding_h, padding_w],
+            pad=[padding_h, padding_w],
             activation=activation, groups=groups,
             use_bias=use_bias, name=name,
         )
@@ -356,7 +356,7 @@ class Conv2dNode(ModuleNode):
             out_channels=self.module.out_channels,
             kernel=[self.module.kernel_size[0], self.module.kernel_size[1]],
             stride=[self.module.stride[0], self.module.stride[1]],
-            padding=[self.module.padding[0], self.module.padding[1]],
+            pad=[self.module.padding[0], self.module.padding[1]],
             activation=self.acti_mode,
             groups=self.module.groups,
             use_bias=(self.module.bias is not None),
@@ -400,7 +400,7 @@ class Pool2dNode(ModuleNode):
             input=input_tensor,
             kernel=[kernel_h, kernel_h],
             stride=[stride_h, stride_h],
-            padding=[padding_h, padding_h],
+            pad=[padding_h, padding_h],
             pool_type=pool_type, activation=activation,
             name=name,
         )
@@ -409,12 +409,9 @@ class Pool2dNode(ModuleNode):
         input_tensor = node_to_output[self.innodes[0].name]
         return ffmodel.pool2d(
             input=input_tensor,
-            kernel_h=self.module.kernel_size,
-            kernel_w=self.module.kernel_size,
-            stride_h=self.module.stride,
-            stride_w=self.module.stride,
-            padding_h=self.module.padding,
-            padding_w=self.module.padding,
+            kernel=[self.module.kernel_size, self.module.kernel_size],
+            stride=[self.module.stride, self.module.stride],
+            pad=[self.module.padding, self.module.padding],
             pool_type=self.pool_type,
             activation=self.acti_mode,
             name=self.name,

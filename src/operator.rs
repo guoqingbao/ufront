@@ -155,9 +155,9 @@ impl Operator {
                 //formula [(W−K+2P)/S]+1
                 let mut padding_w = 0;
                 let mut padding_h = 0;
-                if self.params.contains_key("padding") {
+                if self.params.contains_key("pad") {
                     // padding_w = self.params["padding_w"].trim().parse::<usize>().unwrap();
-                    let padding : Vec<usize> = self.params["padding"].replace(['[', ']'], "").split(",").map(|x| x.trim().parse::<usize>().unwrap()).collect();
+                    let padding : Vec<usize> = self.params["pad"].replace(['[', ']'], "").split(",").map(|x| x.trim().parse::<usize>().unwrap()).collect();
                     padding_h = padding[0];
                     padding_w = padding[1];
                 }
@@ -668,7 +668,15 @@ impl Operator {
             ir
         }
         else {
-            let ir = format!("{output_names}=\"ufront.{name}\"({input_names}){params:?}:({input_shapes}) -> {output_shapes}");
+            let mut params_str = "{".to_string();
+            for (key, v) in params.iter() {
+                params_str += format!("{key}: {v}").as_str();
+                params_str += ", ";
+            }
+            params_str = params_str[0..params_str.len()-2].to_string();
+            params_str += "}";
+
+            let ir = format!("{output_names}=\"ufront.{name}\"({input_names}){params_str}:({input_shapes}) -> {output_shapes}");
             ir
         }
     }

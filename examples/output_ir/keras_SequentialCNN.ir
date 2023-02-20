@@ -1,14 +1,14 @@
 func.func @forward(%input1: tensor<32x3x32x32xf32>) -> tensor<32x10xf32>  { 
-	%1="ufront.conv2d"(%input1){"stride": "[1, 1]", "padding": "[0, 0]", "groups": "1", "kernel": "[3, 3]"}:(tensor<32x3x32x32xf32>) -> tensor<32x32x30x30xf32>
+	%1="ufront.conv2d"(%input1){groups: 1, pad: [0, 0], stride: [1, 1], kernel: [3, 3]}:(tensor<32x3x32x32xf32>) -> tensor<32x32x30x30xf32>
 	%2="ufront.relu"(%1):(tensor<32x32x30x30xf32>) -> tensor<32x32x30x30xf32>
-	%3="ufront.conv2d"(%2){"stride": "[1, 1]", "kernel": "[3, 3]", "groups": "1", "padding": "[0, 0]"}:(tensor<32x32x30x30xf32>) -> tensor<32x32x28x28xf32>
+	%3="ufront.conv2d"(%2){groups: 1, kernel: [3, 3], stride: [1, 1], pad: [0, 0]}:(tensor<32x32x30x30xf32>) -> tensor<32x32x28x28xf32>
 	%4="ufront.relu"(%3):(tensor<32x32x28x28xf32>) -> tensor<32x32x28x28xf32>
-	%5="ufront.pool2d"(%4){"stride": "[2, 2]", "padding": "[0, 0]", "kernel": "[2, 2]"}:(tensor<32x32x28x28xf32>) -> tensor<32x32x14x14xf32>
-	%6="ufront.conv2d"(%5){"kernel": "[3, 3]", "padding": "[0, 0]", "groups": "1", "stride": "[1, 1]"}:(tensor<32x32x14x14xf32>) -> tensor<32x64x12x12xf32>
+	%5="ufront.pool2d"(%4){pad: [0, 0], kernel: [2, 2], stride: [2, 2], pool_type: PoolType.POOL_MAX}:(tensor<32x32x28x28xf32>) -> tensor<32x32x14x14xf32>
+	%6="ufront.conv2d"(%5){stride: [1, 1], kernel: [3, 3], groups: 1, pad: [0, 0]}:(tensor<32x32x14x14xf32>) -> tensor<32x64x12x12xf32>
 	%7="ufront.relu"(%6):(tensor<32x64x12x12xf32>) -> tensor<32x64x12x12xf32>
-	%8="ufront.conv2d"(%7){"groups": "1", "padding": "[0, 0]", "stride": "[1, 1]", "kernel": "[3, 3]"}:(tensor<32x64x12x12xf32>) -> tensor<32x64x10x10xf32>
+	%8="ufront.conv2d"(%7){groups: 1, kernel: [3, 3], pad: [0, 0], stride: [1, 1]}:(tensor<32x64x12x12xf32>) -> tensor<32x64x10x10xf32>
 	%9="ufront.relu"(%8):(tensor<32x64x10x10xf32>) -> tensor<32x64x10x10xf32>
-	%10="ufront.pool2d"(%9){"stride": "[2, 2]", "padding": "[0, 0]", "kernel": "[2, 2]"}:(tensor<32x64x10x10xf32>) -> tensor<32x64x5x5xf32>
+	%10="ufront.pool2d"(%9){kernel: [2, 2], pool_type: PoolType.POOL_MAX, stride: [2, 2], pad: [0, 0]}:(tensor<32x64x10x10xf32>) -> tensor<32x64x5x5xf32>
 	%11="ufront.flat"(%10):(tensor<32x64x5x5xf32>) -> tensor<32x1600xf32>
 	%12="ufront.linear"(%11):(tensor<32x1600xf32>) -> tensor<32x512xf32>
 	%13="ufront.relu"(%12):(tensor<32x512xf32>) -> tensor<32x512xf32>
