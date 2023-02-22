@@ -11,6 +11,8 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::collections::HashMap;
 // use std::os::raw::c_void;
+use itertools::Itertools;
+
 pub trait Texualization {
     fn dump(&self) -> String;
 }
@@ -207,12 +209,12 @@ impl Operator {
             }
             OpType::POOL2D => {
                 if self.params.contains_key("pool_type") && self.params["pool_type"].trim() == "PoolType.POOL_ADAPTIVE" {
-                    //formula (w,h)=output_size
+                    //formula [w,h]=output_size
                     match &self.inputs[0].tensor {
                         Some(v) => {
                             assert!(self.params.contains_key("output_size"));
 
-                            let output_size : Vec<usize> = self.params["output_size"].replace(['(', ')'], "").split(",").map(|x| x.trim().parse::<usize>().unwrap()).collect();
+                            let output_size : Vec<usize> = self.params["output_size"].replace(['[', ']'], "").split(",").map(|x| x.trim().parse::<usize>().unwrap()).collect();
 
                             let output_shape = vec![v.shape[0], v.shape[1], output_size[0], output_size[1]];
                             println!(
@@ -669,8 +671,15 @@ impl Operator {
         }
         else {
             let mut params_str = "{".to_string();
-            for (key, v) in params.iter() {
-                params_str += format!("{key}: {v}").as_str();
+            for (key, v) in params.iter().sorted() {
+                if key=="pool_type" || key == "ActiMode" {
+                    let mut s = v.clone();
+                    s= s.replace("PoolType.", "");
+                    s= s.replace("ActiMode.", "");
+                    params_str += format!("{key}=\"{s}\"").as_str();
+                } else { 
+                    params_str += format!("{key}={v}").as_str(); 
+                };
                 params_str += ", ";
             }
             params_str = params_str[0..params_str.len()-2].to_string();

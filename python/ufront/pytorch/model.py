@@ -446,7 +446,7 @@ class AdaptivePool2dNode(ModuleNode):
         input_tensor = node_to_output[self.innodes[0].name]
         return ffmodel.pool2d(
             input=input_tensor,
-            output_size=self.module.output_size,
+            output_size=list(self.module.output_size),
             pool_type=self.pool_type,
             activation=self.acti_mode,
             name=self.name,
