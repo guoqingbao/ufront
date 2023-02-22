@@ -18,7 +18,7 @@ _(This project is under development)_
 6. In addition to translating Pytorch, Keras, Tensorflow, and ONNX models into the standard computing IR (TOSA), the Rust frontend also provide standard computing workflows including operators, forward, backward, gradient update, etc. for training.
 
 ## Sample usage for Pytorch Models
-``` Python
+``` python
 import torch.nn as nn
 import numpy as np
 import torch
@@ -141,7 +141,7 @@ func.func @forward(%input2: tensor<1x3x32x32xf32>, %input1: tensor<1x3x32x32xf32
 ```
 
 ## Sample usage for ONNX Models
-``` Python
+``` python
 # from ufront import Model, PyOperator, TensorF32, Optimizer, LossType, MetricsType #Rust frontend
 from ufront.onnx.model import ONNXModel, ONNXModelKeras, UFrontONNX #ONNX wrapper
 
@@ -218,7 +218,7 @@ if __name__ == "__main__":
    }
 ```
 ## Sample usage for Keras Models
-``` Python
+``` python
 from tensorflow.keras import backend
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Activation, Input, Concatenate
 from tensorflow.keras import Model
@@ -304,7 +304,7 @@ if __name__ == "__main__":
 ```
 
 ## Sample native usage
-``` Python
+``` python
 import ufront
 import numpy as np;
 from ufront import OpType, PoolType, LossType, MetricsType, Optimizer
