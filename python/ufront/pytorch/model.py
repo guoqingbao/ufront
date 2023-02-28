@@ -19,7 +19,7 @@
 from collections import OrderedDict
 from enum import Enum
 from typing import List
-
+import typing
 import numpy as np
 
 from ..ufront import (OpType, ActiMode, AggrMode, PoolType, TensorF32, DataType, ParamSyncType, Initializer)
@@ -128,7 +128,7 @@ class Node():
         elif op_type == OpType.LINEAR: return LinearNode
         elif op_type == OpType.SOFTMAX: return SoftmaxMNode
         elif op_type == OpType.CONCAT: return ConcatNode
-        elif op_type == OpType.FLAT: return FlattenMNode
+        elif op_type == OpType.FLAT: return FlattenNode
         elif op_type == OpType.BATCH_NORM: return BatchNorm2dNode
         elif op_type == OpType.RELU: return ReLUMNode
         elif op_type == OpType.SIGMOID: return SigmoidNode
@@ -136,7 +136,8 @@ class Node():
         elif op_type == OpType.ELU: return ELUNode
         elif op_type == OpType.DROPOUT: return DropoutMNode
         elif op_type == OpType.BATCH_MATMUL: return BatchMatMulNode
-        elif op_type == OpType.SPLIT: return SplitNode
+        elif op_type == OpType.SPLIT: return SplitChunkNode
+        elif op_type == OpType.SPLIT: return SplitChunkNode
         elif op_type == OpType.RESHAPE: return ReshapeNode
         elif op_type == OpType.TRANSPOSE: return TransposeNode
         elif op_type == OpType.ADD: return AddNode
@@ -185,6 +186,21 @@ class Node():
             assert 0, f"Unknown dtype: {torch_dtype}"
 
     @staticmethod
+    def ff_to_numpy_dtype(ff_dtype):
+        if ff_dtype ==DataType.Float:
+            return np.float32
+        elif ff_dtype ==DataType.Double:
+            return np.float64
+        elif ff_dtype == DataType.Int32:
+            return np.int32
+        elif ff_dtype == DataType.Int64:
+            return np.int64
+        elif ff_dtype == DataType.Half:
+            return np.float16
+        else:
+            assert 0, f"Unknown dtype: {ff_dtype}"
+
+    @staticmethod
     def numpy_to_ff_dtype(numpy_dtype):
         if numpy_dtype in (np.float32, np.float, "float32", "float"):
             return DataType.Float
@@ -214,17 +230,17 @@ class ModuleNode(Node):
         elif type(module) is torch.nn.modules.conv.Conv2d:
             return Conv2dNode(node, module)
         elif type(module) is torch.nn.modules.pooling.MaxPool2d:
-            return Pool2dNode(node, module, PoolType.POOL_MAX)
+            return Pool2dNode(node, PoolType.POOL_MAX, module)
         elif type(module) is torch.nn.modules.pooling.AvgPool2d:
-            return Pool2dNode(node, module, PoolType.POOL_AVG)
+            return Pool2dNode(node, PoolType.POOL_AVG, module)
         elif type(module) is torch.nn.modules.pooling.AdaptiveAvgPool2d:
-            return AdaptivePool2dNode(node, module, PoolType.POOL_ADAPTIVE)
+            return AdaptivePool2dNode(node, PoolType.POOL_ADAPTIVE, module)
         elif type(module) is torch.nn.modules.batchnorm.BatchNorm2d:
             return BatchNorm2dNode(node, module)
         elif type(module) is torch.nn.modules.dropout.Dropout:
             return DropoutMNode(node, module)
         elif type(module) is torch.nn.modules.flatten.Flatten:
-            return FlattenMNode(node, module)
+            return FlattenNode(node, module)
         elif type(module) is torch.nn.modules.activation.ReLU:
             return ReLUMNode(node, module)
         elif type(module) is torch.nn.modules.activation.Sigmoid:
@@ -233,6 +249,12 @@ class ModuleNode(Node):
             return TanhMNode(node, module)
         elif type(module) is torch.nn.modules.activation.ELU:
             return ELUNode(node, module)
+        elif type(module) is torch.nn.modules.activation.Hardswish:
+            return HardswishNode(node, module)
+        elif type(module) is torch.nn.modules.activation.Hardsigmoid:
+            return HardsigmoidNode(node, module)
+        elif type(module) is torch.nn.modules.activation.SiLU:
+            return SiLUNode(node, module)
         elif type(module) is torch.nn.modules.activation.Softmax:
             return SoftmaxMNode(node, module)
         elif type(module) is torch.nn.modules.normalization.LayerNorm:
@@ -363,13 +385,24 @@ class Conv2dNode(ModuleNode):
             name=self.name,
         )
 
+class objectview(object):
+    def __init__(self, d):
+        self.__dict__ = d
 
 class Pool2dNode(ModuleNode):
-    def __init__(self, node, module, pool_type):
+    def __init__(self, node, pool_type, module):
         super().__init__(node, module)
         self.op_type = OpType.POOL2D
         self.pool_type = pool_type
         self.acti_mode = ActiMode.AC_MODE_NONE
+        if module == None:
+            self.module = objectview(node.kwargs)
+            if "padding" not in node.kwargs:
+                self.module.padding = 0
+            if len(self.innodes) > 1:
+                if "kernel_size" not in node.kwargs and type(self.innodes[1])==int:
+                    self.module.kernel_size = self.innodes[1]
+                self.innodes = (self.innodes[0],)
         self.assert_num_args(1, Comparator.EQ)
 
     def parse(self):
@@ -391,16 +424,16 @@ class Pool2dNode(ModuleNode):
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
         items = data.items
-        kernel_h = int(items[4])
-        stride_h = int(items[5])
-        padding_h = int(items[6])
+        kernel = int(items[4])
+        stride = int(items[5])
+        padding = int(items[6])
         pool_type = PoolType.as_enum(int(items[7]))
         activation = ActiMode.as_enum(int(items[8]))
         return ffmodel.pool2d(
             input=input_tensor,
-            kernel=[kernel_h, kernel_h],
-            stride=[stride_h, stride_h],
-            pad=[padding_h, padding_h],
+            kernel=[kernel, kernel],
+            stride=[stride, stride],
+            pad=[padding, padding],
             pool_type=pool_type, activation=activation,
             name=name,
         )
@@ -419,11 +452,17 @@ class Pool2dNode(ModuleNode):
 
 
 class AdaptivePool2dNode(ModuleNode):
-    def __init__(self, node, module, pool_type):
+    def __init__(self, node, pool_type, module):
         super().__init__(node, module)
         self.op_type = OpType.POOL2D
         self.pool_type = pool_type
         self.acti_mode = ActiMode.AC_MODE_NONE
+        if module == None:
+            self.module = objectview(node.kwargs)
+            if len(self.innodes) > 1:
+                if "output_size" not in node.kwargs and (type(self.innodes[1])==int or type(self.innodes[1])==tuple or type(self.innodes[1])==list):
+                    self.module.output_size = self.innodes[1]
+                self.innodes = (self.innodes[0],)
         self.assert_num_args(1, Comparator.EQ)
 
     def parse(self):
@@ -444,9 +483,10 @@ class AdaptivePool2dNode(ModuleNode):
     def to_ff(self, ffmodel, node_to_output):
         # return Pool2dNode.to_ff(self, ffmodel, node_to_output)
         input_tensor = node_to_output[self.innodes[0].name]
+        output_size = self.module.output_size if type(self.module.output_size) != int else [self.module.output_size, self.module.output_size]
         return ffmodel.pool2d(
             input=input_tensor,
-            output_size=list(self.module.output_size),
+            output_size=list(output_size),
             pool_type=self.pool_type,
             activation=self.acti_mode,
             name=self.name,
@@ -464,6 +504,12 @@ class BatchNorm2dNode(ModuleNode):
         s.append(self.parse_inoutnodes(self.innodes))
         s.append(self.parse_inoutnodes(self.outnodes))
         s.append(self.op_type.as_str())
+
+        s.append(str(self.module.eps))
+        s.append(str(self.module.momentum))
+        s.append(str(self.module.affine))
+        s.append(str(self.module.track_running_stats))
+
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
@@ -471,12 +517,23 @@ class BatchNorm2dNode(ModuleNode):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
-        return ffmodel.batch_norm(input=input_tensor, name=name)
+        items = data.items
+        eps = float(items[4])
+        momentum = float(items[5])
+        affine = bool(items[6])
+        track_running_stats = bool(items[7])
+
+        return ffmodel.batch_norm(input=input_tensor, 
+                                eps=eps, momentum=momentum, affine=affine,
+                                track_running_stats=track_running_stats,
+                                name=name)
 
     def to_ff(self, ffmodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         return ffmodel.batch_norm(
             input=input_tensor,
+            eps=self.module.eps, momentum=self.module.momentum, affine=self.module.affine,
+            track_running_stats=self.module.track_running_stats,
             name=self.name,
         )
 
@@ -540,10 +597,24 @@ class DropoutMNode(ModuleNode):
         )
 
 
-class FlattenMNode(ModuleNode):
+class FlattenNode(ModuleNode):
     def __init__(self, node, module):
         super().__init__(node, module)
         self.op_type = OpType.FLAT
+
+        if module == None:
+            self.module = objectview(node.kwargs)
+            if len(self.innodes) > 1:
+                if "start_dim" not in node.kwargs:
+                    if type(self.innodes[1])==int and self.innodes[1] < 4:
+                        self.module.start_dim = self.innodes[1]
+                    else:
+                        self.module.start_dim = 0
+                self.innodes = (self.innodes[0],)
+
+            if "end_dim" not in node.kwargs:
+                self.module.end_dim = -1
+
         self.assert_num_args(1, Comparator.EQ)
 
     def parse(self):
@@ -551,6 +622,9 @@ class FlattenMNode(ModuleNode):
         s.append(self.parse_inoutnodes(self.innodes))
         s.append(self.parse_inoutnodes(self.outnodes))
         s.append(self.op_type.as_str())
+        s.append(str(self.module.start_dim))
+        s.append(str(self.module.end_dim))
+
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
@@ -558,11 +632,13 @@ class FlattenMNode(ModuleNode):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
-        return ffmodel.flat(input=input_tensor, name=name)
+        start_dim = int(data.items[4])
+        end_dim = int(data.items[5])
+        return ffmodel.flat(input=input_tensor, start_dim=start_dim, end_dim=end_dim, name=name)
 
     def to_ff(self, ffmodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return ffmodel.flat(input=input_tensor, name=self.name)
+        return ffmodel.flat(input=input_tensor, start_dim=self.module.start_dim, end_dim=self.module.end_dim, name=self.name)
 
 
 class ReLUMNode(ModuleNode):
@@ -649,6 +725,16 @@ class LayerNormNode(ModuleNode):
     def __init__(self, node, module):
         super().__init__(node, module)
         self.op_type = OpType.LAYER_NORM
+
+        if module == None:
+            self.module = objectview(node.kwargs)
+            if len(self.innodes) > 1:
+                if "normalized_shape" not in node.kwargs and (type(self.innodes[1])==int or type(self.innodes[1])==tuple or type(self.innodes[1])==list):
+                    self.module.normalized_shape = self.innodes[1]
+                if "elementwise_affine" not in node.kwargs:
+                    self.module.elementwise_affine = True
+                self.innodes = (self.innodes[0],)
+
         self.assert_num_args(1, Comparator.EQ)
 
     def parse(self):
@@ -656,6 +742,10 @@ class LayerNormNode(ModuleNode):
         s.append(self.parse_inoutnodes(self.innodes))
         s.append(self.parse_inoutnodes(self.outnodes))
         s.append(self.op_type.as_str())
+        s.append(str(self.module.normalized_shape))
+        s.append(str(self.module.eps))
+        s.append(str(self.module.elementwise_affine))
+
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
@@ -663,11 +753,18 @@ class LayerNormNode(ModuleNode):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
-        return ffmodel.layer_norm(input=input_tensor, name=name)
+        items = data.items
+        normalized_shape = int(items[4])
+        eps = int(items[5])
+        elementwise_affine = bool(items[6])
+
+        return ffmodel.layer_norm(input=input_tensor, normalized_shape=normalized_shape, 
+                                  eps=eps, elementwise_affine=elementwise_affine, name=name)
 
     def to_ff(self, ffmodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return ffmodel.layer_norm(input=input_tensor, name=self.name)
+        return ffmodel.layer_norm(input=input_tensor, normalized_shape=self.module.normalized_shape, 
+                                  eps=self.module.eps, elementwise_affine=self.module.elementwise_affine, name=self.name)
 
 
 class T5LayerNormNode(Node):
@@ -813,7 +910,78 @@ class ELUNode(ModuleNode):
         input_tensor = node_to_output[self.innodes[0].name]
         return ffmodel.elu(input=input_tensor, name=self.name)
 
+class HardswishNode(ModuleNode):
+    def __init__(self, node, module):
+        super().__init__(node, module)
+        self.op_type = OpType.HARDSWISH
+        self.assert_num_args(1, Comparator.EQ)
 
+    def parse(self):
+        s = [self.name]
+        s.append(self.parse_inoutnodes(self.innodes))
+        s.append(self.parse_inoutnodes(self.outnodes))
+        s.append(self.op_type.as_str())
+        self._ir_string = IR_DELIMITER.join(s)
+
+    @staticmethod
+    def string_to_ff(string, ffmodel, node_to_output):
+        data = Node.StringData(string)
+        name = data.name
+        input_tensor = node_to_output[data.innodes[0]]
+        return ffmodel.hardswish(input=input_tensor, name=name)
+
+    def to_ff(self, ffmodel, node_to_output):
+        input_tensor = node_to_output[self.innodes[0].name]
+        return ffmodel.hardswish(input=input_tensor, name=self.name)
+
+class HardsigmoidNode(ModuleNode):
+    def __init__(self, node, module):
+        super().__init__(node, module)
+        self.op_type = OpType.HARDSIGMOID
+        self.assert_num_args(1, Comparator.EQ)
+
+    def parse(self):
+        s = [self.name]
+        s.append(self.parse_inoutnodes(self.innodes))
+        s.append(self.parse_inoutnodes(self.outnodes))
+        s.append(self.op_type.as_str())
+        self._ir_string = IR_DELIMITER.join(s)
+
+    @staticmethod
+    def string_to_ff(string, ffmodel, node_to_output):
+        data = Node.StringData(string)
+        name = data.name
+        input_tensor = node_to_output[data.innodes[0]]
+        return ffmodel.hardsigmoid(input=input_tensor, name=name)
+
+    def to_ff(self, ffmodel, node_to_output):
+        input_tensor = node_to_output[self.innodes[0].name]
+        return ffmodel.hardsigmoid(input=input_tensor, name=self.name)
+
+class SiLUNode(ModuleNode):
+    def __init__(self, node, module):
+        super().__init__(node, module)
+        self.op_type = OpType.SILU
+        self.assert_num_args(1, Comparator.EQ)
+
+    def parse(self):
+        s = [self.name]
+        s.append(self.parse_inoutnodes(self.innodes))
+        s.append(self.parse_inoutnodes(self.outnodes))
+        s.append(self.op_type.as_str())
+        self._ir_string = IR_DELIMITER.join(s)
+
+    @staticmethod
+    def string_to_ff(string, ffmodel, node_to_output):
+        data = Node.StringData(string)
+        name = data.name
+        input_tensor = node_to_output[data.innodes[0]]
+        return ffmodel.silu(input=input_tensor, name=name)
+
+    def to_ff(self, ffmodel, node_to_output):
+        input_tensor = node_to_output[self.innodes[0].name]
+        return ffmodel.silu(input=input_tensor, name=self.name)
+        
 class EmbeddingNode(ModuleNode):
     def __init__(self, node, module):
         super().__init__(node, module)
@@ -985,14 +1153,16 @@ class FunctionNode(Node):
             elif FunctionNode.is_elemwise_op(node):
                 return MulNode(node)
             else:
-                assert 0, \
-                    f"Unknown `mul()` usage with `innodes`: {node.innodes}"
+                return None
+                # assert 0, \
+                #     f"Unknown `mul()` usage with `innodes`: {node.innodes}"
         elif name.find("floordiv") >= 0 or name.find("floor_divide") >= 0:
             return ScalarFloorDivNode(node)
         elif name.find("truediv") >= 0: return ScalarTrueDivNode(node)
         elif name.find("cat") >= 0: return ConcatNode(node)
-        elif name.find("split") >= 0: return SplitNode(node)
-        elif name.find("flatten") >= 0: return FlattenFNode(node)
+        elif name.find("split") >= 0: return SplitChunkNode(node, OpType.SPLIT)
+        elif name.find("chunk") >= 0: return SplitChunkNode(node, OpType.CHUNK)
+        elif name.find("flatten") >= 0: return FlattenNode(node, None)
         elif name.find("relu") >= 0: return ReLUFNode(node)
         elif name.find("getitem") >= 0: return GetItemNode(node)
         elif name.find("matmul") >= 0: return BatchMatMulNode(node)
@@ -1015,11 +1185,24 @@ class FunctionNode(Node):
         elif name.find("tanh") >= 0: return TanhFNode(node)
         elif name.find("gelu") >= 0: return GeluFNode(node)
         elif name.find("eq") >= 0: return EqNode(node)
-        elif name.find("_assert") >= 0: return None
+        elif name.find("_assert") >= 0: return AssertNode(node)
         elif name.find("dim") >= 0: return GetAttrNode(node)
         elif name.find("dims") >= 0: return GetAttrNode(node)
         elif name.find("shape") >= 0: return GetAttrNode(node)
-        assert 0, f"Unknown function or method: {name}"
+        elif name.find("size") >= 0: return GetAttrNode(node)
+        elif name.find("adaptive_avg_pool2d") >= 0: return AdaptivePool2dNode(node, PoolType.POOL_ADAPTIVE, None)
+        elif name.find("avg_pool2d") >= 0: return Pool2dNode(node, PoolType.POOL_AVG, None)
+        elif name.find("max_pool2d") >= 0: return Pool2dNode(node, PoolType.POOL_MAX, None)
+        elif name.find("conv2d") >= 0: return Conv2dNode(node)
+        elif name.find("linear") >= 0: return LinearNode(node)
+        elif name.find("layer_norm") >= 0: return LayerNormNode(node, None)
+        elif name.find("embedding") >= 0: return EmbeddingNode(node)
+        elif name.find("batch_norm") >= 0: return BatchNorm2dNode(node)
+        else:
+            return None
+            # assert 0, f"Unknown function or method: {name}"
+            #  print(f"Unknown function or method: {name}")
+
 
     @staticmethod
     def is_right_scalar_op(node):
@@ -1079,7 +1262,7 @@ class FunctionNode(Node):
             assert type(dim) is int
 
         # Find the input numel
-        input_shape = list(input_tensor.dims)
+        input_shape = list(input_tensor.shape)
         numel = 1
         for dim_size in input_shape:
             numel *= dim_size
@@ -1119,7 +1302,7 @@ class FunctionNode(Node):
     @staticmethod
     def get_unsqueeze_shape(input_tensor, dim):
         assert type(dim) is int
-        shape = list(input_tensor.dims)
+        shape = list(input_tensor.shape)
         shape.insert(dim, 1)
         return shape
 
@@ -1206,14 +1389,14 @@ class ScalarAddNode(FunctionNode):
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
         scalar = float(data.items[4])
-        return ffmodel.scalar_add(
+        return ffmodel.sadd(
             input=input_tensor, scalar=scalar, name=name,
         )
 
     def to_ff(self, ffmodel, node_to_output):
         input_tensor, scalar = \
             FunctionNode.parse_scalar_op(self, node_to_output)
-        return ffmodel.scalar_add(
+        return ffmodel.sadd(
             input=input_tensor, scalar=scalar, name=self.name,
         )
 
@@ -1275,14 +1458,14 @@ class ScalarSubNode(FunctionNode):
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
         scalar = float(data.items[4])
-        return ffmodel.scalar_sub(
+        return ffmodel.ssub(
             input=input_tensor, scalar=scalar, name=name,
         )
 
     def to_ff(self, ffmodel, node_to_output):
         input_tensor, scalar = \
             FunctionNode.parse_scalar_op(self, node_to_output)
-        return ffmodel.scalar_sub(
+        return ffmodel.ssub(
             input=input_tensor, scalar=scalar, name=self.name,
         )
 
@@ -1309,7 +1492,7 @@ class ScalarTrueDivNode(FunctionNode):
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
         scalar = float(data.items[4])
-        return ffmodel.scalar_true_divide(
+        return ffmodel.struediv(
             input=input_tensor, scalar=scalar, name=name,
         )
 
@@ -1317,7 +1500,7 @@ class ScalarTrueDivNode(FunctionNode):
         input_tensor = node_to_output[self.innodes[0].name]
         scalar = self.innodes[1]
         assert type(scalar) is float
-        return ffmodel.scalar_true_divide(
+        return ffmodel.struediv(
             input=input_tensor, scalar=scalar, name=self.name,
         )
 
@@ -1365,11 +1548,11 @@ class ConcatNode(FunctionNode):
         )
 
 
-class SplitNode(FunctionNode):
-    def __init__(self, node):
+class SplitChunkNode(FunctionNode):
+    def __init__(self, node, op_type):
         super().__init__(node)
         # FIXME May be 3
-        self.op_type = OpType.SPLIT
+        self.op_type = op_type # OpType.SPLIT
         self.dim = node.kwargs["dim"]
         self.assert_num_args(2, Comparator.EQ)
 
@@ -1401,32 +1584,15 @@ class SplitNode(FunctionNode):
         sizes = self.innodes[1] #len(self.outnodes)
         axis = self.dim
         assert type(axis) is int
-        return ffmodel.split(
-            input=input_tensor, sizes=sizes, axis=axis, name=self.name,
-        )
-
-
-class FlattenFNode(FunctionNode):
-    def __init__(self, node):
-        super().__init__(node)
-        self.op_type = OpType.FLAT
-        self.assert_num_args(2, Comparator.EQ)
-
-    def parse(self):
-        s = [self.name]
-        innodes = (self.innodes[0],)
-        s.append(self.parse_inoutnodes(innodes))
-        s.append(self.parse_inoutnodes(self.outnodes))
-        s.append(self.op_type.as_str())
-        self._ir_string = IR_DELIMITER.join(s)
-
-    @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
-        return FlattenMNode.string_to_ff(string, ffmodel, node_to_output)
-
-    def to_ff(self, ffmodel, node_to_output):
-        input_tensor = node_to_output[self.innodes[0].name]
-        return ffmodel.flat(input=input_tensor, name=self.name)
+        #TODO split support sizes of int or list
+        if self.op_type==OpType.SPLIT:
+            return ffmodel.split(
+                input=input_tensor, sizes=sizes, axis=axis, name=self.name,
+            ) 
+        else:
+            return ffmodel.chunk(
+                input=input_tensor, sizes=sizes, axis=axis, name=self.name,
+            )
 
 
 class ReLUFNode(FunctionNode):
@@ -1484,15 +1650,20 @@ class GetItemNode(FunctionNode):
             slice_strings = data.items[4:]
             slices = GetItemNode.strings_to_slices(slice_strings)
             output_shape = np.zeros(shape=input_tensor.shape, dtype=np.float)[slices].shape
-            return ffmodel.slice_tensor(input=input_tensor, output_shape=output_shape, slices=slices, name=data.items[0])
+            return ffmodel.slice_tensor(input=input_tensor, output_shape=list(output_shape), slices=slices, name=data.items[0])
 
     def to_ff(self, ffmodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         if type(input_tensor) is TensorF32:
             slices = self.innodes[1]
-            assert type(slices) is tuple, f"Expected tuple slices but got {type(slices)}"
+            if hasattr(slices, "name"):
+                slices = node_to_output[slices.name]
+                slices = slices.ndarray.astype(Node.ff_to_numpy_dtype(slices.dtype))
+            else:
+                assert type(slices) is tuple, f"Expected tuple slices but got {type(slices)}"
+
             output_shape = np.zeros(shape=input_tensor.shape, dtype=np.float)[slices].shape
-            return ffmodel.slice_tensor(input=input_tensor, output_shape=output_shape, slices=slices, name=self.name)
+            return ffmodel.slice_tensor(input=input_tensor, output_shape=list(output_shape), slices=slices, name=self.name)
 
         assert type(input_tensor) is list or \
             type(input_tensor) is tuple, \
@@ -1527,7 +1698,7 @@ class GetItemNode(FunctionNode):
                 assert 0, f"Unsupported slice element: {slice_elem}"
         new_shape.reverse()
         return ffmodel.reshape(
-            input=tensor, shape=new_shape, name=name,
+            input=tensor, shape=list(new_shape), name=name,
         )
 
     @staticmethod
@@ -1629,14 +1800,14 @@ class ScalarMulNode(FunctionNode):
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
         scalar = float(data.items[4])
-        return ffmodel.scalar_multiply(
+        return ffmodel.smultiply(
             input=input_tensor, scalar=scalar, name=name,
         )
 
     def to_ff(self, ffmodel, node_to_output):
         input_tensor, scalar = \
             FunctionNode.parse_scalar_op(self, node_to_output)
-        return ffmodel.scalar_multiply(
+        return ffmodel.smultiply(
             input=input_tensor, scalar=scalar, name=self.name,
         )
 
@@ -1704,7 +1875,7 @@ class GetAttrNode(FunctionNode):
         data = Node.StringData(string)
         input_tensor = node_to_output[data.innodes[0]]
         attr = data.items[4]
-        if attr == "shape":
+        if attr == "shape" or attr == "size":
             return input_tensor.shape
         if attr == "dims":
             return input_tensor.dims
@@ -1714,7 +1885,7 @@ class GetAttrNode(FunctionNode):
     def to_ff(self, ffmodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         attr = self.innodes[1]
-        if attr == "shape":
+        if attr == "shape" or attr == "size":
             return input_tensor.shape
         if attr == "dims" or attr == "dim":
             return input_tensor.dims
@@ -1755,7 +1926,7 @@ class TransposeNode(FunctionNode):
         dim0 = self.innodes[1]
         dim1 = self.innodes[2]
         assert type(dim0) is int and type(dim1) is int
-        perm = list(range(len(input_tensor.dims)))
+        perm = list(range(input_tensor.dims if type(input_tensor.dims)==int else len(input_tensor.dims) ))
         perm[dim0], perm[dim1] = perm[dim1], perm[dim0]
         return ffmodel.transpose(
             input=input_tensor, perm=perm, name=self.name,
@@ -1903,7 +2074,7 @@ class ReshapeNode(FunctionNode):
             shape = node_to_output[data.innodes[1]].dims
         for dim in shape:
             assert type(dim) is int
-        return ffmodel.reshape(input=input_tensor, shape=shape, name=name)
+        return ffmodel.reshape(input=input_tensor, shape=list(shape), name=name)
 
     def to_ff(self, ffmodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
@@ -1921,7 +2092,7 @@ class ReshapeNode(FunctionNode):
             shape = node_to_output[other.name].dims
         for dim in shape:
             assert type(dim) is int
-        return ffmodel.reshape(input=input_tensor, shape=shape, name=self.name)
+        return ffmodel.reshape(input=input_tensor, shape=list(shape), name=self.name)
 
 
 class PermuteNode(FunctionNode):
@@ -1956,7 +2127,7 @@ class PermuteNode(FunctionNode):
         perm = self.innodes[1] if perm_as_list else self.innodes[1:]
         for dim in perm:
             assert type(dim) is int
-        return ffmodel.transpose(input=input_tensor, perm=perm, name=self.name)
+        return ffmodel.transpose(input=input_tensor, perm=list(perm), name=self.name)
 
 
 class SoftmaxFNode(FunctionNode):
@@ -2008,15 +2179,19 @@ class ViewNode(FunctionNode):
             view_shape[dim] = int(dim_size)
         shape = FunctionNode.get_view_shape(input_tensor, view_shape)
         # Treat as a special case of `reshape()`
-        return ffmodel.reshape(input=input_tensor, shape=shape, name=name)
+        return ffmodel.reshape(input=input_tensor, shape=list(shape), name=name)
 
     def to_ff(self, ffmodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        view_shape = self.innodes[1:]
+        view_shape = list(self.innodes[1:])
+        for i in range(len(view_shape)):
+            if type(view_shape[i])==torch.fx.node.Node and hasattr(view_shape[i], "name"):
+                view_shape[i] = node_to_output[view_shape[i].name]
+
         shape = FunctionNode.get_view_shape(input_tensor, view_shape)
         # Treat as a special case of `reshape()`
         return ffmodel.reshape(
-            input=input_tensor, shape=shape, name=self.name
+            input=input_tensor, shape=list(shape), name=self.name
         )
 
 
@@ -2130,12 +2305,16 @@ class MeanNode(FunctionNode):
             keepdims = self.kwargs["keepdim"]
         else:
             keepdims = False
-        dims = list(self.innodes[1:])
+        dims = list(self.innodes)[1:]
+        if type(dims[0])!=int:
+            dims = list(dims[0])
+        # dims = list(self.innodes[1:])
         # Infer the -1 dimension if needed
         for i in range(len(dims)):
             if dims[i] == -1:
                 dims[i] = len(input_tensor.dims) - 1
-            assert dims[i] >= 0 and dims[i] < len(input_tensor.dims)
+            assert dims[i] >= 0 and dims[i] < input_tensor.dims if type(input_tensor.dims)==int else len(input_tensor.dims)
+        #TODO implement mean function
         return ffmodel.mean(
             input=input_tensor, dims=dims, keepdims=keepdims, name=self.name,
         )
@@ -2198,7 +2377,7 @@ class UnsqueezeNode(FunctionNode):
         shape = FunctionNode.get_unsqueeze_shape(input_tensor, dim)
         # Treat as a special case of `reshape()`
         return ffmodel.reshape(
-            input=input_tensor, shape=shape, name=self.name,
+            input=input_tensor, shape=list(shape), name=self.name,
         )
 
 
@@ -2321,6 +2500,37 @@ class TanhFNode(FunctionNode):
         input_tensor = node_to_output[self.innodes[0].name]
         return ffmodel.tanh(input=input_tensor, name=self.name)
 
+class AssertNode(FunctionNode):
+    def __init__(self, node):
+        super().__init__(node)
+        self.op_type = OpType.ASSERT
+        self.assert_num_args(2, Comparator.EQ)
+
+    def parse(self):
+        s = [self.name]
+        s.append(self.parse_inoutnodes(self.innodes))
+        s.append(self.parse_inoutnodes(self.outnodes))
+        s.append(self.op_type.as_str())
+        self._ir_string = IR_DELIMITER.join(s)
+
+    @staticmethod
+    def string_to_ff(string, ffmodel, node_to_output):
+        data = Node.StringData(string)
+        name = data.name
+        if hasattr(data.innodes[0], 'name'):
+            v = node_to_output[data.innodes[0].name]
+        else:
+            v = data.innodes[0]
+        assert v, data.innodes[1]
+
+    def to_ff(self, ffmodel, node_to_output):
+        if hasattr(self.innodes[0], 'name'):
+            v = node_to_output[self.innodes[0].name]
+        else:
+            v = self.innodes[0]
+        assert v, self.innodes[1]
+
+    
 class EqNode(FunctionNode):
     def __init__(self, node):
         super().__init__(node)
@@ -2431,17 +2641,134 @@ class AttributeNode(Node):
             ff_dtype = DataType.Float
             np_tensor = np_tensor.astype(np.float32)
 
-        ff_tensor = ffmodel.create_tensor(
-            torch_tensor.shape, ff_dtype, requires_grad, self.attr_name
-        )
+        # TODO support tensor dtypes of Int32, Int64
+        # ff_dtype = DataType.Float
+        np_tensor = np_tensor.astype(np.float32)
+        if type(self.attr) == torch.nn.Parameter:
+            return ffmodel.parameter(
+                np_tensor=np_tensor, dtype=ff_dtype, requires_grad=requires_grad, name=self.attr_name
+            )
+        else:
+            ff_tensor = ffmodel.create_tensor(
+                shape=torch_tensor.shape, dtype=ff_dtype, requires_grad=requires_grad, name=self.attr_name
+            )
+            ff_tensor.ndarray = np_tensor
+            return ff_tensor
         # delay set_tensor, add to ffmodel
         # ffmodel.attr_tensors[ff_tensor] = np_tensor
         # ff_tensor.set_tensor(
         #     ffmodel, np_tensor
         # )
-        return ff_tensor
+        
+                    
+class CallNode(FunctionNode):
+    def __init__(self, node, callback):
+        super().__init__(node)
+        self.op_type = OpType.CALL
+        self.target = node.target
+        self.callback = callback
+        if hasattr(node.target, "__annotations__"):
+            self.target_argnames = node.target.__annotations__
+        else: 
+            self.target_argnames = {}
+        # self.assert_num_args(2, Comparator.EQ)
 
+    #TODO fix parse for call node
+    def parse(self):
+        s = [self.name]
+        s.append(self.parse_inoutnodes(self.innodes))
+        s.append(self.parse_inoutnodes(self.outnodes))
+        s.append(self.op_type.as_str())
+        self._ir_string = IR_DELIMITER.join(s)
 
+    #TODO fix decode for call node
+    @staticmethod
+    def string_to_ff(string, ffmodel, node_to_output):
+        data = Node.StringData(string)
+        name = data.name
+
+        # for key, vtype in data.innodes:
+        #     args[key] = node_to_output[self.innodes[idx].name]
+        #     idx += 1
+        
+        input_tensor1 = node_to_output[data.innodes[0]]
+        input_tensor2 = node_to_output[data.innodes[1]]
+        return ffmodel.call(
+            input=input_tensor1, B=input_tensor2, name=name,
+        )
+
+    def to_ff(self, ffmodel, node_to_output):
+        idx = 0
+        args = OrderedDict()
+        argtypes = OrderedDict()
+        for key, vtype in self.target_argnames.items():
+            if key == "return": continue
+            if idx < len(self.innodes):  
+                args[key] = node_to_output[self.innodes[idx].name] if type(self.innodes[idx])==torch.fx.node.Node else self.innodes[idx]
+            elif key in self.kwargs:
+                args[key] = node_to_output[self.kwargs[key].name] if type(self.kwargs[key])==torch.fx.node.Node else self.kwargs[key]
+
+            idx += 1
+
+        return ffmodel.call(
+            func=self.name, args=args, argtypes = self.target_argnames, callback=self.callback, name=self.name
+        )
+
+class EinsumNode(CallNode):
+    def __init__(self, node, callback):
+        super().__init__(node, callback)
+        if len(self.target_argnames) <= 2 and "return" in self.target_argnames:
+                    # and type(self.target_argnames[next(iter(self.target_argnames))]) == typing.Any \
+                args = OrderedDict()
+                args["operands"] = []
+
+                for i in range(len(self.innodes)):
+                    if hasattr(self.innodes[i], "name"):
+                        args["operands"].append(self.innodes[i].name)
+                    else:
+                        args["equation"] = self.innodes[i]
+                self.target_argnames = args
+                
+    def to_ff(self, ffmodel, node_to_output):
+        args = OrderedDict()
+        args["operands"] = []
+        argtypes = OrderedDict()
+        for key, value in self.target_argnames.items():
+            if key == "return": continue
+            if key == "operands":
+                for i in range(len(self.target_argnames["operands"])):
+                    args["operands"].append(node_to_output[self.target_argnames["operands"][i]])
+                    self.target_argnames["operands"][i] = type(node_to_output[self.target_argnames["operands"][i]])
+            else:
+                args[key] = value
+
+        return ffmodel.call(
+            func=self.name, args=args, argtypes = self.target_argnames, callback=self.callback, name=self.name
+        )
+    
+class TorchCallNode(CallNode):
+    def __init__(self, node, callback):
+        super().__init__(node, callback)
+        self.args = node.args
+                
+    def to_ff(self, ffmodel, node_to_output):
+        args = OrderedDict()
+        argtypes = OrderedDict()
+        idx = 1
+        for arg in self.args:
+            if hasattr(arg, "name"):
+                v = node_to_output[arg.name]
+                argtypes["arg"+str(idx)] = type(v)
+                args["arg"+str(idx)] = v
+            else:
+                argtypes["arg"+str(idx)] = type(arg)
+                args["arg"+str(idx)] = arg
+            idx += 1
+
+        return ffmodel.call(
+            func=self.name, args=args, argtypes = argtypes, callback=self.callback, name=self.name
+        )
+    
 class InputNode(Node):
     def __init__(self, node):
         super().__init__(node)
@@ -2529,6 +2856,7 @@ class OutputNode(Node):
             else:
                 output_tensors[:] += [node_to_output[other.name]]
 
+TorchFunctions = {'einsum':torch.einsum, 'swapaxes':torch.swapaxes}
 
 class UFrontTorch():
     def __init__(
@@ -2548,11 +2876,49 @@ class UFrontTorch():
         self._loss = LossType.SPARSE_CATEGORICAL_CROSSENTROPY
         self._label_type = DataType.Int32
         self.ufront_model.optimizer = Optimizer(params={"type":"sgd", "lr":"0.01", "momentum":"0", "nesterov":"False", "weight_decay":"0"})
-
+        self.external_functions = {}
         # NOTE: We default `seq_length` to `None` instead of matching
         # the HuggingFace `symbolic_trace()`'s default of `(128, 128)` to
         # decouple the two implementations
+    def normal_callback(self, **kwargs):
+        print(kwargs)
+        assert(len(kwargs["args"]) > 0)
+        for key, v in kwargs["args"].items():
+            if type(v) == TensorF32:
+                dtype = Node.ff_to_numpy_dtype(v.dtype)
+                kwargs["args"][key] = torch.from_numpy(v.ndarray.astype(dtype))
 
+        ret = self.external_functions[kwargs['func']](**kwargs["args"])
+        if type(ret) == torch.Tensor:
+            print("Results after calling the external function: ", ret.shape)
+            return TensorF32(ret.numpy(), kwargs['func']) # convert to Rust f32 tensor
+        else:
+            return ret
+        
+    def torch_callback(self, **kwargs):
+        print(kwargs)
+        assert(len(kwargs["args"]) > 0)
+        args = []
+        for key, v in kwargs["args"].items():
+            if type(v) == TensorF32:
+                dtype = Node.ff_to_numpy_dtype(v.dtype)
+                kwargs["args"][key] = torch.from_numpy(v.ndarray.astype(dtype))
+            args.append(kwargs["args"][key])
+
+        # assert(kwargs['func'] in self.external_functions)
+            # ret = self.external_functions[kwargs['func']](equation=args[0], operands=[args[1], args[2]])
+            # ret = torch.einsum(*args) #special case, failed to call cached external function
+        
+        ret = self.external_functions[kwargs['func']](*args)
+        if type(ret) == torch.Tensor:
+            print("Results after calling the external function: ", ret.shape)
+            nparray = ret.numpy()
+            # if kwargs['func'] == "swapaxes":
+            nparray = np.zeros(nparray.shape, dtype=np.float32)
+            return TensorF32(nparray, kwargs['func']) # convert to Rust f32 tensor
+        else:
+            return ret
+        
     def _trace_model(self):
         # if self.is_hf_model:
         #     from transformers.utils.fx import \
@@ -2588,12 +2954,19 @@ class UFrontTorch():
                 node = AttributeNode(fx_node, self.model) # not supported yet!
             elif fx_node.op == "call_function" or fx_node.op == "call_method":
                 node = FunctionNode.construct_node(fx_node)
+                if node is None:
+                    if fx_node.name.find("einsum") >=0 or fx_node.name.find("swapaxes") >=0: 
+                        node = TorchCallNode(fx_node, self.torch_callback)
+                    else:
+                        node = CallNode(fx_node, self.normal_callback)
             elif fx_node.op == "output":
                 node = OutputNode(fx_node)
             else:
                 assert 0, f"Unknown operator type: {fx_node.op}"
             if node != None:
                 graph.append(node)
+                if type(node) == CallNode or type(node) == TorchCallNode:
+                    self.external_functions[node.name] = node.target
 
         # For non-HuggingFace model
         # if not self.is_hf_model:
@@ -2718,6 +3091,8 @@ class UFrontTorch():
         input_tensors = []
         idx = 1
         for input in inputs:
+            if type(input) == torch.Tensor:
+                input = input.numpy()
             input_tensor = TensorF32(input, "input" + str(idx)) # convert to Rust f32 tensor
             input_tensors.append(input_tensor)
             idx += 1
@@ -2741,8 +3116,8 @@ class UFrontTorch():
                 # elif isinstance(node, EqNode):
                 #     print("EqNode")
                 #     node_output = node.to_ff(self.ufront_model, node_to_output)
-                if type(node) in [GetItemNode, GetAttrNode, AttributeNode, EqNode, ScalarAddNode, ScalarFloorDivNode, ScalarMulNode, ScalarSubNode, ScalarTrueDivNode]:
-                    print(type(node))
+                if type(node) in [GetItemNode, GetAttrNode, AttributeNode, EqNode, AssertNode, ScalarAddNode, ScalarFloorDivNode, ScalarMulNode, ScalarSubNode, ScalarTrueDivNode]:
+                    print(type(node), ": ", node.name)
                 #     operator = node.to_ff(self.ufront_model, node_to_output)
                 #     if type(operator) == PyOperator:
                 #         self.operators.append(operator)
@@ -2753,7 +3128,7 @@ class UFrontTorch():
                 operator = node.to_ff(self.ufront_model, node_to_output)
                 if type(operator) == PyOperator:
                     self.operators.append(operator)
-                    if isinstance(node, SplitNode):
+                    if isinstance(node, SplitChunkNode):
                         node_output = []
                         for i in range(operator.num_of_outputs()):
                             node_output.append(operator.get_output(i))
@@ -2803,7 +3178,7 @@ class UFrontTorch():
                 else:
                     operator = node_class.string_to_ff(string, ufront_model, node_to_output)
                     operators.append(operator)
-                    if node_class == SplitNode:
+                    if node_class == SplitChunkNode:
                         node_output = []
                         for i in range(operator.num_of_outputs()):
                             node_output.append(operator.get_output(i))

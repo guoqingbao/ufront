@@ -7,11 +7,13 @@ use core::panic;
 use ndarray::ArrayD;
 use numpy::{IntoPyArray, PyArrayDyn, PyReadonlyArrayDyn};
 // use pyo3::exceptions::PyOSError;
+use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::collections::HashMap;
 // use std::os::raw::c_void;
 use itertools::Itertools;
+use std::num;
 
 pub trait Texualization {
     fn dump(&self) -> String;
@@ -27,7 +29,8 @@ pub struct Operator {
     pub inputs: Vec<TensorF32>,
     pub outputs: Vec<TensorF32>,
     pub op_type: OpType,
-    pub params: HashMap<String, String>,
+    pub params: IndexMap<String, String>,
+    pub channel_first: bool,
 }
 
 impl PartialEq for Operator {
@@ -58,7 +61,7 @@ impl Texualization for Operator {
 }
 
 impl Operator {
-    pub fn new(op: OpType, params: HashMap<String, String>) -> Operator {
+    pub fn new(op: OpType, params: IndexMap<String, String>) -> Operator {
         println!("Operator::new------------------------------------------------------------------");
         // let mut params_ : HashMap<String, String> = HashMap::new();
         // params_.extend(params.into_iter());
@@ -75,6 +78,7 @@ impl Operator {
             outputs: Vec::new(),
             op_type: op,
             params,
+            channel_first: true,
         }
     }
 
@@ -122,8 +126,6 @@ impl Operator {
             return Ok(&self.inputs[idx]);
         }
         Err(())
-
-        // return Err(PyOSError::new_err("Failed to obtain tensor!".to_string()))
     }
 
     pub fn get_output(&self, idx: usize) -> Result<&TensorF32, ()> {
@@ -132,20 +134,30 @@ impl Operator {
             return Ok(&self.outputs[idx]);
         }
         Err(())
-
-        // return Err(PyOSError::new_err("Failed to obtain tensor!".to_string()))
     }
 
-    pub fn add_input(&mut self, x: Tensor<f32>, name: String) {
-        self.inputs.push(TensorF32 { tensor: Some(x), name });
+    pub fn add_input(&mut self, x: Tensor<f32>, name: String, dtype: DataType) {
+        self.inputs.push(TensorF32 {
+            tensor: Some(x),
+            name,
+            dtype: dtype,
+        });
     }
 
     pub fn add_output(&mut self, x: Tensor<f32>) {
         if !self.outputs.is_empty() {
             let name = format!("{}_{}", self.params["name"], self.outputs.len());
-            self.outputs.push(TensorF32 { tensor: Some(x), name });
-        }else {
-            self.outputs.push(TensorF32 { tensor: Some(x), name: self.params["name"].to_string() });
+            self.outputs.push(TensorF32 {
+                tensor: Some(x),
+                name,
+                dtype: DataType::Float,
+            });
+        } else {
+            self.outputs.push(TensorF32 {
+                tensor: Some(x),
+                name: self.params["name"].to_string(),
+                dtype: DataType::Float,
+            });
         }
     }
 
@@ -163,9 +175,6 @@ impl Operator {
                     padding_h = padding[0];
                     padding_w = padding[1];
                 }
-                // if self.params.contains_key("padding_h") {
-                //     padding_h = self.params["padding_h"].trim().parse::<usize>().unwrap();
-                // }
 
                 if self.params.contains_key("kernel")
                     && self.params.contains_key("stride")
@@ -177,10 +186,6 @@ impl Operator {
                     let stride_h = stride[0];
                     let stride_w  = stride[1];
 
-                    // let kernel_h = self.params["kernel_h"].trim().parse::<usize>().unwrap();
-                    // let kernel_w = self.params["kernel_w"].trim().parse::<usize>().unwrap();
-                    // let stride_h = self.params["stride_h"].trim().parse::<usize>().unwrap();
-                    // let stride_w = self.params["stride_w"].trim().parse::<usize>().unwrap();
                     match &self.inputs[0].tensor {
                         Some(v) => {
                             println!("Input tensor shape {:?}", v.shape);
@@ -189,10 +194,10 @@ impl Operator {
                             let output_channel = if self.params.contains_key("out_channels") {
                                 self.params["out_channels"].trim().parse::<usize>().unwrap()
                             } else {
-                                v.shape[1]
+                                if self.channel_first {v.shape[1]} else {v.shape[3]}
                             };
 
-                            let output_shape = vec![v.shape[0], output_channel, w, h];
+                            let output_shape = if self.channel_first {vec![v.shape[0], output_channel, w, h]} else {vec![v.shape[0], w, h, output_channel]};
                             let sz: usize = output_shape.iter().product();
                             println!("Output tensor with shape {:?} created within Rust for operator {:?}!", output_shape, self.op_type);
                             let tensor = Tensor::<f32> {
@@ -216,7 +221,7 @@ impl Operator {
 
                             let output_size : Vec<usize> = self.params["output_size"].replace(['[', ']'], "").split(",").map(|x| x.trim().parse::<usize>().unwrap()).collect();
 
-                            let output_shape = vec![v.shape[0], v.shape[1], output_size[0], output_size[1]];
+                            let output_shape = if self.channel_first {vec![v.shape[0], v.shape[1], output_size[0], output_size[1]]} else {vec![v.shape[0], output_size[0], output_size[1], v.shape[3]]};
                             println!(
                                 "Output tensor with shape {:?} created within Rust for operator {:?}!",
                                 output_shape, self.op_type
@@ -237,9 +242,9 @@ impl Operator {
                     //formula W/2, H/2
                     match &self.inputs[0].tensor {
                         Some(v) => {
-                            let w = v.shape[2] / 2;
-                            let h = v.shape[3] / 2;
-                            let output_shape = vec![v.shape[0], v.shape[1], w, h];
+                            let w = if self.channel_first {v.shape[2] / 2} else {v.shape[1] / 2};
+                            let h = if self.channel_first {v.shape[3] / 2} else {v.shape[2] / 2};
+                            let output_shape = if self.channel_first {vec![v.shape[0], v.shape[1], w, h]} else {vec![v.shape[0], w, h, v.shape[3]]};
                             println!(
                                 "Output tensor with shape {:?} created within Rust for operator {:?}!",
                                 output_shape, self.op_type
@@ -256,28 +261,30 @@ impl Operator {
                         }
                     }
                 }
-                
             }
 
             OpType::EXP
             | OpType::ADD
             | OpType::SUBTRACT
             | OpType::DIVIDE
-            | OpType::MULTIPLY
             | OpType::DROPOUT
             | OpType::ELU
             | OpType::RELU
             | OpType::GELU
+            | OpType::SILU
+            | OpType::HARDSWISH
+            | OpType::HARDSIGMOID
             | OpType::SIGMOID
             | OpType::TANH
+            | OpType::IDENTITY
             | OpType::SCALAR_ADD
             | OpType::SCALAR_FLOORDIV
             | OpType::SCALAR_MULTIPLY
             | OpType::SCALAR_SUB
             | OpType::SCALAR_TRUEDIV
-            | OpType::SOFTMAX 
-            | OpType::BATCH_NORM 
-            | OpType::LAYER_NORM 
+            | OpType::SOFTMAX
+            | OpType::BATCH_NORM
+            | OpType::LAYER_NORM
             | OpType:: MULTIHEAD_ATTENTION //output shape of multiheaded attention is equal to shape of input "q" (first item in input list) when batch_first=True
              => {
                 // let activations = vec![OpType::ELU, OpType::RELU, OpType::GELU, OpType::SIGMOID, OpType::TANH];
@@ -305,6 +312,53 @@ impl Operator {
                     }
                 }
                 // }
+            }
+            OpType::MULTIPLY => {
+                match (&self.inputs[0].tensor, &self.inputs[1].tensor) {
+                    (Some(v1), Some(v2)) => {
+                        let mut v1shape = v1.shape.clone();
+                        let mut v2shape = v2.shape.clone();
+
+                        if v1shape.len() != v2shape.len() {
+    
+                            let mut vshape = if v1shape.len() > v2shape.len() {v1shape.clone()} else {v2shape.clone()};
+                            vshape = vshape[0..v1shape.len().abs_diff(v2shape.len())].to_vec();
+                            vshape.extend(if v1shape.len() > v2shape.len() {v2shape.clone()} else {v1shape.clone()});
+                            // println!("vshape {:?}", vshape);
+
+                            if v1shape.len() > v2shape.len() {
+                                v2shape = vshape;
+                            }
+                            else {
+                                v1shape = vshape;
+                            }
+                            // panic!("Mismatched shape a={:?}, b={:?}!", v1.shape, v2.shape);
+                        }
+                        let mut output_shape = vec![];
+                        for i in 0..v1shape.len() {
+                            if v1shape[i] != v2shape[i] && v1shape[i] != 1 && v2shape[i] != 1 {
+                                panic!("Mismatched shape a={:?}, b={:?} in dim {}!", v1shape, v2shape, i);
+                            }
+                            output_shape.push(if v1shape[i] > v2shape[i] {v1shape[i]} else {v2shape[i]}); 
+                        }
+
+                        println!(
+                            "Output tensor with shape {:?} created within Rust for operator {:?}!",
+                            output_shape, self.op_type
+                        );
+                        let tensor = Tensor::<f32> {
+                            shape: output_shape.clone(),
+                            data_buffer: DataBuffer::CPUDataBuffer(vec![
+                                0f32;
+                                output_shape.iter().product()
+                            ]),
+                        };
+                        self.add_output(tensor);
+                    }
+                    _ => {
+                        panic!("Invalid inputs!");
+                    }
+                }
             }
             OpType::CONCAT => {
                 //formula
@@ -336,22 +390,51 @@ impl Operator {
                 };
                 self.add_output(tensor);
             }
-            OpType::SPLIT => {
-                //formula
-                // w/sizes for axis 1
-                // h/sizes for axis 0
+            OpType::SPLIT | OpType::CHUNK => {
+                //formula 1 for sizes of int
+                //sizes of C/sizes for axis 1 (channel_first)
+
+                //formula 2 for sizes of list (channel_first)
+                //C1 -> list.1
+                //C2 -> list.2
+                //..
+
                 match &mut self.inputs[0].tensor {
                     Some(v) => {
                         let params = self.params.clone();
-                        let idx = params["axis"].trim().parse::<usize>().unwrap();
-                        assert!(idx < v.shape.len());
+                        let mut idx = params["axis"].trim().parse::<i32>().unwrap();
+                        if idx == -1 {
+                            idx = v.shape.len() as i32 - 1;
+                        }
                         let mut output_shape = v.shape.clone();
                         if params.contains_key("sizes") {
-                            let parts = params["sizes"].replace(['[',']'], "");
-                            println!("{parts}");
-                            for part in parts.split([',']) {
-                                let size = part.trim().parse::<usize>().unwrap();
-                                output_shape[idx] = size;
+                            let mut sizes = vec![];
+                            if params["sizes"].find("[").is_some() { //sizes of list
+                                let parts = params["sizes"].replace(['[',']'], "");                                
+                                for part in parts.split([',']) {
+                                    let size = part.trim().parse::<usize>().unwrap();
+                                    sizes.push(size);
+                                }
+                            }
+                            else {
+                                let size = params["sizes"].trim().parse::<usize>().unwrap();
+                                let eachsize = output_shape[idx as usize] / size;
+                                for i in 0..size {
+                                    sizes.push(eachsize);
+                                }
+                                
+                                if sizes.len() * eachsize < output_shape[idx as usize] { 
+                                    if self.op_type == OpType::CHUNK { //the remaining parts for chunk
+                                        sizes.push(output_shape[idx as usize] - sizes.len() * eachsize);
+                                    }
+                                    else {
+                                        panic!("Unable to split on the given axis!");
+                                    }
+                                }
+                            }
+
+                            for size in sizes {
+                                output_shape[idx as usize] = size;
                                 let sz: usize = output_shape.iter().product();
                                 let tensor = Tensor::<f32> {
                                     shape: output_shape.clone(),
@@ -360,12 +443,13 @@ impl Operator {
                                 self.add_output(tensor);
                                 println!("Output tensor with shape {:?} created within Rust for operator {:?}!", output_shape, self.op_type);
                             }
+
                         } else {
-                            panic!("Missing parameter 'sizes' for split!");
+                            panic!("Missing parameter 'sizes' for split/chunk!");
                         };
                     }
                     _ => {
-                        panic!("Invalid tensor for axis {} split!", self.params["axis"]);
+                        panic!("Invalid tensor for axis {} split/chunk!", self.params["axis"]);
                     }
                 }
             }
@@ -374,8 +458,32 @@ impl Operator {
                 // output shape = [batch, channel * w * h]
                 match &mut self.inputs[0].tensor {
                     Some(v) => {
+                        let mut start_dim = 0;
+                        let mut end_dim = v.shape.len() - 1;
+                        if self.params.contains_key("start_dim") {
+                            start_dim = self.params["start_dim"].trim().parse::<usize>().unwrap();
+                        }
+                        if self.params.contains_key("end_dim") {
+                            let dim = self.params["end_dim"].trim().parse::<i32>().unwrap();
+                            if dim > -1 {
+                                end_dim = dim as usize;
+                            } 
+                        }
+                        let mut output_shape = vec![];
+                        let mut reduced_dim = 1;
+                        for i in 0..v.shape.len() {
+                            if i >= start_dim && i <= end_dim {
+                                reduced_dim *= v.shape[i];
+                                if i == end_dim {
+                                    output_shape.push(reduced_dim);
+                                }
+                            } 
+                            else {
+                                output_shape.push(v.shape[i]);
+                            }
+                        }
                         let sz: usize = v.shape.iter().product();
-                        let output_shape = vec![v.shape[0], sz/v.shape[0]];
+                        // let output_shape = vec![v.shape[0], sz/v.shape[0]];
                         let tensor = Tensor::<f32> {
                             shape: output_shape.clone(),
                             data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
@@ -399,7 +507,7 @@ impl Operator {
                     Some(v) => {
                         assert!(self.params.contains_key("shape"));
 
-                        let output_shape : Vec<usize> = self.params["shape"].replace(['(', ')'], "").split(",").map(|x| x.trim().parse::<usize>().unwrap()).collect();
+                        let output_shape : Vec<usize> = self.params["shape"].replace(['[', ']'], "").split(",").map(|x| x.trim().parse::<usize>().unwrap()).collect();
                         let sz: usize = v.shape.iter().product();
                         let tensor = Tensor::<f32> {
                             shape: output_shape.clone(),
@@ -425,7 +533,7 @@ impl Operator {
                     Some(v) => {
                         assert!(self.params.contains_key("perm"));
 
-                        let output_idx : Vec<usize> = self.params["perm"].replace(['(', ')'], "").split(",").map(|x| x.trim().parse::<usize>().unwrap()).collect();
+                        let output_idx : Vec<usize> = self.params["perm"].replace(['[', ']'], "").split(",").map(|x| x.trim().parse::<usize>().unwrap()).collect();
                         let mut output_shape : Vec<usize>  = vec![];
                         for i in 0..v.shape.len() {
                             let idx = output_idx[i];
@@ -485,7 +593,7 @@ impl Operator {
 
             OpType::LINEAR => {
                 //formula
-                // output shape = [batch, output dim]
+                // output shape = [batch, .. output dim]
                 if !self.params.contains_key("out_dim") {
                     panic!("Missing important parameters!");
                 }
@@ -493,10 +601,12 @@ impl Operator {
                 let output_dim = self.params["out_dim"].trim().parse::<usize>().unwrap();
                 match &mut self.inputs[0].tensor {
                     Some(v) => {
-                        let output_shape = vec![v.shape[0], output_dim];
+                        let mut output_shape = v.shape.clone(); //vec![v.shape[0], output_dim, v.shape[2], v.shape[3]];
+                        output_shape[v.shape.len() - 1] = output_dim;
+                        let sz: usize = output_shape.iter().product();
                         let tensor = Tensor::<f32> {
                             shape: output_shape.clone(),
-                            data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; v.shape[0] * output_dim]),
+                            data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
                         };
                         self.add_output(tensor);
                         println!(
@@ -509,9 +619,7 @@ impl Operator {
                         panic!("Invalid tensor for flat!");
                     }
                 }
-                
             }
-
             OpType::SLICE => {
                 //formula
                 //output_shape = input_shape[slices]
@@ -519,7 +627,7 @@ impl Operator {
                     Some(v) => {
                         assert!(self.params.contains_key("output_shape"));
 
-                        let output_shape : Vec<usize> = self.params["output_shape"].replace(['(', ')'], "").split(",").map(|x| x.trim().parse::<usize>().unwrap()).collect();
+                        let output_shape : Vec<usize> = self.params["output_shape"].replace(['[', ']'], "").split(",").map(|x| x.trim().parse::<usize>().unwrap()).collect();
 
                         let sz: usize = output_shape.iter().product();
                         let tensor = Tensor::<f32> {
@@ -535,6 +643,80 @@ impl Operator {
                     }
                     _ => {
                         panic!("Invalid tensor for flat!");
+                    }
+                }
+            }
+
+            OpType::PARAMETER => {
+                //formula
+                //output_shape = input_shape
+                match &mut self.inputs[0].tensor {
+                    Some(v) => {
+                        let output_shape = v.shape.clone();
+                        let sz: usize = output_shape.iter().product();
+                        let tensor = Tensor::<f32> {
+                            shape: output_shape.clone(),
+                            data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
+                        };
+                        self.add_output(tensor);
+                        println!(
+                            "Output tensor with shape {:?} created within Rust for operator {:?}!",
+                            output_shape,
+                            self.op_type
+                        );
+                    }
+                    _ => {
+                        panic!("Invalid tensor for parameter!");
+                    }
+                }
+            }
+            OpType::MEAN => {
+                //keepdims
+                if !self.params.contains_key("dims") && !self.params.contains_key("keepdims") {
+                    panic!("Missing important parameters!");
+                }
+                match &mut self.inputs[0].tensor {
+                    Some(v) => {
+                        let mut output_shape: Vec<usize> = vec![];
+                        if self.params.contains_key("dims") {
+                            if self.params["dims"].find("[").is_some() {
+                                let dims : Vec<usize> = self.params["dims"].replace(['[', ']'], "").split(",").map(|x| x.trim().parse::<usize>().unwrap()).collect();
+                                for dim in 0..v.shape.len() {
+                                    if !dims.contains(&dim) {
+                                        output_shape.push(v.shape[dim]);
+                                    }
+                                }
+                            } else {
+                                let dims = self.params["dims"].trim().parse::<usize>().unwrap();
+                                for dim in 0..v.shape.len() {
+                                    if dim != dims {
+                                        output_shape.push(v.shape[dim]);
+                                    }
+                                }
+                            }
+                        } else if self.params.contains_key("keepdims") {
+                            if self.params["keepdims"].trim() == "True" {
+                                output_shape = v.shape.clone();
+                            }
+                            else {
+                                panic!("Missing important parameters!");
+                            }
+                        }
+
+                        let sz: usize = output_shape.iter().product();
+                        let tensor = Tensor::<f32> {
+                            shape: output_shape.clone(),
+                            data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
+                        };
+                        self.add_output(tensor);
+                        println!(
+                            "Output tensor with shape {:?} created within Rust for operator {:?}!",
+                            output_shape,
+                            self.op_type
+                        );
+                    }
+                    _ => {
+                        panic!("Invalid tensor for mean!");
                     }
                 }
             }
@@ -566,27 +748,38 @@ impl Operator {
     pub fn get_ir(&self) -> String {
         return self.dump_ir(None);
     }
-    
+
+    fn parse_call_args(&self, s: String) -> Vec<String> {
+        let mut strargs = s.replace("OrderedDict([", "").to_string(); //.replace("])", "");
+        strargs = strargs[0..strargs.len() - 2].to_string();
+
+        let lst: Vec<&str> = strargs.split("), ").collect();
+        let mut retlst: Vec<String> = Vec::<String>::new();
+        for item in lst {
+            match item.find("TensorF32") {
+                Some(_) => {
+                    continue;
+                }
+                _ => {
+                    retlst.push(item.to_string());
+                }
+            }
+        }
+
+        for i in 0..retlst.len() {
+            let item = retlst[i].to_string();
+            if item[item.len() - 1..] != ")".to_string() {
+                retlst[i] += ")";
+            }
+            if i < retlst.len() - 1 {
+                retlst[i] += ", ";
+            }
+        }
+        retlst
+    }
     pub fn dump_ir(&self, ssa_ids: Option<&HashMap<String, i32>>) -> String {
         let name = self.op_type.as_str();
         let mut params = self.params.clone();
-        // if params.contains_key("kernel_w") && params.contains_key("kernel_h") {
-        //     params.insert("kernel".to_string(), format!("[{}, {}]", params["kernel_w"], params["kernel_h"]));
-        //     params.remove("kernel_w");
-        //     params.remove("kernel_h");
-        // }
-
-        // if params.contains_key("stride_w") && params.contains_key("stride_h") {
-        //     params.insert("stride".to_string(), format!("[{}, {}]", params["stride_w"], params["stride_h"]));
-        //     params.remove("stride_w");
-        //     params.remove("stride_h");
-        // }
-
-        // if params.contains_key("padding_w") && params.contains_key("padding_h") {
-        //     params.insert("padding".to_string(), format!("[{}, {}]", params["padding_w"], params["padding_h"]));
-        //     params.remove("padding_w");
-        //     params.remove("padding_h");
-        // }
         params.remove("name");
         params.remove("tensors"); //for concat
         params.remove("out_dim");
@@ -595,15 +788,30 @@ impl Operator {
         params.remove("y"); //for add
 
         if self.op_type == OpType::MULTIHEAD_ATTENTION {
-            params.remove("q"); 
-            params.remove("k"); 
-            params.remove("v"); 
-
+            params.remove("q");
+            params.remove("k");
+            params.remove("v");
+        } else if self.op_type == OpType::PARAMETER {
+            params.remove("dtype");
+            params.remove("np_tensor");
+        } else if self.op_type == OpType::CALL {
+            params.remove("argtypes");
+            params.remove("callback");
+            if params.contains_key("args") {
+                let lst = self.parse_call_args(params["args"].to_string());
+                params.remove("args");
+                let mut s = "[".to_string();
+                for item in lst {
+                    s += &item;
+                }
+                s += "]";
+                params.insert("addargs".to_string(), s);
+            }
         }
 
         params.remove("activation"); //fused activation not supported at the moment
         params.remove("inplace"); //inplace not supported at the moment
-        params.remove("use_bias");//bias supported at the moment
+        params.remove("use_bias"); //bias supported at the moment
 
         let mut input_names = "".to_string();
         let mut input_shapes = "".to_string();
@@ -614,15 +822,15 @@ impl Operator {
                 Some(ssa) => {
                     if ssa.contains_key(&input.name) {
                         input_names += &ssa[&input.name].to_string();
-                    }
-                    else {
+                    } else {
                         input_names += input.name.as_str();
                     }
-                    
                 }
-                _=> { input_names += input.name.as_str(); }
+                _ => {
+                    input_names += input.name.as_str();
+                }
             }
-            
+
             input_names += ", ";
 
             input_shapes += input.get_ir().as_str();
@@ -630,10 +838,14 @@ impl Operator {
         }
 
         input_names = input_names.trim().to_string();
-        if &input_names[input_names.len()-1..] == "," {input_names.pop();}
+        if &input_names[input_names.len() - 1..] == "," {
+            input_names.pop();
+        }
 
         input_shapes = input_shapes.trim().to_string();
-        if &input_shapes[input_shapes.len()-1..] == "," {input_shapes.pop();}
+        if &input_shapes[input_shapes.len() - 1..] == "," {
+            input_shapes.pop();
+        }
 
         let mut output_names = "".to_string();
         let mut output_shapes = "".to_string();
@@ -644,45 +856,48 @@ impl Operator {
                 Some(ssa) => {
                     if ssa.contains_key(&output.name) {
                         output_names += &ssa[&output.name].to_string();
-                    }
-                    else {
+                    } else {
                         output_names += output.name.as_str();
                     }
-                    
                 }
-                _=> { output_names += output.name.as_str(); }
+                _ => {
+                    output_names += output.name.as_str();
+                }
             }
-            
+
             output_names += ", ";
 
             output_shapes += output.get_ir().as_str();
             output_shapes += ", ";
         }
-        
+
         output_names = output_names.trim().to_string();
-        if &output_names[output_names.len()-1..] == "," {output_names.pop();}
+        if &output_names[output_names.len() - 1..] == "," {
+            output_names.pop();
+        }
 
         output_shapes = output_shapes.trim().to_string();
-        if &output_shapes[output_shapes.len()-1..] == "," {output_shapes.pop();}
+        if &output_shapes[output_shapes.len() - 1..] == "," {
+            output_shapes.pop();
+        }
 
         if params.is_empty() {
             let ir = format!("{output_names}=\"ufront.{name}\"({input_names}):({input_shapes}) -> {output_shapes}");
             ir
-        }
-        else {
+        } else {
             let mut params_str = "{".to_string();
             for (key, v) in params.iter().sorted() {
-                if key=="pool_type" || key == "ActiMode" {
+                if key == "pool_type" || key == "ActiMode" {
                     let mut s = v.clone();
-                    s= s.replace("PoolType.", "");
-                    s= s.replace("ActiMode.", "");
+                    s = s.replace("PoolType.", "");
+                    s = s.replace("ActiMode.", "");
                     params_str += format!("{key}=\"{s}\"").as_str();
-                } else { 
-                    params_str += format!("{key}={v}").as_str(); 
+                } else {
+                    params_str += format!("{key}={v}").as_str();
                 };
                 params_str += ", ";
             }
-            params_str = params_str[0..params_str.len()-2].to_string();
+            params_str = params_str[0..params_str.len() - 2].to_string();
             params_str += "}";
 
             let ir = format!("{output_names}=\"ufront.{name}\"({input_names}){params_str}:({input_shapes}) -> {output_shapes}");
@@ -798,7 +1013,7 @@ impl PyOperator {
                 if self.raw_ptr > 0 {
                     unsafe {
                         let operator = std::mem::transmute::<u64, *mut Operator>(self.raw_ptr);
-                        (*operator).add_input(tensor, name);
+                        (*operator).add_input(tensor, name, DataType::Float);
                     }
                 } else {
                     println!("Input not added to the graph!");
@@ -824,7 +1039,7 @@ impl PyOperator {
                             shape: v.shape.to_vec(),
                             data_buffer: v.data_buffer.clone(),
                         };
-                        (*operator).add_input(tensor, x.name.clone());
+                        (*operator).add_input(tensor, x.name.clone(), x.dtype);
                         Ok(())
                     }
                     _ => {
@@ -845,6 +1060,29 @@ impl PyOperator {
             }
         } else {
             panic!("Input not added to the graph!");
+        }
+    }
+
+    pub fn add_output(&mut self, x: &TensorF32) {
+        println!("Operator::add_output");
+        if self.raw_ptr > 0 {
+            unsafe {
+                let operator = std::mem::transmute::<u64, *mut Operator>(self.raw_ptr);
+                match &x.tensor {
+                    Some(v) => {
+                        let tensor = Tensor::<f32> {
+                            shape: v.shape.to_vec(),
+                            data_buffer: v.data_buffer.clone(),
+                        };
+                        (*operator).add_output(tensor);
+                    }
+                    _ => {
+                        panic!("Invalid tensor outputs!")
+                    }
+                }
+            }
+        } else {
+            panic!("OUtput not added to the graph!");
         }
     }
     // pub fn get_input<'py>( &self, py: Python<'py>, idx : usize) -> Result<&'py TensorF32, ()> {
@@ -881,7 +1119,8 @@ impl PyOperator {
                                     py,
                                     TensorF32 {
                                         tensor: Some(tensor),
-                                        name : tensorf32.name.clone(),
+                                        name: tensorf32.name.clone(),
+                                        dtype: DataType::Float,
                                     },
                                 )
                                 .unwrap()
@@ -891,11 +1130,10 @@ impl PyOperator {
                             panic!("Unable to obtain output!");
                         }
                     },
-               
+
                     _ => {
                         panic!("Unable to obtain output!");
                     }
-                
                 }
             }
         } else {

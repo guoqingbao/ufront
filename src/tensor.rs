@@ -41,6 +41,7 @@ impl<T> TensorTrait for Tensor<T> {
 pub struct TensorF32 {
     pub tensor: Option<Tensor<f32>>,
     pub name: String,
+    pub dtype: DataType,
 }
 
 #[pymethods]
@@ -48,7 +49,11 @@ impl TensorF32 {
     #[new]
     pub fn new(x: PyReadonlyArrayDyn<f32>, name: String) -> PyResult<PyClassInitializer<Self>> {
         println!("PyTensor::new");
-        let mut tensor = TensorF32 { tensor: None, name };
+        let mut tensor = TensorF32 {
+            tensor: None,
+            name,
+            dtype: DataType::Float,
+        };
         tensor.set_ndarray(x);
         Ok(PyClassInitializer::from(tensor))
     }
@@ -115,17 +120,17 @@ impl TensorF32 {
     pub fn get_ir(&self) -> String {
         match &self.tensor {
             Some(v) => {
-                let mut joined: Vec<String> = v.shape.iter().map( |&dim| dim.to_string()).collect();
+                let mut joined: Vec<String> = v.shape.iter().map(|&dim| dim.to_string()).collect();
                 joined.extend(["f32".to_string()]);
-                format!("tensor<{}>",joined.join("x"))
+                format!("tensor<{}>", joined.join("x"))
             }
             _ => panic!("Not initialized tensor!"),
         }
     }
 
     #[getter]
-    pub fn get_data_type(&self) -> DataType {
-        DataType::Float
+    pub fn get_dtype(&self) -> DataType {
+        self.dtype
     }
 
     #[getter]

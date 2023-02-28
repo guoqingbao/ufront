@@ -2,22 +2,19 @@ use pyo3::prelude::*;
 pub mod databuffer;
 pub mod error;
 pub mod graph;
+pub mod initializer;
 pub mod model;
 pub mod operator;
+pub mod optimizer;
 pub mod prelude;
 pub mod tensor;
 pub mod types;
-pub mod initializer;
-pub mod optimizer;
+use initializer::Initializer;
 use model::Model;
 use operator::PyOperator;
-use tensor::TensorF32;
 use optimizer::Optimizer;
-use initializer::Initializer;
-use types::{
-    ActiMode, AggrMode, DataType, LossType, MetricsType, OpType,
-    ParamSyncType, PoolType,
-};
+use tensor::TensorF32;
+use types::{ActiMode, AggrMode, DataType, LossType, MetricsType, OpType, ParamSyncType, PoolType};
 
 /// A Python module implemented in Rust.
 #[pymodule]

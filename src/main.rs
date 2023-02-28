@@ -4,13 +4,13 @@ use pyo3::prelude::*;
 pub mod databuffer;
 pub mod error;
 pub mod graph;
+pub mod initializer;
 pub mod model;
 pub mod operator;
+pub mod optimizer;
 pub mod prelude;
 pub mod tensor;
 pub mod types;
-pub mod optimizer;
-pub mod initializer;
 use model::Model;
 use numpy::ndarray::array;
 use numpy::pyo3::Python;
@@ -40,7 +40,6 @@ fn main() {
         operator.add_input_ndarray(arr.to_dyn().readonly(), "input".to_string());
     });
 
-
     let mut operator = PyOperator {
         op_type: OpType::RELU,
         params: HashMap::from([("name".to_string(), "".to_string())]),
@@ -48,7 +47,6 @@ fn main() {
     };
 
     model.add_operator(&mut operator);
-
 
     let mut operator = PyOperator {
         op_type: OpType::CONV2D,

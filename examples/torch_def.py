@@ -42,6 +42,9 @@ class ComplexCNN(nn.Module):
     self.conv3 = nn.Conv2d(64, 64, 3, 1)
     self.conv4 = nn.Conv2d(64, 64, 3, 1)
     self.pool2 = nn.MaxPool2d(2, 2)
+
+    self.batch_norm = nn.BatchNorm2d(64)
+
     self.flat1 = nn.Flatten()
     self.linear1 = nn.Linear(1600, 512)
     self.linear2 = nn.Linear(512, 10)
@@ -63,6 +66,9 @@ class ComplexCNN(nn.Module):
     y = self.conv4(y)
     y = self.relu(y)
     y = self.pool2(y)
+
+    y = self.batch_norm(y)
+
     y = self.flat1(y)
     y = self.linear1(y)
     y = self.relu(y)

@@ -127,7 +127,7 @@ pub enum OpType {
     SCALAR_ADD,
     SCALAR_SUB,
     SCALAR_TRUEDIV,
-    INIT_PARAM,
+    PARAMETER,
     FLOAT,
     CONTIGUOUS,
     TO,
@@ -137,6 +137,12 @@ pub enum OpType {
     ATTRIBUTE,
     EQ,
     SLICE,
+    CALL,
+    ASSERT,
+    CHUNK,
+    HARDSWISH,
+    HARDSIGMOID,
+    SILU,
 }
 
 #[pymethods]
@@ -188,7 +194,7 @@ impl OpType {
             OpType::SCALAR_ADD => "sadd",
             OpType::SCALAR_SUB => "ssub",
             OpType::SCALAR_TRUEDIV => "struediv",
-            OpType::INIT_PARAM => "init_param",
+            OpType::PARAMETER => "parameter",
             OpType::FLOAT => "float",
             OpType::CONTIGUOUS => "contigeous",
             OpType::TO => "to",
@@ -198,6 +204,13 @@ impl OpType {
             OpType::ATTRIBUTE => "attribute",
             OpType::EQ => "eq",
             OpType::SLICE => "slice",
+            OpType::CALL => "call",
+            OpType::ASSERT => "assert",
+            OpType::CHUNK => "chunk",
+            OpType::HARDSWISH => "hardswish",
+            OpType::HARDSIGMOID => "hardsigmoid",
+            OpType::SILU => "silu",
+
             // _ => panic!("Not supported operator!"),
         }
     }
@@ -250,7 +263,7 @@ impl OpType {
             "sadd" => OpType::SCALAR_ADD,
             "ssub" => OpType::SCALAR_SUB,
             "struediv" => OpType::SCALAR_TRUEDIV,
-            "init_param" => OpType::INIT_PARAM,
+            "parameter" => OpType::PARAMETER,
             "float" => OpType::FLOAT,
             "contigeous" => OpType::CONTIGUOUS,
             "to" => OpType::TO,
@@ -259,6 +272,13 @@ impl OpType {
             "view" => OpType::VIEW,
             "attribute" => OpType::ATTRIBUTE,
             "eq" => OpType::EQ,
+            "call" => OpType::CALL,
+            "assert" => OpType::ASSERT,
+            "chunk" => OpType::CHUNK,
+            "hardswish" => OpType::HARDSWISH,
+            "hardsigmoid" => OpType::HARDSIGMOID,
+            "silu" => OpType::SILU,
+
             _ => {
                 panic!("Not supported type!");
             }
@@ -395,7 +415,6 @@ pub enum ParamSyncType {
 //     UniformInit,
 //     GlorotUniformInit,
 // }
-
 
 // #[pyclass]
 // #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, TryFromPrimitive)]

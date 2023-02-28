@@ -1,4 +1,5 @@
 use core::panic;
+use numpy::PyReadonlyArrayDyn;
 use pyo3::prelude::*;
 use pyo3::types::IntoPyDict;
 use pyo3::types::PyDict;
@@ -8,7 +9,6 @@ use tuple_conv::RepeatedTuple;
 // use pyo3::wrap_pyfunction;
 // use pyo3_log;
 // use crate::error::RustError;
-
 use crate::databuffer::DataBuffer;
 use crate::graph::Graph;
 use crate::graph::GraphTrait;
@@ -17,7 +17,8 @@ use crate::operator::PyOperator;
 use crate::prelude::Tensor;
 use crate::tensor::TensorF32;
 use crate::types::DataType;
-use crate::types::{OpType};
+use crate::types::OpType;
+use indexmap::IndexMap;
 
 use crate::optimizer::Optimizer;
 
@@ -85,7 +86,6 @@ pub trait FunctionTrait {
     fn getitem(&self);
     fn getattr(&self);
 
-    fn init_param(&self);
     fn float(&self);
 }
 pub trait ModelTrait {
@@ -101,8 +101,8 @@ pub struct Model {
     pub graph: Graph,
     #[pyo3(get, set)]
     pub optimizer: Optimizer,
-    args : HashMap<String, String>,
-    argshapes: HashMap<String, String>,
+    args: IndexMap<String, String>,
+    argshapes: IndexMap<String, String>,
     ssa_ids: HashMap<String, i32>,
     op_names: Vec<String>,
 }
@@ -112,19 +112,21 @@ impl Model {
     #[new]
     pub fn new() -> Model {
         println!("Model::new");
-        let params = HashMap::from([("type".to_string(),"sgd".to_string()), 
-                                ("lr".to_string(),"0.01".to_string()), 
-                                ("momentum".to_string(),"0".to_string()), 
-                                ("nesterov".to_string(),"False".to_string()), 
-                                ("weight_decay".to_string(),"0".to_string())]);
+        let params = HashMap::from([
+            ("type".to_string(), "sgd".to_string()),
+            ("lr".to_string(), "0.01".to_string()),
+            ("momentum".to_string(), "0".to_string()),
+            ("nesterov".to_string(), "False".to_string()),
+            ("weight_decay".to_string(), "0".to_string()),
+        ]);
         Model {
             graph: Graph { operators: vec![] },
             optimizer: Optimizer {
                 // optim_type: OptimizerType::SGD,
                 params,
             },
-            args: HashMap::new(),
-            argshapes: HashMap::new(),
+            args: IndexMap::new(),
+            argshapes: IndexMap::new(),
             ssa_ids: HashMap::new(),
             op_names: Vec::new(),
         }
@@ -138,7 +140,6 @@ impl Model {
                     self.ssa_ids.insert(output.name.clone(), idx);
                     idx += 1;
                 }
-
             }
         }
     }
@@ -187,16 +188,28 @@ impl Model {
 
     #[pyo3(text_signature = "($self, pyop)")]
     pub fn add_operator(&mut self, pyop: &mut PyOperator) {
-        if !pyop.params.contains_key("name") || pyop.params["name"].is_empty() || self.op_names.contains(&pyop.params["name"]) {
-            let mut name: String = if pyop.params.contains_key("name") && !pyop.params["name"].is_empty() {pyop.params["name"].clone()} else {pyop.op_type.as_str().to_string()};
+        if !pyop.params.contains_key("name")
+            || pyop.params["name"].is_empty()
+            || self.op_names.contains(&pyop.params["name"])
+        {
+            let mut name: String =
+                if pyop.params.contains_key("name") && !pyop.params["name"].is_empty() {
+                    pyop.params["name"].clone()
+                } else {
+                    pyop.op_type.as_str().to_string()
+                };
             for opname in self.op_names.iter().rev() {
                 if opname.find(&name) != None {
                     match opname.find("_") {
                         Some(pos) => {
                             name += "_";
-                            name += (opname[pos+1..].parse::<usize>().unwrap() + 1).to_string().as_str();
+                            name += (opname[pos + 1..].parse::<usize>().unwrap() + 1)
+                                .to_string()
+                                .as_str();
                         }
-                        _ => { name += "_1"; }
+                        _ => {
+                            name += "_1";
+                        }
                     }
                     break;
                 }
@@ -207,17 +220,18 @@ impl Model {
         }
 
         print!("Op: {}, ", pyop.op_type.as_str());
+        let mut idxmap = IndexMap::<String, String>::new();
         for (key, value) in &pyop.params {
-            print!("{key}:{value}, ")
+            print!("{key}:{value}, ");
+            idxmap.insert(key.to_string(), value.to_string());
         }
         println!();
 
-        let operator = Box::new(Operator::new(pyop.op_type, pyop.params.clone()));
+        let operator = Box::new(Operator::new(pyop.op_type, idxmap));
 
         let handle_ptr: *const Operator = &*operator;
 
         self.graph.operators.push(operator);
-
 
         // let ptr = &mut self.graph.operators[idx];
         pyop.raw_ptr = handle_ptr as u64;
@@ -287,15 +301,17 @@ impl Model {
             argstr += self.argshapes[arg].as_str();
             argstr += ", ";
         }
-        
+
         argstr = argstr.trim().to_string();
-        if &argstr[argstr.len()-1..] == "," {argstr.pop();}
+        if &argstr[argstr.len() - 1..] == "," {
+            argstr.pop();
+        }
 
         let mut output_shapes = "".to_string();
         let mut last_outname = "".to_string();
 
         if let Some(op) = &self.graph.operators.last() {
-            for output in &op.outputs {        
+            for output in &op.outputs {
                 output_shapes += output.get_ir().as_str();
                 output_shapes += ", ";
 
@@ -303,8 +319,7 @@ impl Model {
 
                 if self.ssa_ids.contains_key(&output.name) {
                     last_outname += &self.ssa_ids[&output.name].to_string();
-                }
-                else {
+                } else {
                     last_outname += output.name.as_str();
                 }
 
@@ -312,12 +327,16 @@ impl Model {
             }
         }
         output_shapes = output_shapes.trim().to_string();
-        if &output_shapes[output_shapes.len()-1..] == "," {output_shapes.pop();}
+        if &output_shapes[output_shapes.len() - 1..] == "," {
+            output_shapes.pop();
+        }
 
         last_outname = last_outname.trim().to_string();
-        if &last_outname[last_outname.len()-1..] == "," {last_outname.pop();}
+        if &last_outname[last_outname.len() - 1..] == "," {
+            last_outname.pop();
+        }
 
-        let header = format!{"func.func @forward({argstr}) -> {output_shapes} "};
+        let header = format! {"func.func @forward({argstr}) -> {output_shapes} "};
 
         // println!("{:?}", self.args);
         let mut op_ir = "".to_string();
@@ -328,7 +347,6 @@ impl Model {
         }
 
         format!("{header} {{ \n{op_ir}\treturn {last_outname}: {output_shapes}\n}}")
-
     }
     // pub fn num_of_op_inputs(&self, id : usize) -> usize {
     //     for i in 0..self.graph.operators.len() {
@@ -397,9 +415,9 @@ impl Model {
                 if op_type == OpType::CONCAT {
                     if para.contains("tensors").is_ok() {
                         let ret = para
-                        .get_item("tensors")
-                        .unwrap()
-                        .extract::<Vec<PyRef<TensorF32>>>(); // .downcast::<TensorF32>();
+                            .get_item("tensors")
+                            .unwrap()
+                            .extract::<Vec<PyRef<TensorF32>>>(); // .downcast::<TensorF32>();
                         match ret {
                             Ok(vlist) => {
                                 for v in vlist {
@@ -415,61 +433,111 @@ impl Model {
                                 panic! {"Not a valid input type!"};
                             }
                         }
-                    } else { panic! {"Missing important arguments (tensors?)"}; }
-
-                } else if op_type == OpType::ADD {
-                    
+                    } else {
+                        panic! {"Missing important arguments (tensors?)"};
+                    }
+                } else if op_type == OpType::ADD || op_type == OpType::MULTIPLY {
                     if para.contains("x").is_ok() && para.contains("y").is_ok() {
                         let x = para.get_item("x").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
                         let y = para.get_item("y").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
                         match (x, y) {
                             (Ok(v1), Ok(v2)) => {
-                                    if op.add_input(&v1).is_ok() && op.add_input(&v2).is_ok(){
-                                        op.calculate_output();
-                                    }
-                            },
+                                if op.add_input(&v1).is_ok() && op.add_input(&v2).is_ok() {
+                                    op.calculate_output();
+                                }
+                            }
                             _ => {
                                 panic! {"Not a valid input type!"};
                             }
                         }
-                    }else { panic! {"Missing important arguments (x, or y?)"}; }
-                    
+                    } else {
+                        panic! {"Missing important arguments (x, or y?)"};
+                    }
                 } else if op_type == OpType::MULTIHEAD_ATTENTION {
-                    
-                    if para.contains("q").is_ok() && para.contains("k").is_ok() && para.contains("v").is_ok() {
+                    if para.contains("q").is_ok()
+                        && para.contains("k").is_ok()
+                        && para.contains("v").is_ok()
+                    {
                         let q = para.get_item("q").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
                         let k = para.get_item("k").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
                         let v = para.get_item("v").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
-    
+
                         match (q, k, v) {
                             (Ok(q1), Ok(k1), Ok(v1)) => {
-                                    if op.add_input(&q1).is_ok() && op.add_input(&k1).is_ok() && op.add_input(&v1).is_ok(){
-                                        op.calculate_output();
-                                    }
-                            },
+                                if op.add_input(&q1).is_ok()
+                                    && op.add_input(&k1).is_ok()
+                                    && op.add_input(&v1).is_ok()
+                                {
+                                    op.calculate_output();
+                                }
+                            }
                             _ => {
                                 panic! {"Not a valid input type!"};
                             }
                         }
-                    } else { panic! {"Missing important arguments (q, k, or v?)"}; }
-                    
-                }else if para.contains("input").is_ok() {
-                    let ret = para.get_item("input").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
-                    match ret {
-                        Ok(v) => {
-                                if v.name.find("input") == Some(0) {
-                                    self.args.insert(v.name.clone(), argstr.clone());
-                                    self.argshapes.insert(v.name.clone(), v.get_ir());
-                                }
-                                if op.add_input(&v).is_ok() {
+                    } else {
+                        panic! {"Missing important arguments (q, k, or v?)"};
+                    }
+                } else if op_type == OpType::PARAMETER {
+                    if para.contains("np_tensor").is_ok() && para.contains("dtype").is_ok() {
+                        let np_tensor = para
+                            .get_item("np_tensor")
+                            .unwrap()
+                            .extract::<PyReadonlyArrayDyn<f32>>();
+                        let dtype = para
+                            .get_item("dtype")
+                            .unwrap()
+                            .extract::<DataType>()
+                            .unwrap();
+                        match dtype {
+                            DataType::Float
+                            | DataType::Double
+                            | DataType::Int32
+                            | DataType::Int64 => {}
+                            _ => {
+                                panic! {"Not supported type!"};
+                            }
+                        }
+
+                        match np_tensor {
+                            Ok(_np_tensor) => {
+                                let mut tensor = TensorF32 {
+                                    tensor: None,
+                                    name: para.get_item("name").unwrap().to_string(),
+                                    dtype: dtype,
+                                };
+                                tensor.set_ndarray(_np_tensor);
+                                if op.add_input(&tensor).is_ok() {
                                     op.calculate_output();
                                 }
-                        },
+                            }
+                            _ => {
+                                panic! {"Not a valid input type!"};
+                            }
+                        }
+                    } else {
+                        panic! {"Missing important arguments (q, k, or v?)"};
+                    }
+                } else if para.contains("input").is_ok() {
+                    let ret = para
+                        .get_item("input")
+                        .unwrap()
+                        .extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
+                    match ret {
+                        Ok(v) => {
+                            if v.name.find("input") == Some(0) {
+                                self.args.insert(v.name.clone(), argstr.clone());
+                                self.argshapes.insert(v.name.clone(), v.get_ir());
+                            }
+                            if op.add_input(&v).is_ok() {
+                                op.calculate_output();
+                            }
+                        }
                         _ => {
                             panic! {"Not a valid input type!"};
                         }
                     }
-                }  
+                }
 
                 Python::with_gil(|py| Py::new(py, op).unwrap())
             }
@@ -482,10 +550,16 @@ impl Model {
     }
     // impl FunctionTrait for Model {
 
-    pub fn create_tensor(&mut self, shape: Vec<usize>, tp: DataType, requires_grad: bool, name: String) -> Py<TensorF32> {
+    pub fn create_tensor(
+        &mut self,
+        shape: Vec<usize>,
+        dtype: DataType,
+        requires_grad: bool,
+        name: String,
+    ) -> Py<TensorF32> {
         // let sp = shape.as_slice().to_vec();
-        match tp {
-            DataType::Float => {
+        match dtype {
+            DataType::Float | DataType::Double | DataType::Int32 | DataType::Int64 => {
                 let shape = shape.to_vec();
                 let tensor = Some(Tensor::<f32> {
                     shape: shape.clone(),
@@ -497,31 +571,119 @@ impl Model {
                         py,
                         TensorF32 {
                             tensor,
-                            name : name.clone(),
+                            name: name.clone(),
+                            dtype: dtype,
                         },
                     )
                     .unwrap()
                 })
             }
-            _=> {panic!("Not supported type at the moment!");}
+            _ => {
+                panic!("Not supported type at the moment!");
+            }
+        }
+    }
+
+    #[pyo3(signature = (**kwds))]
+    pub fn parameter(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
+        self.handle_operator(OpType::PARAMETER, kwds)
+    }
+
+    #[pyo3(signature = (**kwds))]
+    pub fn call(&mut self, py: Python, kwds: Option<&PyDict>) -> Py<PyOperator> {
+        // self.handle_operator(OpType::CALL, kwds)
+        println!("{:?}\r\n", kwds);
+        let op_type = OpType::CALL;
+        let mut op = PyOperator {
+            op_type,
+            params: HashMap::<String, String>::new(),
+            raw_ptr: 0,
+        };
+        let mut argstr = "".to_string();
+        match kwds {
+            Some(para) => {
+                for key in para.keys() {
+                    if key.to_string() != "input" {
+                        op.params
+                            .insert(key.to_string(), para.get_item(key).unwrap().to_string());
+                    } else {
+                        argstr = para.get_item(key).unwrap().to_string();
+                    }
+                }
+
+                let callback = para.get_item("callback").unwrap().extract::<PyObject>();
+                let func_args = para.get_item("args").unwrap().extract::<&PyDict>(); // .downcast::<TensorF32>();
+                self.add_operator(&mut op);
+
+                match (callback, func_args) {
+                    (Ok(_callback), Ok(_func_args)) => {
+                        println!("Function args  {:?}", _func_args);
+
+                        for key in _func_args.keys() {
+                            let x = _func_args
+                                .get_item(key)
+                                .unwrap()
+                                .extract::<PyRef<TensorF32>>();
+                            match x {
+                                Ok(_x) => {
+                                    if op.add_input(&_x).is_ok() {
+                                        println!(
+                                            "A list of input tensors added for operator {op_type:?}!"
+                                        );
+                                    }
+                                }
+                                _ => {
+                                    println!("{:?} is not tensor argument!", key);
+                                }
+                            }
+                        }
+
+                        match _callback.call(py, (), kwds) {
+                            Ok(ret) => {
+                                // if para.contains("return").is_ok() {
+                                println!("Model::add_layer calculate output for {:?} by calling the external function {}", 
+                                            op_type, para.get_item("func").unwrap().to_string());
+                                let tensor = ret.extract::<PyRef<TensorF32>>(py);
+
+                                match tensor {
+                                    Ok(v) => {
+                                        op.add_output(&v);
+                                        println!("Output tensor with shape {:?} created within Rust for operator {:?}!", v.get_shape(py), op_type);
+                                    }
+                                    _ => panic!("Invalid tensor inputs!"),
+                                }
+                            }
+                            Err(e) => {
+                                println!("No return values of the callback! {:?}", e);
+                            }
+                        }
+                    }
+                    _ => {
+                        panic!("Invalid call!");
+                    }
+                }
+            }
+            _ => {
+                panic!("Invalid call!");
+            }
         }
 
+        Python::with_gil(|py| Py::new(py, op).unwrap())
     }
 
     #[pyo3(signature = (**kwds))]
     pub fn slice_tensor(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::SLICE, kwds)
     }
-    
-    pub fn input(&mut self){
-                
-    }
+
+    pub fn input(&mut self) {}
     pub fn output(&self) {}
 
     #[pyo3(signature = (**kwds))]
     pub fn eq(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::EQ, kwds)
     }
+
     fn handle_operator(&mut self, op_type: OpType, kwds: Option<&PyDict>) -> Py<PyOperator> {
         match kwds {
             Some(args) => {
@@ -553,7 +715,7 @@ impl Model {
     pub fn batch_norm(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::BATCH_NORM, kwds)
     }
-    
+
     #[pyo3(signature = (**kwds))]
     pub fn linear(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::LINEAR, kwds)
@@ -691,6 +853,21 @@ impl Model {
     }
 
     #[pyo3(signature = (**kwds))]
+    pub fn hardswish(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
+        self.handle_operator(OpType::HARDSWISH, kwds)
+    }
+
+    #[pyo3(signature = (**kwds))]
+    pub fn hardsigmoid(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
+        self.handle_operator(OpType::HARDSIGMOID, kwds)
+    }
+
+    #[pyo3(signature = (**kwds))]
+    pub fn silu(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
+        self.handle_operator(OpType::SILU, kwds)
+    }
+
+    #[pyo3(signature = (**kwds))]
     pub fn concat(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::CONCAT, kwds)
     }
@@ -698,6 +875,11 @@ impl Model {
     #[pyo3(signature = (**kwds))]
     pub fn split(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::SPLIT, kwds)
+    }
+
+    #[pyo3(signature = (**kwds))]
+    pub fn chunk(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
+        self.handle_operator(OpType::CHUNK, kwds)
     }
 
     #[pyo3(signature = (**kwds))]
@@ -737,15 +919,16 @@ impl Model {
 
     pub fn contigeous(&self) {}
 
-    pub fn identity(&self) {}
+    #[pyo3(signature = (**kwds))]
+    pub fn identity(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator>  {
+        self.handle_operator(OpType::IDENTITY, kwds)
+    }
 
     pub fn attribute(&self) {}
 
     pub fn getitem(&self) {}
 
     pub fn getattr(&self) {}
-
-    pub fn init_param(&self) {}
 
     pub fn float(&self) {}
 }
