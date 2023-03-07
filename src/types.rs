@@ -14,6 +14,7 @@ pub enum DataType {
     Half,
     Float,
     Double,
+    Bool,
 }
 
 // impl PartialEq for DataType {
@@ -55,6 +56,7 @@ impl DataType {
             DataType::Half => 2,
             DataType::Float => 4,
             DataType::Double => 8,
+            DataType::Bool => 2,
         }
     }
 }
@@ -143,6 +145,8 @@ pub enum OpType {
     HARDSWISH,
     HARDSIGMOID,
     SILU,
+    MASKEDFILL,
+    REPEAT
 }
 
 #[pymethods]
@@ -210,6 +214,8 @@ impl OpType {
             OpType::HARDSWISH => "hardswish",
             OpType::HARDSIGMOID => "hardsigmoid",
             OpType::SILU => "silu",
+            OpType::MASKEDFILL => "masked_fill",
+            OpType::REPEAT => "repeat",
 
             // _ => panic!("Not supported operator!"),
         }
@@ -278,6 +284,8 @@ impl OpType {
             "hardswish" => OpType::HARDSWISH,
             "hardsigmoid" => OpType::HARDSIGMOID,
             "silu" => OpType::SILU,
+            "masked_fill" => OpType::MASKEDFILL,
+            "repeat" => OpType::REPEAT,
 
             _ => {
                 panic!("Not supported type!");

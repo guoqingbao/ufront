@@ -436,7 +436,7 @@ impl Model {
                     } else {
                         panic! {"Missing important arguments (tensors?)"};
                     }
-                } else if op_type == OpType::ADD || op_type == OpType::MULTIPLY {
+                } else if op_type == OpType::ADD || op_type == OpType::MULTIPLY || op_type == OpType::BATCH_MATMUL {
                     if para.contains("x").is_ok() && para.contains("y").is_ok() {
                         let x = para.get_item("x").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
                         let y = para.get_item("y").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
@@ -518,6 +518,29 @@ impl Model {
                     } else {
                         panic! {"Missing important arguments (q, k, or v?)"};
                     }
+                } else if op_type == OpType::MASKEDFILL {
+                    if para.contains("input").is_ok()
+                        && para.contains("mask").is_ok()
+                        && para.contains("value").is_ok()
+                    {
+                        let input = para.get_item("input").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
+                        let mask = para.get_item("mask").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
+
+                        match (input, mask) {
+                            (Ok(input1), Ok(mask1)) => {
+                                if op.add_input(&input1).is_ok()
+                                    && op.add_input(&mask1).is_ok()
+                                {
+                                    op.calculate_output();
+                                }
+                            }
+                            _ => {
+                                panic! {"Not a valid input type!"};
+                            }
+                        }
+                    } else {
+                        panic! {"Missing important arguments (q, k, or v?)"};
+                    }
                 } else if para.contains("input").is_ok() {
                     let ret = para
                         .get_item("input")
@@ -559,7 +582,7 @@ impl Model {
     ) -> Py<TensorF32> {
         // let sp = shape.as_slice().to_vec();
         match dtype {
-            DataType::Float | DataType::Double | DataType::Int32 | DataType::Int64 => {
+            DataType::Float | DataType::Double | DataType::Int32 | DataType::Int64 | DataType::Bool => {
                 let shape = shape.to_vec();
                 let tensor = Some(Tensor::<f32> {
                     shape: shape.clone(),
@@ -650,7 +673,10 @@ impl Model {
                                         op.add_output(&v);
                                         println!("Output tensor with shape {:?} created within Rust for operator {:?}!", v.get_shape(py), op_type);
                                     }
-                                    _ => panic!("Invalid tensor inputs!"),
+                                    // _ => panic!("Invalid tensor outputs!"),
+                                    _ => {
+                                        println!("The return value from function call {} is not tensor output!", para.get_item("func").unwrap().to_string());
+                                    }
                                 }
                             }
                             Err(e) => {
@@ -931,4 +957,15 @@ impl Model {
     pub fn getattr(&self) {}
 
     pub fn float(&self) {}
+
+    #[pyo3(signature = (**kwds))]
+    pub fn masked_fill(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator>  {
+        self.handle_operator(OpType::MASKEDFILL, kwds)
+    }
+
+
+    #[pyo3(signature = (**kwds))]
+    pub fn repeat(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator>  {
+        self.handle_operator(OpType::REPEAT, kwds)
+    }
 }

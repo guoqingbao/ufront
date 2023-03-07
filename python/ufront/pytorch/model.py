@@ -182,6 +182,8 @@ class Node():
             return DataType.Int64
         elif torch_dtype in (torch.float16, torch.half, "float16", "half"):
             return DataType.Half
+        elif torch_dtype in (torch.bool, "bool", "BOOL", "boolean", "Boolean"):
+            return DataType.Bool
         else:
             assert 0, f"Unknown dtype: {torch_dtype}"
 
@@ -197,6 +199,8 @@ class Node():
             return np.int64
         elif ff_dtype == DataType.Half:
             return np.float16
+        elif ff_dtype == DataType.Bool:
+            return np.bool
         else:
             assert 0, f"Unknown dtype: {ff_dtype}"
 
@@ -212,6 +216,8 @@ class Node():
             return DataType.Int64
         elif numpy_dtype in (np.float16, np.half, "float16", "half"):
             return DataType.Half
+        elif numpy_dtype in (np.bool, "bool", "BOOL", "boolean", "Boolean"):
+            return DataType.Bool
         else:
             assert 0, f"Unknown dtype: {numpy_dtype}"
 
@@ -1253,7 +1259,9 @@ class FunctionNode(Node):
             scalar = node.innodes[0]
         else:
             assert 0, f"Unknown scalar position: {node.scalar_pos}"
-        assert type(scalar) is float
+        # if type(scalar) == int:
+        #     scalar = scalar * 1.0
+        # assert type(scalar) is float
         return input_tensor, scalar
 
     @staticmethod
@@ -1499,6 +1507,8 @@ class ScalarTrueDivNode(FunctionNode):
     def to_ff(self, ffmodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         scalar = self.innodes[1]
+        if hasattr(scalar, "name"):
+            scalar = node_to_output[scalar.name]
         assert type(scalar) is float
         return ffmodel.struediv(
             input=input_tensor, scalar=scalar, name=self.name,
@@ -1762,14 +1772,14 @@ class BatchMatMulNode(FunctionNode):
         input_tensor1 = node_to_output[data.innodes[0]]
         input_tensor2 = node_to_output[data.innodes[1]]
         return ffmodel.batch_matmul(
-            A=input_tensor1, B=input_tensor2, name=name,
+            x=input_tensor1, y=input_tensor2, name=name,
         )
 
     def to_ff(self, ffmodel, node_to_output):
         input_tensor1 = node_to_output[self.innodes[0].name]
         input_tensor2 = node_to_output[self.innodes[1].name]
         return ffmodel.batch_matmul(
-            A=input_tensor1, B=input_tensor2, name=self.name,
+            x=input_tensor1, y=input_tensor2, name=self.name,
         )
 
 
@@ -1807,9 +1817,12 @@ class ScalarMulNode(FunctionNode):
     def to_ff(self, ffmodel, node_to_output):
         input_tensor, scalar = \
             FunctionNode.parse_scalar_op(self, node_to_output)
-        return ffmodel.smultiply(
-            input=input_tensor, scalar=scalar, name=self.name,
-        )
+        if type(input_tensor) == TensorF32:
+            return ffmodel.smultiply(
+                input=input_tensor, scalar=scalar, name=self.name,
+            )
+        else:
+            return input_tensor * scalar
 
 
 class MulNode(FunctionNode):
@@ -2500,6 +2513,54 @@ class TanhFNode(FunctionNode):
         input_tensor = node_to_output[self.innodes[0].name]
         return ffmodel.tanh(input=input_tensor, name=self.name)
 
+class MaskedFillNode(FunctionNode):
+    def __init__(self, node):
+        super().__init__(node)
+        self.op_type = OpType.MASKEDFILL
+        self.assert_num_args(3, Comparator.EQ)
+
+    def parse(self):
+        s = [self.name]
+        s.append(self.parse_inoutnodes(self.innodes))
+        s.append(self.parse_inoutnodes(self.outnodes))
+        s.append(self.op_type.as_str())
+        self._ir_string = IR_DELIMITER.join(s)
+
+    @staticmethod
+    def string_to_ff(string, ffmodel, node_to_output):
+        # return TanhMNode.string_to_ff(string, ffmodel, node_to_output)
+        assert 0, "Not implemented!"
+
+    def to_ff(self, ffmodel, node_to_output):
+        input_tensor = node_to_output[self.innodes[0].name]
+        mask_tensor = node_to_output[self.innodes[1].name]
+        value = self.innodes[2]
+        return ffmodel.masked_fill(input=input_tensor, mask=mask_tensor, value=value, name=self.name)
+    
+class RepeatNode(FunctionNode):
+    def __init__(self, node):
+        super().__init__(node)
+        self.op_type = OpType.REPEAT
+        self.assert_num_args(2, Comparator.GEQ)
+
+    def parse(self):
+        s = [self.name]
+        s.append(self.parse_inoutnodes(self.innodes))
+        s.append(self.parse_inoutnodes(self.outnodes))
+        s.append(self.op_type.as_str())
+        self._ir_string = IR_DELIMITER.join(s)
+
+    @staticmethod
+    def string_to_ff(string, ffmodel, node_to_output):
+        # return TanhMNode.string_to_ff(string, ffmodel, node_to_output)
+        assert 0, "Not implemented!"
+
+    def to_ff(self, ffmodel, node_to_output):
+        input_tensor = node_to_output[self.innodes[0].name]
+        sizes = self.innodes[1:]
+        return ffmodel.repeat(input=input_tensor, sizes=list(sizes), name=self.name)
+    
+
 class AssertNode(FunctionNode):
     def __init__(self, node):
         super().__init__(node)
@@ -2563,7 +2624,18 @@ class EqNode(FunctionNode):
         else:
             input_tensor2 = self.innodes[1]
 
-        return input_tensor1 == input_tensor2
+        if type(input_tensor1) == TensorF32 and type(input_tensor2) == TensorF32:
+            return input_tensor1 == input_tensor2
+        elif type(input_tensor1) == TensorF32:
+            # ret = input_tensor1.ndarray == input_tensor2
+            # return TensorF32(ret.astype(np.float32), self.name)
+            return ffmodel.eq(input=input_tensor1, comparator=input_tensor2, name=self.name)
+        elif type(input_tensor2) == TensorF32:
+            # ret = input_tensor1 == input_tensor2.ndarray
+            # return TensorF32(ret.astype(np.float32), self.name)
+            return ffmodel.eq(input=input_tensor2, comparator=input_tensor1, name=self.name)
+        else:
+            return input_tensor1 == input_tensor2
         # res = ffmodel.eq(x=input_tensor1, y=input_tensor2, name=self.name)
         # return res
 
@@ -2671,6 +2743,10 @@ class CallNode(FunctionNode):
             self.target_argnames = node.target.__annotations__
         else: 
             self.target_argnames = {}
+
+        self.funcname = self.name
+        if hasattr(node.target, "__name__"):
+            self.funcname = node.target.__name__
         # self.assert_num_args(2, Comparator.EQ)
 
     #TODO fix parse for call node
@@ -2711,45 +2787,15 @@ class CallNode(FunctionNode):
             idx += 1
 
         return ffmodel.call(
-            func=self.name, args=args, argtypes = self.target_argnames, callback=self.callback, name=self.name
+            func=self.funcname, args=args, argtypes = self.target_argnames, callback=self.callback, name=self.name
         )
 
-class EinsumNode(CallNode):
-    def __init__(self, node, callback):
-        super().__init__(node, callback)
-        if len(self.target_argnames) <= 2 and "return" in self.target_argnames:
-                    # and type(self.target_argnames[next(iter(self.target_argnames))]) == typing.Any \
-                args = OrderedDict()
-                args["operands"] = []
-
-                for i in range(len(self.innodes)):
-                    if hasattr(self.innodes[i], "name"):
-                        args["operands"].append(self.innodes[i].name)
-                    else:
-                        args["equation"] = self.innodes[i]
-                self.target_argnames = args
-                
-    def to_ff(self, ffmodel, node_to_output):
-        args = OrderedDict()
-        args["operands"] = []
-        argtypes = OrderedDict()
-        for key, value in self.target_argnames.items():
-            if key == "return": continue
-            if key == "operands":
-                for i in range(len(self.target_argnames["operands"])):
-                    args["operands"].append(node_to_output[self.target_argnames["operands"][i]])
-                    self.target_argnames["operands"][i] = type(node_to_output[self.target_argnames["operands"][i]])
-            else:
-                args[key] = value
-
-        return ffmodel.call(
-            func=self.name, args=args, argtypes = self.target_argnames, callback=self.callback, name=self.name
-        )
     
 class TorchCallNode(CallNode):
     def __init__(self, node, callback):
         super().__init__(node, callback)
         self.args = node.args
+        self.funcname = node.target.__name__
                 
     def to_ff(self, ffmodel, node_to_output):
         args = OrderedDict()
@@ -2766,8 +2812,34 @@ class TorchCallNode(CallNode):
             idx += 1
 
         return ffmodel.call(
-            func=self.name, args=args, argtypes = argtypes, callback=self.callback, name=self.name
+            func=self.funcname, args=args, argtypes = argtypes, callback=self.callback, name=self.name
         )
+
+    
+class MathCallNode(CallNode):
+    def __init__(self, node, callback):
+        super().__init__(node, callback)
+        self.args = node.args
+        self.funcname = node.target.__name__
+                
+    def to_ff(self, ffmodel, node_to_output):
+        args = OrderedDict()
+        argtypes = OrderedDict()
+        idx = 1
+        for arg in self.args:
+            if hasattr(arg, "name"):
+                v = node_to_output[arg.name]
+                argtypes["arg"+str(idx)] = type(v)
+                args["arg"+str(idx)] = v
+            else:
+                argtypes["arg"+str(idx)] = type(arg)
+                args["arg"+str(idx)] = arg
+            idx += 1
+        import math
+        return math.sqrt(args["arg1"])
+        # return ffmodel.call(
+        #     func=self.funcname, args=args, argtypes = argtypes, callback=self.callback, name=self.name
+        # )
     
 class InputNode(Node):
     def __init__(self, node):
@@ -2904,10 +2976,6 @@ class UFrontTorch():
                 dtype = Node.ff_to_numpy_dtype(v.dtype)
                 kwargs["args"][key] = torch.from_numpy(v.ndarray.astype(dtype))
             args.append(kwargs["args"][key])
-
-        # assert(kwargs['func'] in self.external_functions)
-            # ret = self.external_functions[kwargs['func']](equation=args[0], operands=[args[1], args[2]])
-            # ret = torch.einsum(*args) #special case, failed to call cached external function
         
         ret = self.external_functions[kwargs['func']](*args)
         if type(ret) == torch.Tensor:
@@ -2918,7 +2986,17 @@ class UFrontTorch():
             return TensorF32(nparray, kwargs['func']) # convert to Rust f32 tensor
         else:
             return ret
+
+    def math_callback(self, **kwargs):
+        print(kwargs)
+        assert(len(kwargs["args"]) > 0)
+        args = []
+        for key, v in kwargs["args"].items():
+            args.append(kwargs["args"][key])
         
+        ret = self.external_functions[kwargs['func']](*args)
+        return ret
+                
     def _trace_model(self):
         # if self.is_hf_model:
         #     from transformers.utils.fx import \
@@ -2955,8 +3033,17 @@ class UFrontTorch():
             elif fx_node.op == "call_function" or fx_node.op == "call_method":
                 node = FunctionNode.construct_node(fx_node)
                 if node is None:
-                    if fx_node.name.find("einsum") >=0 or fx_node.name.find("swapaxes") >=0: 
+                    # if fx_node.name.find("einsum") >=0 or fx_node.name.find("swapaxes") >=0: 
+                    if hasattr(fx_node.target, "__module__") and (fx_node.target.__module__ == "torch.functional" or fx_node.target.__module__=="torch"):
+                        print(fx_node.target.__module__)
                         node = TorchCallNode(fx_node, self.torch_callback)
+                    elif hasattr(fx_node.target, "__module__") and fx_node.target.__module__ == "math":
+                        print(fx_node.target.__module__)
+                        node = MathCallNode(fx_node, self.math_callback)
+                    elif fx_node.target == 'masked_fill':
+                        node = MaskedFillNode(fx_node)
+                    elif fx_node.target == 'repeat':
+                        node = RepeatNode(fx_node)
                     else:
                         node = CallNode(fx_node, self.normal_callback)
             elif fx_node.op == "output":
@@ -2965,7 +3052,7 @@ class UFrontTorch():
                 assert 0, f"Unknown operator type: {fx_node.op}"
             if node != None:
                 graph.append(node)
-                if type(node) == CallNode or type(node) == TorchCallNode:
+                if type(node) == CallNode or type(node) == TorchCallNode or type(node) == MathCallNode:
                     self.external_functions[node.name] = node.target
 
         # For non-HuggingFace model

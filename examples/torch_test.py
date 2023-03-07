@@ -7,12 +7,19 @@ import torchvision.models as models
 
 from ufront.pytorch.model import UFrontTorch #Flexflow-like PytorchModel wrapper
 from torch_def import SimpleCNN, ComplexCNN
+from multihead_attention import MultiHeadAttention
 
 if __name__ == "__main__":
     batch_size = 1
     # input = np.zeros((batch_size, 3, 32, 32), dtype=np.float32)
     # input = np.zeros((batch_size, 3, 224, 224), dtype=np.float32)
     input = torch.ones((batch_size, 3, 224, 224), dtype=torch.float32)
+
+    #Multihead attention
+    #input = torch.empty(1, 512, 128).normal_(std=0.02)
+    #mask = MultiHeadAttention.gen_history_mask(input)
+    #net = MultiHeadAttention(128, 16)
+    #out = net(input, input, input, mask)
 
     # net = ComplexCNN()
     net = maxvit_t(pretrained=False)
@@ -30,7 +37,7 @@ if __name__ == "__main__":
     # net = models.vision_transformer.vit_b_16(weights=False)
     # net = models.swin_transformer.swin_t(weights=None)
     # net.train(False)
-    b = net(input)
+    # b = net(input)
 
     # resnet.train(mode=False)
     model = UFrontTorch(net, batch_size=batch_size) # convert torch model to ufront model
@@ -45,11 +52,11 @@ if __name__ == "__main__":
 
     #This will trigger Rust frontend for actual model conversion and graph building
     #operators can also be managed by python side (each operator here corresponding to an operator in the Rust computation graph)
-    output_tensors = model(inputs = [input, input])
+    output_tensors = model(inputs = [input])
 
     #The output of the model (forward pass have not been triggered at the moment!)
-    output = model.softmax(input=output_tensors[0], name="softmax_out")
-    print(output.shape)
+    # output = model.softmax(input=output_tensors[0], name="softmax_out")
+    # print(output.shape)
 
     #The Rust frontend will build computation graph and initialize temporary inputs and outputs for each operator
     total_memory = 0

@@ -285,6 +285,8 @@ impl Operator {
             | OpType::SOFTMAX
             | OpType::BATCH_NORM
             | OpType::LAYER_NORM
+            | OpType::EQ //output shape of equal op (compare a tensor with a scalar) is the shape of input
+            | OpType::MASKEDFILL //output shape of masked_fill is equal to the input
             | OpType:: MULTIHEAD_ATTENTION //output shape of multiheaded attention is equal to shape of input "q" (first item in input list) when batch_first=True
              => {
                 // let activations = vec![OpType::ELU, OpType::RELU, OpType::GELU, OpType::SIGMOID, OpType::TANH];
@@ -721,6 +723,94 @@ impl Operator {
                 }
             }
 
+            OpType::BATCH_MATMUL => {
+                match (&self.inputs[0].tensor, &self.inputs[1].tensor) {
+                    (Some(v1), Some(v2)) => {
+                        let v1shape = v1.shape.clone();
+                        let v2shape = v2.shape.clone();
+
+                        if v1shape.len() < 3 || v2shape.len() < 3 {
+                            panic!("Invalid shape a={:?}, b={:?}!", v1shape, v2shape);
+                        }
+
+                        let m1shape = &v1shape[v1shape.len()-2..];
+                        let m2shape = &v2shape[v2shape.len()-2..];
+                        if m1shape[1] != m2shape[0] {
+                            panic!("Mismatched shape a={:?}, b={:?}!", v1shape, v2shape);
+                        }
+
+                        let mut idx : usize = 0;
+
+                        for i in 0..if v1shape.len() > v2shape.len() {v2shape.len()} else {v1shape.len()} {
+                            if v1shape[i] == v2shape[i] {
+                                idx += 1;
+                            }
+                        }
+
+                        let mut output_shape : Vec<usize> = v1shape[0..v1shape.len()-2].to_vec();
+                        output_shape.push(m1shape[0]);
+
+                        if idx  < v2shape.len() - 2 {
+                            output_shape.extend(v2shape[idx..v2shape.len() - 2].iter());
+                        }
+
+                        output_shape.push(m2shape[1]);
+
+                        println!(
+                            "Output tensor with shape {:?} created within Rust for operator {:?}!",
+                            output_shape, self.op_type
+                        );
+                        let tensor = Tensor::<f32> {
+                            shape: output_shape.clone(),
+                            data_buffer: DataBuffer::CPUDataBuffer(vec![
+                                0f32;
+                                output_shape.iter().product()
+                            ]),
+                        };
+                        self.add_output(tensor);
+                    }
+                    _ => {
+                        panic!("Invalid inputs!");
+                    }
+                }
+            }
+
+            OpType::REPEAT => {
+                //keepdims
+                if !self.params.contains_key("sizes") {
+                    panic!("Missing important parameters!");
+                }
+                match &mut self.inputs[0].tensor {
+                    Some(v) => {
+                        let mut output_shape: Vec<usize> = vec![];
+
+                        let repeats : Vec<usize> = self.params["sizes"].replace(['[', ']'], "").split(",").map(|x| x.trim().parse::<usize>().unwrap()).collect();
+                        if repeats.len() != v.shape.len() {
+                            panic!("Invalid sizes {:?} for repeat!", repeats);
+                        }
+                        for i in 0..repeats.len() {
+                            output_shape.push(v.shape[i] * repeats[i]);
+                        }
+               
+
+                        let sz: usize = output_shape.iter().product();
+                        let tensor = Tensor::<f32> {
+                            shape: output_shape.clone(),
+                            data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
+                        };
+                        self.add_output(tensor);
+                        println!(
+                            "Output tensor with shape {:?} created within Rust for operator {:?}!",
+                            output_shape,
+                            self.op_type
+                        );
+                    }
+                    _ => {
+                        panic!("Invalid tensor for repeat!");
+                    }
+                }
+            }
+
             _ => {
                 panic!("Not implemented!");
             }
@@ -807,6 +897,8 @@ impl Operator {
                 s += "]";
                 params.insert("addargs".to_string(), s);
             }
+        } else if self.op_type == OpType::MASKEDFILL {
+            params.remove("mask");
         }
 
         params.remove("activation"); //fused activation not supported at the moment
