@@ -21,6 +21,7 @@ from enum import Enum
 from typing import List
 import typing
 import numpy as np
+import math
 
 from ..ufront import (OpType, ActiMode, AggrMode, PoolType, TensorF32, DataType, ParamSyncType, Initializer)
 from ..ufront import Model, PyOperator, TensorF32, Optimizer, LossType, MetricsType #Rust frontend
@@ -538,7 +539,7 @@ class BatchNorm2dNode(ModuleNode):
         input_tensor = node_to_output[self.innodes[0].name]
         return ffmodel.batch_norm(
             input=input_tensor,
-            eps=self.module.eps, momentum=self.module.momentum, affine=self.module.affine,
+            eps=float(self.module.eps), momentum=self.module.momentum, affine=self.module.affine,
             track_running_stats=self.module.track_running_stats,
             name=self.name,
         )
@@ -736,11 +737,11 @@ class LayerNormNode(ModuleNode):
             self.module = objectview(node.kwargs)
             if len(self.innodes) > 1:
                 if "normalized_shape" not in node.kwargs and (type(self.innodes[1])==int or type(self.innodes[1])==tuple or type(self.innodes[1])==list):
-                    self.module.normalized_shape = self.innodes[1]
+                    self.module.normalized_shape = [self.innodes[1]] if type(self.innodes[1])==int else list(self.innodes[1])
                 if "elementwise_affine" not in node.kwargs:
                     self.module.elementwise_affine = True
                 self.innodes = (self.innodes[0],)
-
+        self.module.normalized_shape = list(self.module.normalized_shape)
         self.assert_num_args(1, Comparator.EQ)
 
     def parse(self):
@@ -760,17 +761,17 @@ class LayerNormNode(ModuleNode):
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
         items = data.items
-        normalized_shape = int(items[4])
-        eps = int(items[5])
+        normalized_shape = list(items[4])
+        eps = float(items[5])
         elementwise_affine = bool(items[6])
 
-        return ffmodel.layer_norm(input=input_tensor, normalized_shape=normalized_shape, 
-                                  eps=eps, elementwise_affine=elementwise_affine, name=name)
+        return ffmodel.layer_norm(input=input_tensor, normalized_shape=list(normalized_shape), 
+                                  eps=float(eps), elementwise_affine=elementwise_affine, name=name)
 
     def to_ff(self, ffmodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return ffmodel.layer_norm(input=input_tensor, normalized_shape=self.module.normalized_shape, 
-                                  eps=self.module.eps, elementwise_affine=self.module.elementwise_affine, name=self.name)
+        return ffmodel.layer_norm(input=input_tensor, normalized_shape=list(self.module.normalized_shape), 
+                                  eps=float(self.module.eps), elementwise_affine=self.module.elementwise_affine, name=self.name)
 
 
 class T5LayerNormNode(Node):
@@ -1928,10 +1929,10 @@ class TransposeNode(FunctionNode):
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
         dim0, dim1 = int(data.items[4]), int(data.items[5])
-        perm = list(range(len(input_tensor.dims)))
-        perm[dim0], perm[dim1] = perm[dim1], perm[dim0]
+        perms = list(range(len(input_tensor.dims)))
+        perms[dim0], perms[dim1] = perms[dim1], perms[dim0]
         return ffmodel.transpose(
-            input=input_tensor, perm=perm, name=name,
+            input=input_tensor, perms=perms, name=name,
         )
 
     def to_ff(self, ffmodel, node_to_output):
@@ -1939,10 +1940,10 @@ class TransposeNode(FunctionNode):
         dim0 = self.innodes[1]
         dim1 = self.innodes[2]
         assert type(dim0) is int and type(dim1) is int
-        perm = list(range(input_tensor.dims if type(input_tensor.dims)==int else len(input_tensor.dims) ))
-        perm[dim0], perm[dim1] = perm[dim1], perm[dim0]
+        perms = list(range(input_tensor.dims if type(input_tensor.dims)==int else len(input_tensor.dims) ))
+        perms[dim0], perms[dim1] = perms[dim1], perms[dim0]
         return ffmodel.transpose(
-            input=input_tensor, perm=perm, name=self.name,
+            input=input_tensor, perms=perms, name=self.name,
         )
 
 
@@ -2131,16 +2132,16 @@ class PermuteNode(FunctionNode):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
-        perm = [int(dim) for dim in data.items[4:]]
-        return ffmodel.transpose(input=input_tensor, perm=perm, name=name)
+        perms = [int(dim) for dim in data.items[4:]]
+        return ffmodel.transpose(input=input_tensor, perms=perms, name=name)
 
     def to_ff(self, ffmodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         perm_as_list = isinstance(self.innodes[1], list)
-        perm = self.innodes[1] if perm_as_list else self.innodes[1:]
-        for dim in perm:
+        perms = self.innodes[1] if perm_as_list else self.innodes[1:]
+        for dim in perms:
             assert type(dim) is int
-        return ffmodel.transpose(input=input_tensor, perm=list(perm), name=self.name)
+        return ffmodel.transpose(input=input_tensor, perms=list(perms), name=self.name)
 
 
 class SoftmaxFNode(FunctionNode):
@@ -2835,8 +2836,9 @@ class MathCallNode(CallNode):
                 argtypes["arg"+str(idx)] = type(arg)
                 args["arg"+str(idx)] = arg
             idx += 1
-        import math
-        return math.sqrt(args["arg1"])
+        func = getattr(math, self.funcname)
+        assert func!=None, "Unable to obtain function " + self.funcname + " from math!" 
+        return func(*list(args.values()))
         # return ffmodel.call(
         #     func=self.funcname, args=args, argtypes = argtypes, callback=self.callback, name=self.name
         # )

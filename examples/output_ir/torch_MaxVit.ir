@@ -1,16 +1,16 @@
 func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  { 
 	%1="ufront.conv2d"(%input1){groups=1, kernel=[3, 3], pad=[1, 1], stride=[2, 2]}:(tensor<1x3x224x224xf32>) -> tensor<1x64x112x112xf32>
-	%2="ufront.batchnorm"(%1){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x64x112x112xf32>) -> tensor<1x64x112x112xf32>
+	%2="ufront.batchnorm"(%1){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x64x112x112xf32>) -> tensor<1x64x112x112xf32>
 	%3="ufront.gelu"(%2):(tensor<1x64x112x112xf32>) -> tensor<1x64x112x112xf32>
 	%4="ufront.conv2d"(%3){groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<1x64x112x112xf32>) -> tensor<1x64x112x112xf32>
 	%5="ufront.pool2d"(%4){kernel=[3, 3], pad=[1, 1], pool_type="POOL_AVG", stride=[2, 2]}:(tensor<1x64x112x112xf32>) -> tensor<1x64x56x56xf32>
 	%6="ufront.conv2d"(%5){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x64x56x56xf32>) -> tensor<1x64x56x56xf32>
-	%7="ufront.batchnorm"(%4){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x64x112x112xf32>) -> tensor<1x64x112x112xf32>
+	%7="ufront.batchnorm"(%4){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x64x112x112xf32>) -> tensor<1x64x112x112xf32>
 	%8="ufront.conv2d"(%7){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x64x112x112xf32>) -> tensor<1x256x112x112xf32>
-	%9="ufront.batchnorm"(%8){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x256x112x112xf32>) -> tensor<1x256x112x112xf32>
+	%9="ufront.batchnorm"(%8){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x256x112x112xf32>) -> tensor<1x256x112x112xf32>
 	%10="ufront.gelu"(%9):(tensor<1x256x112x112xf32>) -> tensor<1x256x112x112xf32>
 	%11="ufront.conv2d"(%10){groups=256, kernel=[3, 3], pad=[1, 1], stride=[2, 2]}:(tensor<1x256x112x112xf32>) -> tensor<1x256x56x56xf32>
-	%12="ufront.batchnorm"(%11){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x256x56x56xf32>) -> tensor<1x256x56x56xf32>
+	%12="ufront.batchnorm"(%11){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x256x56x56xf32>) -> tensor<1x256x56x56xf32>
 	%13="ufront.gelu"(%12):(tensor<1x256x56x56xf32>) -> tensor<1x256x56x56xf32>
 	%14="ufront.pool2d"(%13){output_size=[1, 1], pool_type="POOL_ADAPTIVE"}:(tensor<1x256x56x56xf32>) -> tensor<1x256x1x1xf32>
 	%15="ufront.conv2d"(%14){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x256x1x1xf32>) -> tensor<1x16x1x1xf32>
@@ -22,34 +22,34 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%21="ufront.identity"(%20):(tensor<1x64x56x56xf32>) -> tensor<1x64x56x56xf32>
 	%22="ufront.add"(%6, %21):(tensor<1x64x56x56xf32>, tensor<1x64x56x56xf32>) -> tensor<1x64x56x56xf32>
 	%23="ufront.reshape"(%22){shape=[1, 64, 8, 7, 8, 7]}:(tensor<1x64x56x56xf32>) -> tensor<1x64x8x7x8x7xf32>
-	%24="ufront.transpose"(%23){perm=[0, 2, 4, 3, 5, 1]}:(tensor<1x64x8x7x8x7xf32>) -> tensor<1x8x8x7x7x64xf32>
+	%24="ufront.transpose"(%23){perms=[0, 2, 4, 3, 5, 1]}:(tensor<1x64x8x7x8x7xf32>) -> tensor<1x8x8x7x7x64xf32>
 	%25="ufront.reshape"(%24){shape=[1, 64, 49, 64]}:(tensor<1x8x8x7x7x64xf32>) -> tensor<1x64x49x64xf32>
 	%26="ufront.identity"(%25):(tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
-	%27="ufront.layer_norm"(%26){elementwise_affine=True, eps=1e-05, normalized_shape=(64,)}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
+	%27="ufront.layer_norm"(%26){elementwise_affine=true, eps=0.00001, normalized_shape=[64]}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
 	%28="ufront.linear"(%27):(tensor<1x64x49x64xf32>) -> tensor<1x64x49x192xf32>
 	%29, %30, %31="ufront.chunk"(%28){axis=-1, sizes=3}:(tensor<1x64x49x192xf32>) -> tensor<1x64x49x64xf32>, tensor<1x64x49x64xf32>, tensor<1x64x49x64xf32>
 	%32="ufront.reshape"(%29){shape=[1, 64, 49, 2, 32]}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x2x32xf32>
-	%33="ufront.transpose"(%32){perm=[0, 1, 3, 2, 4]}:(tensor<1x64x49x2x32xf32>) -> tensor<1x64x2x49x32xf32>
+	%33="ufront.transpose"(%32){perms=[0, 1, 3, 2, 4]}:(tensor<1x64x49x2x32xf32>) -> tensor<1x64x2x49x32xf32>
 	%34="ufront.reshape"(%30){shape=[1, 64, 49, 2, 32]}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x2x32xf32>
-	%35="ufront.transpose"(%34){perm=[0, 1, 3, 2, 4]}:(tensor<1x64x49x2x32xf32>) -> tensor<1x64x2x49x32xf32>
+	%35="ufront.transpose"(%34){perms=[0, 1, 3, 2, 4]}:(tensor<1x64x49x2x32xf32>) -> tensor<1x64x2x49x32xf32>
 	%36="ufront.reshape"(%31){shape=[1, 64, 49, 2, 32]}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x2x32xf32>
-	%37="ufront.transpose"(%36){perm=[0, 1, 3, 2, 4]}:(tensor<1x64x49x2x32xf32>) -> tensor<1x64x2x49x32xf32>
+	%37="ufront.transpose"(%36){perms=[0, 1, 3, 2, 4]}:(tensor<1x64x49x2x32xf32>) -> tensor<1x64x2x49x32xf32>
 	%38="ufront.smultiply"(%35){scalar=0.125}:(tensor<1x64x2x49x32xf32>) -> tensor<1x64x2x49x32xf32>
 	%39="ufront.call"(%33, %38){addargs=[('arg1', 'B G H I D, B G H J D -> B G H I J')], func=einsum}:(tensor<1x64x2x49x32xf32>, tensor<1x64x2x49x32xf32>) -> tensor<1x64x2x49x49xf32>
-	%40="ufront.parameter"(%40){requires_grad=True}:(tensor<169x2xf32>) -> tensor<169x2xf32>
+	%40="ufront.parameter"(%40){requires_grad=true}:(tensor<169x2xf32>) -> tensor<169x2xf32>
 	%41="ufront.slice"(%40){output_shape=[2401, 2], slices=[84 83 82 ... 86 85 84]}:(tensor<169x2xf32>) -> tensor<2401x2xf32>
 	%42="ufront.reshape"(%41){shape=[49, 49, 2]}:(tensor<2401x2xf32>) -> tensor<49x49x2xf32>
-	%43="ufront.transpose"(%42){perm=[2, 0, 1]}:(tensor<49x49x2xf32>) -> tensor<2x49x49xf32>
+	%43="ufront.transpose"(%42){perms=[2, 0, 1]}:(tensor<49x49x2xf32>) -> tensor<2x49x49xf32>
 	%44="ufront.reshape"(%43){shape=[1, 2, 49, 49]}:(tensor<2x49x49xf32>) -> tensor<1x2x49x49xf32>
 	%45="ufront.add"(%39, %44):(tensor<1x64x2x49x49xf32>, tensor<1x2x49x49xf32>) -> tensor<1x64x2x49x49xf32>
 	%46="ufront.softmax"(%45):(tensor<1x64x2x49x49xf32>) -> tensor<1x64x2x49x49xf32>
 	%47="ufront.call"(%46, %37){addargs=[('arg1', 'B G H I J, B G H J D -> B G H I D')], func=einsum}:(tensor<1x64x2x49x49xf32>, tensor<1x64x2x49x32xf32>) -> tensor<1x64x2x49x32xf32>
-	%48="ufront.transpose"(%47){perm=[0, 1, 3, 2, 4]}:(tensor<1x64x2x49x32xf32>) -> tensor<1x64x49x2x32xf32>
+	%48="ufront.transpose"(%47){perms=[0, 1, 3, 2, 4]}:(tensor<1x64x2x49x32xf32>) -> tensor<1x64x49x2x32xf32>
 	%49="ufront.reshape"(%48){shape=[1, 64, 49, 64]}:(tensor<1x64x49x2x32xf32>) -> tensor<1x64x49x64xf32>
 	%50="ufront.linear"(%49):(tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
 	%51="ufront.dropout"(%50){rate=0.0, seed=0}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
 	%52="ufront.add"(%26, %51):(tensor<1x64x49x64xf32>, tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
-	%53="ufront.layer_norm"(%52){elementwise_affine=True, eps=1e-05, normalized_shape=(64,)}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
+	%53="ufront.layer_norm"(%52){elementwise_affine=true, eps=0.00001, normalized_shape=[64]}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
 	%54="ufront.linear"(%53):(tensor<1x64x49x64xf32>) -> tensor<1x64x49x256xf32>
 	%55="ufront.gelu"(%54):(tensor<1x64x49x256xf32>) -> tensor<1x64x49x256xf32>
 	%56="ufront.linear"(%55):(tensor<1x64x49x256xf32>) -> tensor<1x64x49x64xf32>
@@ -57,37 +57,37 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%58="ufront.add"(%52, %57):(tensor<1x64x49x64xf32>, tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
 	%59="ufront.identity"(%58):(tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
 	%60="ufront.reshape"(%59){shape=[1, 8, 8, 7, 7, 64]}:(tensor<1x64x49x64xf32>) -> tensor<1x8x8x7x7x64xf32>
-	%61="ufront.transpose"(%60){perm=[0, 5, 1, 3, 2, 4]}:(tensor<1x8x8x7x7x64xf32>) -> tensor<1x64x8x7x8x7xf32>
+	%61="ufront.transpose"(%60){perms=[0, 5, 1, 3, 2, 4]}:(tensor<1x8x8x7x7x64xf32>) -> tensor<1x64x8x7x8x7xf32>
 	%62="ufront.reshape"(%61){shape=[1, 64, 56, 56]}:(tensor<1x64x8x7x8x7xf32>) -> tensor<1x64x56x56xf32>
 	%63="ufront.reshape"(%62){shape=[1, 64, 7, 8, 7, 8]}:(tensor<1x64x56x56xf32>) -> tensor<1x64x7x8x7x8xf32>
-	%64="ufront.transpose"(%63){perm=[0, 2, 4, 3, 5, 1]}:(tensor<1x64x7x8x7x8xf32>) -> tensor<1x7x7x8x8x64xf32>
+	%64="ufront.transpose"(%63){perms=[0, 2, 4, 3, 5, 1]}:(tensor<1x64x7x8x7x8xf32>) -> tensor<1x7x7x8x8x64xf32>
 	%65="ufront.reshape"(%64){shape=[1, 49, 64, 64]}:(tensor<1x7x7x8x8x64xf32>) -> tensor<1x49x64x64xf32>
 	%66="ufront.call"(%65){addargs=[('arg2', -2), ('arg3', -3)], func=swapaxes}:(tensor<1x49x64x64xf32>) -> tensor<1x64x49x64xf32>
-	%67="ufront.layer_norm"(%66){elementwise_affine=True, eps=1e-05, normalized_shape=(64,)}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
+	%67="ufront.layer_norm"(%66){elementwise_affine=true, eps=0.00001, normalized_shape=[64]}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
 	%68="ufront.linear"(%67):(tensor<1x64x49x64xf32>) -> tensor<1x64x49x192xf32>
 	%30, %69, %70="ufront.chunk"(%68){axis=-1, sizes=3}:(tensor<1x64x49x192xf32>) -> tensor<1x64x49x64xf32>, tensor<1x64x49x64xf32>, tensor<1x64x49x64xf32>
 	%71="ufront.reshape"(%30){shape=[1, 64, 49, 2, 32]}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x2x32xf32>
-	%72="ufront.transpose"(%71){perm=[0, 1, 3, 2, 4]}:(tensor<1x64x49x2x32xf32>) -> tensor<1x64x2x49x32xf32>
+	%72="ufront.transpose"(%71){perms=[0, 1, 3, 2, 4]}:(tensor<1x64x49x2x32xf32>) -> tensor<1x64x2x49x32xf32>
 	%73="ufront.reshape"(%69){shape=[1, 64, 49, 2, 32]}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x2x32xf32>
-	%74="ufront.transpose"(%73){perm=[0, 1, 3, 2, 4]}:(tensor<1x64x49x2x32xf32>) -> tensor<1x64x2x49x32xf32>
+	%74="ufront.transpose"(%73){perms=[0, 1, 3, 2, 4]}:(tensor<1x64x49x2x32xf32>) -> tensor<1x64x2x49x32xf32>
 	%75="ufront.reshape"(%70){shape=[1, 64, 49, 2, 32]}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x2x32xf32>
-	%76="ufront.transpose"(%75){perm=[0, 1, 3, 2, 4]}:(tensor<1x64x49x2x32xf32>) -> tensor<1x64x2x49x32xf32>
+	%76="ufront.transpose"(%75){perms=[0, 1, 3, 2, 4]}:(tensor<1x64x49x2x32xf32>) -> tensor<1x64x2x49x32xf32>
 	%77="ufront.smultiply"(%74){scalar=0.125}:(tensor<1x64x2x49x32xf32>) -> tensor<1x64x2x49x32xf32>
 	%78="ufront.call"(%72, %77){addargs=[('arg1', 'B G H I D, B G H J D -> B G H I J')], func=einsum}:(tensor<1x64x2x49x32xf32>, tensor<1x64x2x49x32xf32>) -> tensor<1x64x2x49x49xf32>
-	%79="ufront.parameter"(%79){requires_grad=True}:(tensor<169x2xf32>) -> tensor<169x2xf32>
+	%79="ufront.parameter"(%79){requires_grad=true}:(tensor<169x2xf32>) -> tensor<169x2xf32>
 	%80="ufront.slice"(%79){output_shape=[2401, 2], slices=[84 83 82 ... 86 85 84]}:(tensor<169x2xf32>) -> tensor<2401x2xf32>
 	%81="ufront.reshape"(%80){shape=[49, 49, 2]}:(tensor<2401x2xf32>) -> tensor<49x49x2xf32>
-	%82="ufront.transpose"(%81){perm=[2, 0, 1]}:(tensor<49x49x2xf32>) -> tensor<2x49x49xf32>
+	%82="ufront.transpose"(%81){perms=[2, 0, 1]}:(tensor<49x49x2xf32>) -> tensor<2x49x49xf32>
 	%83="ufront.reshape"(%82){shape=[1, 2, 49, 49]}:(tensor<2x49x49xf32>) -> tensor<1x2x49x49xf32>
 	%84="ufront.add"(%78, %83):(tensor<1x64x2x49x49xf32>, tensor<1x2x49x49xf32>) -> tensor<1x64x2x49x49xf32>
 	%85="ufront.softmax"(%84):(tensor<1x64x2x49x49xf32>) -> tensor<1x64x2x49x49xf32>
 	%86="ufront.call"(%85, %76){addargs=[('arg1', 'B G H I J, B G H J D -> B G H I D')], func=einsum}:(tensor<1x64x2x49x49xf32>, tensor<1x64x2x49x32xf32>) -> tensor<1x64x2x49x32xf32>
-	%87="ufront.transpose"(%86){perm=[0, 1, 3, 2, 4]}:(tensor<1x64x2x49x32xf32>) -> tensor<1x64x49x2x32xf32>
+	%87="ufront.transpose"(%86){perms=[0, 1, 3, 2, 4]}:(tensor<1x64x2x49x32xf32>) -> tensor<1x64x49x2x32xf32>
 	%88="ufront.reshape"(%87){shape=[1, 64, 49, 64]}:(tensor<1x64x49x2x32xf32>) -> tensor<1x64x49x64xf32>
 	%89="ufront.linear"(%88):(tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
 	%90="ufront.dropout"(%89){rate=0.0, seed=0}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
 	%91="ufront.add"(%66, %90):(tensor<1x64x49x64xf32>, tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
-	%92="ufront.layer_norm"(%91){elementwise_affine=True, eps=1e-05, normalized_shape=(64,)}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
+	%92="ufront.layer_norm"(%91){elementwise_affine=true, eps=0.00001, normalized_shape=[64]}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
 	%93="ufront.linear"(%92):(tensor<1x64x49x64xf32>) -> tensor<1x64x49x256xf32>
 	%94="ufront.gelu"(%93):(tensor<1x64x49x256xf32>) -> tensor<1x64x49x256xf32>
 	%95="ufront.linear"(%94):(tensor<1x64x49x256xf32>) -> tensor<1x64x49x64xf32>
@@ -95,15 +95,15 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%97="ufront.add"(%91, %96):(tensor<1x64x49x64xf32>, tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
 	%98="ufront.call"(%97){addargs=[('arg2', -2), ('arg3', -3)], func=swapaxes}:(tensor<1x64x49x64xf32>) -> tensor<1x49x64x64xf32>
 	%99="ufront.reshape"(%98){shape=[1, 7, 7, 8, 8, 64]}:(tensor<1x49x64x64xf32>) -> tensor<1x7x7x8x8x64xf32>
-	%100="ufront.transpose"(%99){perm=[0, 5, 1, 3, 2, 4]}:(tensor<1x7x7x8x8x64xf32>) -> tensor<1x64x7x8x7x8xf32>
+	%100="ufront.transpose"(%99){perms=[0, 5, 1, 3, 2, 4]}:(tensor<1x7x7x8x8x64xf32>) -> tensor<1x64x7x8x7x8xf32>
 	%101="ufront.reshape"(%100){shape=[1, 64, 56, 56]}:(tensor<1x64x7x8x7x8xf32>) -> tensor<1x64x56x56xf32>
 	%102="ufront.identity"(%101):(tensor<1x64x56x56xf32>) -> tensor<1x64x56x56xf32>
-	%103="ufront.batchnorm"(%101){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x64x56x56xf32>) -> tensor<1x64x56x56xf32>
+	%103="ufront.batchnorm"(%101){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x64x56x56xf32>) -> tensor<1x64x56x56xf32>
 	%104="ufront.conv2d"(%103){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x64x56x56xf32>) -> tensor<1x256x56x56xf32>
-	%105="ufront.batchnorm"(%104){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x256x56x56xf32>) -> tensor<1x256x56x56xf32>
+	%105="ufront.batchnorm"(%104){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x256x56x56xf32>) -> tensor<1x256x56x56xf32>
 	%106="ufront.gelu"(%105):(tensor<1x256x56x56xf32>) -> tensor<1x256x56x56xf32>
 	%107="ufront.conv2d"(%106){groups=256, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<1x256x56x56xf32>) -> tensor<1x256x56x56xf32>
-	%108="ufront.batchnorm"(%107){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x256x56x56xf32>) -> tensor<1x256x56x56xf32>
+	%108="ufront.batchnorm"(%107){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x256x56x56xf32>) -> tensor<1x256x56x56xf32>
 	%109="ufront.gelu"(%108):(tensor<1x256x56x56xf32>) -> tensor<1x256x56x56xf32>
 	%110="ufront.pool2d"(%109){output_size=[1, 1], pool_type="POOL_ADAPTIVE"}:(tensor<1x256x56x56xf32>) -> tensor<1x256x1x1xf32>
 	%111="ufront.conv2d"(%110){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x256x1x1xf32>) -> tensor<1x16x1x1xf32>
@@ -114,34 +114,34 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%116="ufront.conv2d"(%115){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x256x56x56xf32>) -> tensor<1x64x56x56xf32>
 	%117="ufront.add"(%102, %116):(tensor<1x64x56x56xf32>, tensor<1x64x56x56xf32>) -> tensor<1x64x56x56xf32>
 	%118="ufront.reshape"(%117){shape=[1, 64, 8, 7, 8, 7]}:(tensor<1x64x56x56xf32>) -> tensor<1x64x8x7x8x7xf32>
-	%119="ufront.transpose"(%118){perm=[0, 2, 4, 3, 5, 1]}:(tensor<1x64x8x7x8x7xf32>) -> tensor<1x8x8x7x7x64xf32>
+	%119="ufront.transpose"(%118){perms=[0, 2, 4, 3, 5, 1]}:(tensor<1x64x8x7x8x7xf32>) -> tensor<1x8x8x7x7x64xf32>
 	%120="ufront.reshape"(%119){shape=[1, 64, 49, 64]}:(tensor<1x8x8x7x7x64xf32>) -> tensor<1x64x49x64xf32>
 	%121="ufront.identity"(%120):(tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
-	%122="ufront.layer_norm"(%121){elementwise_affine=True, eps=1e-05, normalized_shape=(64,)}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
+	%122="ufront.layer_norm"(%121){elementwise_affine=true, eps=0.00001, normalized_shape=[64]}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
 	%123="ufront.linear"(%122):(tensor<1x64x49x64xf32>) -> tensor<1x64x49x192xf32>
 	%31, %124, %125="ufront.chunk"(%123){axis=-1, sizes=3}:(tensor<1x64x49x192xf32>) -> tensor<1x64x49x64xf32>, tensor<1x64x49x64xf32>, tensor<1x64x49x64xf32>
 	%126="ufront.reshape"(%31){shape=[1, 64, 49, 2, 32]}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x2x32xf32>
-	%127="ufront.transpose"(%126){perm=[0, 1, 3, 2, 4]}:(tensor<1x64x49x2x32xf32>) -> tensor<1x64x2x49x32xf32>
+	%127="ufront.transpose"(%126){perms=[0, 1, 3, 2, 4]}:(tensor<1x64x49x2x32xf32>) -> tensor<1x64x2x49x32xf32>
 	%128="ufront.reshape"(%124){shape=[1, 64, 49, 2, 32]}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x2x32xf32>
-	%129="ufront.transpose"(%128){perm=[0, 1, 3, 2, 4]}:(tensor<1x64x49x2x32xf32>) -> tensor<1x64x2x49x32xf32>
+	%129="ufront.transpose"(%128){perms=[0, 1, 3, 2, 4]}:(tensor<1x64x49x2x32xf32>) -> tensor<1x64x2x49x32xf32>
 	%130="ufront.reshape"(%125){shape=[1, 64, 49, 2, 32]}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x2x32xf32>
-	%131="ufront.transpose"(%130){perm=[0, 1, 3, 2, 4]}:(tensor<1x64x49x2x32xf32>) -> tensor<1x64x2x49x32xf32>
+	%131="ufront.transpose"(%130){perms=[0, 1, 3, 2, 4]}:(tensor<1x64x49x2x32xf32>) -> tensor<1x64x2x49x32xf32>
 	%132="ufront.smultiply"(%129){scalar=0.125}:(tensor<1x64x2x49x32xf32>) -> tensor<1x64x2x49x32xf32>
 	%133="ufront.call"(%127, %132){addargs=[('arg1', 'B G H I D, B G H J D -> B G H I J')], func=einsum}:(tensor<1x64x2x49x32xf32>, tensor<1x64x2x49x32xf32>) -> tensor<1x64x2x49x49xf32>
-	%134="ufront.parameter"(%134){requires_grad=True}:(tensor<169x2xf32>) -> tensor<169x2xf32>
+	%134="ufront.parameter"(%134){requires_grad=true}:(tensor<169x2xf32>) -> tensor<169x2xf32>
 	%135="ufront.slice"(%134){output_shape=[2401, 2], slices=[84 83 82 ... 86 85 84]}:(tensor<169x2xf32>) -> tensor<2401x2xf32>
 	%136="ufront.reshape"(%135){shape=[49, 49, 2]}:(tensor<2401x2xf32>) -> tensor<49x49x2xf32>
-	%137="ufront.transpose"(%136){perm=[2, 0, 1]}:(tensor<49x49x2xf32>) -> tensor<2x49x49xf32>
+	%137="ufront.transpose"(%136){perms=[2, 0, 1]}:(tensor<49x49x2xf32>) -> tensor<2x49x49xf32>
 	%138="ufront.reshape"(%137){shape=[1, 2, 49, 49]}:(tensor<2x49x49xf32>) -> tensor<1x2x49x49xf32>
 	%139="ufront.add"(%133, %138):(tensor<1x64x2x49x49xf32>, tensor<1x2x49x49xf32>) -> tensor<1x64x2x49x49xf32>
 	%140="ufront.softmax"(%139):(tensor<1x64x2x49x49xf32>) -> tensor<1x64x2x49x49xf32>
 	%141="ufront.call"(%140, %131){addargs=[('arg1', 'B G H I J, B G H J D -> B G H I D')], func=einsum}:(tensor<1x64x2x49x49xf32>, tensor<1x64x2x49x32xf32>) -> tensor<1x64x2x49x32xf32>
-	%142="ufront.transpose"(%141){perm=[0, 1, 3, 2, 4]}:(tensor<1x64x2x49x32xf32>) -> tensor<1x64x49x2x32xf32>
+	%142="ufront.transpose"(%141){perms=[0, 1, 3, 2, 4]}:(tensor<1x64x2x49x32xf32>) -> tensor<1x64x49x2x32xf32>
 	%143="ufront.reshape"(%142){shape=[1, 64, 49, 64]}:(tensor<1x64x49x2x32xf32>) -> tensor<1x64x49x64xf32>
 	%144="ufront.linear"(%143):(tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
 	%145="ufront.dropout"(%144){rate=0.0, seed=0}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
 	%146="ufront.add"(%121, %145):(tensor<1x64x49x64xf32>, tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
-	%147="ufront.layer_norm"(%146){elementwise_affine=True, eps=1e-05, normalized_shape=(64,)}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
+	%147="ufront.layer_norm"(%146){elementwise_affine=true, eps=0.00001, normalized_shape=[64]}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
 	%148="ufront.linear"(%147):(tensor<1x64x49x64xf32>) -> tensor<1x64x49x256xf32>
 	%149="ufront.gelu"(%148):(tensor<1x64x49x256xf32>) -> tensor<1x64x49x256xf32>
 	%150="ufront.linear"(%149):(tensor<1x64x49x256xf32>) -> tensor<1x64x49x64xf32>
@@ -149,37 +149,37 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%152="ufront.add"(%146, %151):(tensor<1x64x49x64xf32>, tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
 	%153="ufront.identity"(%152):(tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
 	%154="ufront.reshape"(%153){shape=[1, 8, 8, 7, 7, 64]}:(tensor<1x64x49x64xf32>) -> tensor<1x8x8x7x7x64xf32>
-	%155="ufront.transpose"(%154){perm=[0, 5, 1, 3, 2, 4]}:(tensor<1x8x8x7x7x64xf32>) -> tensor<1x64x8x7x8x7xf32>
+	%155="ufront.transpose"(%154){perms=[0, 5, 1, 3, 2, 4]}:(tensor<1x8x8x7x7x64xf32>) -> tensor<1x64x8x7x8x7xf32>
 	%156="ufront.reshape"(%155){shape=[1, 64, 56, 56]}:(tensor<1x64x8x7x8x7xf32>) -> tensor<1x64x56x56xf32>
 	%157="ufront.reshape"(%156){shape=[1, 64, 7, 8, 7, 8]}:(tensor<1x64x56x56xf32>) -> tensor<1x64x7x8x7x8xf32>
-	%158="ufront.transpose"(%157){perm=[0, 2, 4, 3, 5, 1]}:(tensor<1x64x7x8x7x8xf32>) -> tensor<1x7x7x8x8x64xf32>
+	%158="ufront.transpose"(%157){perms=[0, 2, 4, 3, 5, 1]}:(tensor<1x64x7x8x7x8xf32>) -> tensor<1x7x7x8x8x64xf32>
 	%159="ufront.reshape"(%158){shape=[1, 49, 64, 64]}:(tensor<1x7x7x8x8x64xf32>) -> tensor<1x49x64x64xf32>
 	%160="ufront.call"(%159){addargs=[('arg2', -2), ('arg3', -3)], func=swapaxes}:(tensor<1x49x64x64xf32>) -> tensor<1x64x49x64xf32>
-	%161="ufront.layer_norm"(%160){elementwise_affine=True, eps=1e-05, normalized_shape=(64,)}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
+	%161="ufront.layer_norm"(%160){elementwise_affine=true, eps=0.00001, normalized_shape=[64]}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
 	%162="ufront.linear"(%161):(tensor<1x64x49x64xf32>) -> tensor<1x64x49x192xf32>
 	%163, %164, %165="ufront.chunk"(%162){axis=-1, sizes=3}:(tensor<1x64x49x192xf32>) -> tensor<1x64x49x64xf32>, tensor<1x64x49x64xf32>, tensor<1x64x49x64xf32>
 	%166="ufront.reshape"(%163){shape=[1, 64, 49, 2, 32]}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x2x32xf32>
-	%167="ufront.transpose"(%166){perm=[0, 1, 3, 2, 4]}:(tensor<1x64x49x2x32xf32>) -> tensor<1x64x2x49x32xf32>
+	%167="ufront.transpose"(%166){perms=[0, 1, 3, 2, 4]}:(tensor<1x64x49x2x32xf32>) -> tensor<1x64x2x49x32xf32>
 	%168="ufront.reshape"(%164){shape=[1, 64, 49, 2, 32]}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x2x32xf32>
-	%169="ufront.transpose"(%168){perm=[0, 1, 3, 2, 4]}:(tensor<1x64x49x2x32xf32>) -> tensor<1x64x2x49x32xf32>
+	%169="ufront.transpose"(%168){perms=[0, 1, 3, 2, 4]}:(tensor<1x64x49x2x32xf32>) -> tensor<1x64x2x49x32xf32>
 	%170="ufront.reshape"(%165){shape=[1, 64, 49, 2, 32]}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x2x32xf32>
-	%171="ufront.transpose"(%170){perm=[0, 1, 3, 2, 4]}:(tensor<1x64x49x2x32xf32>) -> tensor<1x64x2x49x32xf32>
+	%171="ufront.transpose"(%170){perms=[0, 1, 3, 2, 4]}:(tensor<1x64x49x2x32xf32>) -> tensor<1x64x2x49x32xf32>
 	%172="ufront.smultiply"(%169){scalar=0.125}:(tensor<1x64x2x49x32xf32>) -> tensor<1x64x2x49x32xf32>
 	%173="ufront.call"(%167, %172){addargs=[('arg1', 'B G H I D, B G H J D -> B G H I J')], func=einsum}:(tensor<1x64x2x49x32xf32>, tensor<1x64x2x49x32xf32>) -> tensor<1x64x2x49x49xf32>
-	%174="ufront.parameter"(%174){requires_grad=True}:(tensor<169x2xf32>) -> tensor<169x2xf32>
+	%174="ufront.parameter"(%174){requires_grad=true}:(tensor<169x2xf32>) -> tensor<169x2xf32>
 	%175="ufront.slice"(%174){output_shape=[2401, 2], slices=[84 83 82 ... 86 85 84]}:(tensor<169x2xf32>) -> tensor<2401x2xf32>
 	%176="ufront.reshape"(%175){shape=[49, 49, 2]}:(tensor<2401x2xf32>) -> tensor<49x49x2xf32>
-	%177="ufront.transpose"(%176){perm=[2, 0, 1]}:(tensor<49x49x2xf32>) -> tensor<2x49x49xf32>
+	%177="ufront.transpose"(%176){perms=[2, 0, 1]}:(tensor<49x49x2xf32>) -> tensor<2x49x49xf32>
 	%178="ufront.reshape"(%177){shape=[1, 2, 49, 49]}:(tensor<2x49x49xf32>) -> tensor<1x2x49x49xf32>
 	%179="ufront.add"(%173, %178):(tensor<1x64x2x49x49xf32>, tensor<1x2x49x49xf32>) -> tensor<1x64x2x49x49xf32>
 	%180="ufront.softmax"(%179):(tensor<1x64x2x49x49xf32>) -> tensor<1x64x2x49x49xf32>
 	%181="ufront.call"(%180, %171){addargs=[('arg1', 'B G H I J, B G H J D -> B G H I D')], func=einsum}:(tensor<1x64x2x49x49xf32>, tensor<1x64x2x49x32xf32>) -> tensor<1x64x2x49x32xf32>
-	%182="ufront.transpose"(%181){perm=[0, 1, 3, 2, 4]}:(tensor<1x64x2x49x32xf32>) -> tensor<1x64x49x2x32xf32>
+	%182="ufront.transpose"(%181){perms=[0, 1, 3, 2, 4]}:(tensor<1x64x2x49x32xf32>) -> tensor<1x64x49x2x32xf32>
 	%183="ufront.reshape"(%182){shape=[1, 64, 49, 64]}:(tensor<1x64x49x2x32xf32>) -> tensor<1x64x49x64xf32>
 	%184="ufront.linear"(%183):(tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
 	%185="ufront.dropout"(%184){rate=0.0, seed=0}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
 	%186="ufront.add"(%160, %185):(tensor<1x64x49x64xf32>, tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
-	%187="ufront.layer_norm"(%186){elementwise_affine=True, eps=1e-05, normalized_shape=(64,)}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
+	%187="ufront.layer_norm"(%186){elementwise_affine=true, eps=0.00001, normalized_shape=[64]}:(tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
 	%188="ufront.linear"(%187):(tensor<1x64x49x64xf32>) -> tensor<1x64x49x256xf32>
 	%189="ufront.gelu"(%188):(tensor<1x64x49x256xf32>) -> tensor<1x64x49x256xf32>
 	%190="ufront.linear"(%189):(tensor<1x64x49x256xf32>) -> tensor<1x64x49x64xf32>
@@ -187,16 +187,16 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%192="ufront.add"(%186, %191):(tensor<1x64x49x64xf32>, tensor<1x64x49x64xf32>) -> tensor<1x64x49x64xf32>
 	%193="ufront.call"(%192){addargs=[('arg2', -2), ('arg3', -3)], func=swapaxes}:(tensor<1x64x49x64xf32>) -> tensor<1x49x64x64xf32>
 	%194="ufront.reshape"(%193){shape=[1, 7, 7, 8, 8, 64]}:(tensor<1x49x64x64xf32>) -> tensor<1x7x7x8x8x64xf32>
-	%195="ufront.transpose"(%194){perm=[0, 5, 1, 3, 2, 4]}:(tensor<1x7x7x8x8x64xf32>) -> tensor<1x64x7x8x7x8xf32>
+	%195="ufront.transpose"(%194){perms=[0, 5, 1, 3, 2, 4]}:(tensor<1x7x7x8x8x64xf32>) -> tensor<1x64x7x8x7x8xf32>
 	%196="ufront.reshape"(%195){shape=[1, 64, 56, 56]}:(tensor<1x64x7x8x7x8xf32>) -> tensor<1x64x56x56xf32>
 	%197="ufront.pool2d"(%196){kernel=[3, 3], pad=[1, 1], pool_type="POOL_AVG", stride=[2, 2]}:(tensor<1x64x56x56xf32>) -> tensor<1x64x28x28xf32>
 	%198="ufront.conv2d"(%197){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x64x28x28xf32>) -> tensor<1x128x28x28xf32>
-	%199="ufront.batchnorm"(%196){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x64x56x56xf32>) -> tensor<1x64x56x56xf32>
+	%199="ufront.batchnorm"(%196){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x64x56x56xf32>) -> tensor<1x64x56x56xf32>
 	%200="ufront.conv2d"(%199){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x64x56x56xf32>) -> tensor<1x512x56x56xf32>
-	%201="ufront.batchnorm"(%200){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x512x56x56xf32>) -> tensor<1x512x56x56xf32>
+	%201="ufront.batchnorm"(%200){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x512x56x56xf32>) -> tensor<1x512x56x56xf32>
 	%202="ufront.gelu"(%201):(tensor<1x512x56x56xf32>) -> tensor<1x512x56x56xf32>
 	%203="ufront.conv2d"(%202){groups=512, kernel=[3, 3], pad=[1, 1], stride=[2, 2]}:(tensor<1x512x56x56xf32>) -> tensor<1x512x28x28xf32>
-	%204="ufront.batchnorm"(%203){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x512x28x28xf32>) -> tensor<1x512x28x28xf32>
+	%204="ufront.batchnorm"(%203){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x512x28x28xf32>) -> tensor<1x512x28x28xf32>
 	%205="ufront.gelu"(%204):(tensor<1x512x28x28xf32>) -> tensor<1x512x28x28xf32>
 	%206="ufront.pool2d"(%205){output_size=[1, 1], pool_type="POOL_ADAPTIVE"}:(tensor<1x512x28x28xf32>) -> tensor<1x512x1x1xf32>
 	%207="ufront.conv2d"(%206){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x512x1x1xf32>) -> tensor<1x32x1x1xf32>
@@ -207,34 +207,34 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%212="ufront.conv2d"(%211){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x512x28x28xf32>) -> tensor<1x128x28x28xf32>
 	%213="ufront.add"(%198, %212):(tensor<1x128x28x28xf32>, tensor<1x128x28x28xf32>) -> tensor<1x128x28x28xf32>
 	%214="ufront.reshape"(%213){shape=[1, 128, 4, 7, 4, 7]}:(tensor<1x128x28x28xf32>) -> tensor<1x128x4x7x4x7xf32>
-	%215="ufront.transpose"(%214){perm=[0, 2, 4, 3, 5, 1]}:(tensor<1x128x4x7x4x7xf32>) -> tensor<1x4x4x7x7x128xf32>
+	%215="ufront.transpose"(%214){perms=[0, 2, 4, 3, 5, 1]}:(tensor<1x128x4x7x4x7xf32>) -> tensor<1x4x4x7x7x128xf32>
 	%216="ufront.reshape"(%215){shape=[1, 16, 49, 128]}:(tensor<1x4x4x7x7x128xf32>) -> tensor<1x16x49x128xf32>
 	%217="ufront.identity"(%216):(tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
-	%218="ufront.layer_norm"(%217){elementwise_affine=True, eps=1e-05, normalized_shape=(128,)}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
+	%218="ufront.layer_norm"(%217){elementwise_affine=true, eps=0.00001, normalized_shape=[128]}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
 	%219="ufront.linear"(%218):(tensor<1x16x49x128xf32>) -> tensor<1x16x49x384xf32>
 	%220, %221, %222="ufront.chunk"(%219){axis=-1, sizes=3}:(tensor<1x16x49x384xf32>) -> tensor<1x16x49x128xf32>, tensor<1x16x49x128xf32>, tensor<1x16x49x128xf32>
 	%223="ufront.reshape"(%220){shape=[1, 16, 49, 4, 32]}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x4x32xf32>
-	%224="ufront.transpose"(%223){perm=[0, 1, 3, 2, 4]}:(tensor<1x16x49x4x32xf32>) -> tensor<1x16x4x49x32xf32>
+	%224="ufront.transpose"(%223){perms=[0, 1, 3, 2, 4]}:(tensor<1x16x49x4x32xf32>) -> tensor<1x16x4x49x32xf32>
 	%225="ufront.reshape"(%221){shape=[1, 16, 49, 4, 32]}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x4x32xf32>
-	%226="ufront.transpose"(%225){perm=[0, 1, 3, 2, 4]}:(tensor<1x16x49x4x32xf32>) -> tensor<1x16x4x49x32xf32>
+	%226="ufront.transpose"(%225){perms=[0, 1, 3, 2, 4]}:(tensor<1x16x49x4x32xf32>) -> tensor<1x16x4x49x32xf32>
 	%227="ufront.reshape"(%222){shape=[1, 16, 49, 4, 32]}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x4x32xf32>
-	%228="ufront.transpose"(%227){perm=[0, 1, 3, 2, 4]}:(tensor<1x16x49x4x32xf32>) -> tensor<1x16x4x49x32xf32>
+	%228="ufront.transpose"(%227){perms=[0, 1, 3, 2, 4]}:(tensor<1x16x49x4x32xf32>) -> tensor<1x16x4x49x32xf32>
 	%229="ufront.smultiply"(%226){scalar=0.08838834764831845}:(tensor<1x16x4x49x32xf32>) -> tensor<1x16x4x49x32xf32>
 	%230="ufront.call"(%224, %229){addargs=[('arg1', 'B G H I D, B G H J D -> B G H I J')], func=einsum}:(tensor<1x16x4x49x32xf32>, tensor<1x16x4x49x32xf32>) -> tensor<1x16x4x49x49xf32>
-	%231="ufront.parameter"(%231){requires_grad=True}:(tensor<169x4xf32>) -> tensor<169x4xf32>
+	%231="ufront.parameter"(%231){requires_grad=true}:(tensor<169x4xf32>) -> tensor<169x4xf32>
 	%232="ufront.slice"(%231){output_shape=[2401, 4], slices=[84 83 82 ... 86 85 84]}:(tensor<169x4xf32>) -> tensor<2401x4xf32>
 	%233="ufront.reshape"(%232){shape=[49, 49, 4]}:(tensor<2401x4xf32>) -> tensor<49x49x4xf32>
-	%234="ufront.transpose"(%233){perm=[2, 0, 1]}:(tensor<49x49x4xf32>) -> tensor<4x49x49xf32>
+	%234="ufront.transpose"(%233){perms=[2, 0, 1]}:(tensor<49x49x4xf32>) -> tensor<4x49x49xf32>
 	%235="ufront.reshape"(%234){shape=[1, 4, 49, 49]}:(tensor<4x49x49xf32>) -> tensor<1x4x49x49xf32>
 	%236="ufront.add"(%230, %235):(tensor<1x16x4x49x49xf32>, tensor<1x4x49x49xf32>) -> tensor<1x16x4x49x49xf32>
 	%237="ufront.softmax"(%236):(tensor<1x16x4x49x49xf32>) -> tensor<1x16x4x49x49xf32>
 	%238="ufront.call"(%237, %228){addargs=[('arg1', 'B G H I J, B G H J D -> B G H I D')], func=einsum}:(tensor<1x16x4x49x49xf32>, tensor<1x16x4x49x32xf32>) -> tensor<1x16x4x49x32xf32>
-	%239="ufront.transpose"(%238){perm=[0, 1, 3, 2, 4]}:(tensor<1x16x4x49x32xf32>) -> tensor<1x16x49x4x32xf32>
+	%239="ufront.transpose"(%238){perms=[0, 1, 3, 2, 4]}:(tensor<1x16x4x49x32xf32>) -> tensor<1x16x49x4x32xf32>
 	%240="ufront.reshape"(%239){shape=[1, 16, 49, 128]}:(tensor<1x16x49x4x32xf32>) -> tensor<1x16x49x128xf32>
 	%241="ufront.linear"(%240):(tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
 	%242="ufront.dropout"(%241){rate=0.0, seed=0}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
 	%243="ufront.add"(%217, %242):(tensor<1x16x49x128xf32>, tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
-	%244="ufront.layer_norm"(%243){elementwise_affine=True, eps=1e-05, normalized_shape=(128,)}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
+	%244="ufront.layer_norm"(%243){elementwise_affine=true, eps=0.00001, normalized_shape=[128]}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
 	%245="ufront.linear"(%244):(tensor<1x16x49x128xf32>) -> tensor<1x16x49x512xf32>
 	%246="ufront.gelu"(%245):(tensor<1x16x49x512xf32>) -> tensor<1x16x49x512xf32>
 	%247="ufront.linear"(%246):(tensor<1x16x49x512xf32>) -> tensor<1x16x49x128xf32>
@@ -242,37 +242,37 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%249="ufront.add"(%243, %248):(tensor<1x16x49x128xf32>, tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
 	%250="ufront.identity"(%249):(tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
 	%251="ufront.reshape"(%250){shape=[1, 4, 4, 7, 7, 128]}:(tensor<1x16x49x128xf32>) -> tensor<1x4x4x7x7x128xf32>
-	%252="ufront.transpose"(%251){perm=[0, 5, 1, 3, 2, 4]}:(tensor<1x4x4x7x7x128xf32>) -> tensor<1x128x4x7x4x7xf32>
+	%252="ufront.transpose"(%251){perms=[0, 5, 1, 3, 2, 4]}:(tensor<1x4x4x7x7x128xf32>) -> tensor<1x128x4x7x4x7xf32>
 	%253="ufront.reshape"(%252){shape=[1, 128, 28, 28]}:(tensor<1x128x4x7x4x7xf32>) -> tensor<1x128x28x28xf32>
 	%254="ufront.reshape"(%253){shape=[1, 128, 7, 4, 7, 4]}:(tensor<1x128x28x28xf32>) -> tensor<1x128x7x4x7x4xf32>
-	%255="ufront.transpose"(%254){perm=[0, 2, 4, 3, 5, 1]}:(tensor<1x128x7x4x7x4xf32>) -> tensor<1x7x7x4x4x128xf32>
+	%255="ufront.transpose"(%254){perms=[0, 2, 4, 3, 5, 1]}:(tensor<1x128x7x4x7x4xf32>) -> tensor<1x7x7x4x4x128xf32>
 	%256="ufront.reshape"(%255){shape=[1, 49, 16, 128]}:(tensor<1x7x7x4x4x128xf32>) -> tensor<1x49x16x128xf32>
 	%257="ufront.call"(%256){addargs=[('arg2', -2), ('arg3', -3)], func=swapaxes}:(tensor<1x49x16x128xf32>) -> tensor<1x16x49x128xf32>
-	%258="ufront.layer_norm"(%257){elementwise_affine=True, eps=1e-05, normalized_shape=(128,)}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
+	%258="ufront.layer_norm"(%257){elementwise_affine=true, eps=0.00001, normalized_shape=[128]}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
 	%259="ufront.linear"(%258):(tensor<1x16x49x128xf32>) -> tensor<1x16x49x384xf32>
 	%260, %261, %262="ufront.chunk"(%259){axis=-1, sizes=3}:(tensor<1x16x49x384xf32>) -> tensor<1x16x49x128xf32>, tensor<1x16x49x128xf32>, tensor<1x16x49x128xf32>
 	%263="ufront.reshape"(%260){shape=[1, 16, 49, 4, 32]}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x4x32xf32>
-	%264="ufront.transpose"(%263){perm=[0, 1, 3, 2, 4]}:(tensor<1x16x49x4x32xf32>) -> tensor<1x16x4x49x32xf32>
+	%264="ufront.transpose"(%263){perms=[0, 1, 3, 2, 4]}:(tensor<1x16x49x4x32xf32>) -> tensor<1x16x4x49x32xf32>
 	%265="ufront.reshape"(%261){shape=[1, 16, 49, 4, 32]}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x4x32xf32>
-	%266="ufront.transpose"(%265){perm=[0, 1, 3, 2, 4]}:(tensor<1x16x49x4x32xf32>) -> tensor<1x16x4x49x32xf32>
+	%266="ufront.transpose"(%265){perms=[0, 1, 3, 2, 4]}:(tensor<1x16x49x4x32xf32>) -> tensor<1x16x4x49x32xf32>
 	%267="ufront.reshape"(%262){shape=[1, 16, 49, 4, 32]}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x4x32xf32>
-	%268="ufront.transpose"(%267){perm=[0, 1, 3, 2, 4]}:(tensor<1x16x49x4x32xf32>) -> tensor<1x16x4x49x32xf32>
+	%268="ufront.transpose"(%267){perms=[0, 1, 3, 2, 4]}:(tensor<1x16x49x4x32xf32>) -> tensor<1x16x4x49x32xf32>
 	%269="ufront.smultiply"(%266){scalar=0.08838834764831845}:(tensor<1x16x4x49x32xf32>) -> tensor<1x16x4x49x32xf32>
 	%270="ufront.call"(%264, %269){addargs=[('arg1', 'B G H I D, B G H J D -> B G H I J')], func=einsum}:(tensor<1x16x4x49x32xf32>, tensor<1x16x4x49x32xf32>) -> tensor<1x16x4x49x49xf32>
-	%271="ufront.parameter"(%271){requires_grad=True}:(tensor<169x4xf32>) -> tensor<169x4xf32>
+	%271="ufront.parameter"(%271){requires_grad=true}:(tensor<169x4xf32>) -> tensor<169x4xf32>
 	%272="ufront.slice"(%271){output_shape=[2401, 4], slices=[84 83 82 ... 86 85 84]}:(tensor<169x4xf32>) -> tensor<2401x4xf32>
 	%273="ufront.reshape"(%272){shape=[49, 49, 4]}:(tensor<2401x4xf32>) -> tensor<49x49x4xf32>
-	%274="ufront.transpose"(%273){perm=[2, 0, 1]}:(tensor<49x49x4xf32>) -> tensor<4x49x49xf32>
+	%274="ufront.transpose"(%273){perms=[2, 0, 1]}:(tensor<49x49x4xf32>) -> tensor<4x49x49xf32>
 	%275="ufront.reshape"(%274){shape=[1, 4, 49, 49]}:(tensor<4x49x49xf32>) -> tensor<1x4x49x49xf32>
 	%276="ufront.add"(%270, %275):(tensor<1x16x4x49x49xf32>, tensor<1x4x49x49xf32>) -> tensor<1x16x4x49x49xf32>
 	%277="ufront.softmax"(%276):(tensor<1x16x4x49x49xf32>) -> tensor<1x16x4x49x49xf32>
 	%278="ufront.call"(%277, %268){addargs=[('arg1', 'B G H I J, B G H J D -> B G H I D')], func=einsum}:(tensor<1x16x4x49x49xf32>, tensor<1x16x4x49x32xf32>) -> tensor<1x16x4x49x32xf32>
-	%279="ufront.transpose"(%278){perm=[0, 1, 3, 2, 4]}:(tensor<1x16x4x49x32xf32>) -> tensor<1x16x49x4x32xf32>
+	%279="ufront.transpose"(%278){perms=[0, 1, 3, 2, 4]}:(tensor<1x16x4x49x32xf32>) -> tensor<1x16x49x4x32xf32>
 	%280="ufront.reshape"(%279){shape=[1, 16, 49, 128]}:(tensor<1x16x49x4x32xf32>) -> tensor<1x16x49x128xf32>
 	%281="ufront.linear"(%280):(tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
 	%282="ufront.dropout"(%281){rate=0.0, seed=0}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
 	%283="ufront.add"(%257, %282):(tensor<1x16x49x128xf32>, tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
-	%284="ufront.layer_norm"(%283){elementwise_affine=True, eps=1e-05, normalized_shape=(128,)}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
+	%284="ufront.layer_norm"(%283){elementwise_affine=true, eps=0.00001, normalized_shape=[128]}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
 	%285="ufront.linear"(%284):(tensor<1x16x49x128xf32>) -> tensor<1x16x49x512xf32>
 	%286="ufront.gelu"(%285):(tensor<1x16x49x512xf32>) -> tensor<1x16x49x512xf32>
 	%287="ufront.linear"(%286):(tensor<1x16x49x512xf32>) -> tensor<1x16x49x128xf32>
@@ -280,15 +280,15 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%289="ufront.add"(%283, %288):(tensor<1x16x49x128xf32>, tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
 	%290="ufront.call"(%289){addargs=[('arg2', -2), ('arg3', -3)], func=swapaxes}:(tensor<1x16x49x128xf32>) -> tensor<1x49x16x128xf32>
 	%291="ufront.reshape"(%290){shape=[1, 7, 7, 4, 4, 128]}:(tensor<1x49x16x128xf32>) -> tensor<1x7x7x4x4x128xf32>
-	%292="ufront.transpose"(%291){perm=[0, 5, 1, 3, 2, 4]}:(tensor<1x7x7x4x4x128xf32>) -> tensor<1x128x7x4x7x4xf32>
+	%292="ufront.transpose"(%291){perms=[0, 5, 1, 3, 2, 4]}:(tensor<1x7x7x4x4x128xf32>) -> tensor<1x128x7x4x7x4xf32>
 	%293="ufront.reshape"(%292){shape=[1, 128, 28, 28]}:(tensor<1x128x7x4x7x4xf32>) -> tensor<1x128x28x28xf32>
 	%294="ufront.identity"(%293):(tensor<1x128x28x28xf32>) -> tensor<1x128x28x28xf32>
-	%295="ufront.batchnorm"(%293){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x128x28x28xf32>) -> tensor<1x128x28x28xf32>
+	%295="ufront.batchnorm"(%293){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x128x28x28xf32>) -> tensor<1x128x28x28xf32>
 	%296="ufront.conv2d"(%295){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x128x28x28xf32>) -> tensor<1x512x28x28xf32>
-	%297="ufront.batchnorm"(%296){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x512x28x28xf32>) -> tensor<1x512x28x28xf32>
+	%297="ufront.batchnorm"(%296){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x512x28x28xf32>) -> tensor<1x512x28x28xf32>
 	%298="ufront.gelu"(%297):(tensor<1x512x28x28xf32>) -> tensor<1x512x28x28xf32>
 	%299="ufront.conv2d"(%298){groups=512, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<1x512x28x28xf32>) -> tensor<1x512x28x28xf32>
-	%300="ufront.batchnorm"(%299){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x512x28x28xf32>) -> tensor<1x512x28x28xf32>
+	%300="ufront.batchnorm"(%299){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x512x28x28xf32>) -> tensor<1x512x28x28xf32>
 	%301="ufront.gelu"(%300):(tensor<1x512x28x28xf32>) -> tensor<1x512x28x28xf32>
 	%302="ufront.pool2d"(%301){output_size=[1, 1], pool_type="POOL_ADAPTIVE"}:(tensor<1x512x28x28xf32>) -> tensor<1x512x1x1xf32>
 	%303="ufront.conv2d"(%302){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x512x1x1xf32>) -> tensor<1x32x1x1xf32>
@@ -299,34 +299,34 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%308="ufront.conv2d"(%307){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x512x28x28xf32>) -> tensor<1x128x28x28xf32>
 	%309="ufront.add"(%294, %308):(tensor<1x128x28x28xf32>, tensor<1x128x28x28xf32>) -> tensor<1x128x28x28xf32>
 	%310="ufront.reshape"(%309){shape=[1, 128, 4, 7, 4, 7]}:(tensor<1x128x28x28xf32>) -> tensor<1x128x4x7x4x7xf32>
-	%311="ufront.transpose"(%310){perm=[0, 2, 4, 3, 5, 1]}:(tensor<1x128x4x7x4x7xf32>) -> tensor<1x4x4x7x7x128xf32>
+	%311="ufront.transpose"(%310){perms=[0, 2, 4, 3, 5, 1]}:(tensor<1x128x4x7x4x7xf32>) -> tensor<1x4x4x7x7x128xf32>
 	%312="ufront.reshape"(%311){shape=[1, 16, 49, 128]}:(tensor<1x4x4x7x7x128xf32>) -> tensor<1x16x49x128xf32>
 	%313="ufront.identity"(%312):(tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
-	%314="ufront.layer_norm"(%313){elementwise_affine=True, eps=1e-05, normalized_shape=(128,)}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
+	%314="ufront.layer_norm"(%313){elementwise_affine=true, eps=0.00001, normalized_shape=[128]}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
 	%315="ufront.linear"(%314):(tensor<1x16x49x128xf32>) -> tensor<1x16x49x384xf32>
 	%316, %317, %318="ufront.chunk"(%315){axis=-1, sizes=3}:(tensor<1x16x49x384xf32>) -> tensor<1x16x49x128xf32>, tensor<1x16x49x128xf32>, tensor<1x16x49x128xf32>
 	%319="ufront.reshape"(%316){shape=[1, 16, 49, 4, 32]}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x4x32xf32>
-	%320="ufront.transpose"(%319){perm=[0, 1, 3, 2, 4]}:(tensor<1x16x49x4x32xf32>) -> tensor<1x16x4x49x32xf32>
+	%320="ufront.transpose"(%319){perms=[0, 1, 3, 2, 4]}:(tensor<1x16x49x4x32xf32>) -> tensor<1x16x4x49x32xf32>
 	%321="ufront.reshape"(%317){shape=[1, 16, 49, 4, 32]}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x4x32xf32>
-	%322="ufront.transpose"(%321){perm=[0, 1, 3, 2, 4]}:(tensor<1x16x49x4x32xf32>) -> tensor<1x16x4x49x32xf32>
+	%322="ufront.transpose"(%321){perms=[0, 1, 3, 2, 4]}:(tensor<1x16x49x4x32xf32>) -> tensor<1x16x4x49x32xf32>
 	%323="ufront.reshape"(%318){shape=[1, 16, 49, 4, 32]}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x4x32xf32>
-	%324="ufront.transpose"(%323){perm=[0, 1, 3, 2, 4]}:(tensor<1x16x49x4x32xf32>) -> tensor<1x16x4x49x32xf32>
+	%324="ufront.transpose"(%323){perms=[0, 1, 3, 2, 4]}:(tensor<1x16x49x4x32xf32>) -> tensor<1x16x4x49x32xf32>
 	%325="ufront.smultiply"(%322){scalar=0.08838834764831845}:(tensor<1x16x4x49x32xf32>) -> tensor<1x16x4x49x32xf32>
 	%326="ufront.call"(%320, %325){addargs=[('arg1', 'B G H I D, B G H J D -> B G H I J')], func=einsum}:(tensor<1x16x4x49x32xf32>, tensor<1x16x4x49x32xf32>) -> tensor<1x16x4x49x49xf32>
-	%327="ufront.parameter"(%327){requires_grad=True}:(tensor<169x4xf32>) -> tensor<169x4xf32>
+	%327="ufront.parameter"(%327){requires_grad=true}:(tensor<169x4xf32>) -> tensor<169x4xf32>
 	%328="ufront.slice"(%327){output_shape=[2401, 4], slices=[84 83 82 ... 86 85 84]}:(tensor<169x4xf32>) -> tensor<2401x4xf32>
 	%329="ufront.reshape"(%328){shape=[49, 49, 4]}:(tensor<2401x4xf32>) -> tensor<49x49x4xf32>
-	%330="ufront.transpose"(%329){perm=[2, 0, 1]}:(tensor<49x49x4xf32>) -> tensor<4x49x49xf32>
+	%330="ufront.transpose"(%329){perms=[2, 0, 1]}:(tensor<49x49x4xf32>) -> tensor<4x49x49xf32>
 	%331="ufront.reshape"(%330){shape=[1, 4, 49, 49]}:(tensor<4x49x49xf32>) -> tensor<1x4x49x49xf32>
 	%332="ufront.add"(%326, %331):(tensor<1x16x4x49x49xf32>, tensor<1x4x49x49xf32>) -> tensor<1x16x4x49x49xf32>
 	%333="ufront.softmax"(%332):(tensor<1x16x4x49x49xf32>) -> tensor<1x16x4x49x49xf32>
 	%334="ufront.call"(%333, %324){addargs=[('arg1', 'B G H I J, B G H J D -> B G H I D')], func=einsum}:(tensor<1x16x4x49x49xf32>, tensor<1x16x4x49x32xf32>) -> tensor<1x16x4x49x32xf32>
-	%335="ufront.transpose"(%334){perm=[0, 1, 3, 2, 4]}:(tensor<1x16x4x49x32xf32>) -> tensor<1x16x49x4x32xf32>
+	%335="ufront.transpose"(%334){perms=[0, 1, 3, 2, 4]}:(tensor<1x16x4x49x32xf32>) -> tensor<1x16x49x4x32xf32>
 	%336="ufront.reshape"(%335){shape=[1, 16, 49, 128]}:(tensor<1x16x49x4x32xf32>) -> tensor<1x16x49x128xf32>
 	%337="ufront.linear"(%336):(tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
 	%338="ufront.dropout"(%337){rate=0.0, seed=0}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
 	%339="ufront.add"(%313, %338):(tensor<1x16x49x128xf32>, tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
-	%340="ufront.layer_norm"(%339){elementwise_affine=True, eps=1e-05, normalized_shape=(128,)}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
+	%340="ufront.layer_norm"(%339){elementwise_affine=true, eps=0.00001, normalized_shape=[128]}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
 	%341="ufront.linear"(%340):(tensor<1x16x49x128xf32>) -> tensor<1x16x49x512xf32>
 	%342="ufront.gelu"(%341):(tensor<1x16x49x512xf32>) -> tensor<1x16x49x512xf32>
 	%343="ufront.linear"(%342):(tensor<1x16x49x512xf32>) -> tensor<1x16x49x128xf32>
@@ -334,37 +334,37 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%345="ufront.add"(%339, %344):(tensor<1x16x49x128xf32>, tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
 	%346="ufront.identity"(%345):(tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
 	%347="ufront.reshape"(%346){shape=[1, 4, 4, 7, 7, 128]}:(tensor<1x16x49x128xf32>) -> tensor<1x4x4x7x7x128xf32>
-	%348="ufront.transpose"(%347){perm=[0, 5, 1, 3, 2, 4]}:(tensor<1x4x4x7x7x128xf32>) -> tensor<1x128x4x7x4x7xf32>
+	%348="ufront.transpose"(%347){perms=[0, 5, 1, 3, 2, 4]}:(tensor<1x4x4x7x7x128xf32>) -> tensor<1x128x4x7x4x7xf32>
 	%349="ufront.reshape"(%348){shape=[1, 128, 28, 28]}:(tensor<1x128x4x7x4x7xf32>) -> tensor<1x128x28x28xf32>
 	%350="ufront.reshape"(%349){shape=[1, 128, 7, 4, 7, 4]}:(tensor<1x128x28x28xf32>) -> tensor<1x128x7x4x7x4xf32>
-	%351="ufront.transpose"(%350){perm=[0, 2, 4, 3, 5, 1]}:(tensor<1x128x7x4x7x4xf32>) -> tensor<1x7x7x4x4x128xf32>
+	%351="ufront.transpose"(%350){perms=[0, 2, 4, 3, 5, 1]}:(tensor<1x128x7x4x7x4xf32>) -> tensor<1x7x7x4x4x128xf32>
 	%352="ufront.reshape"(%351){shape=[1, 49, 16, 128]}:(tensor<1x7x7x4x4x128xf32>) -> tensor<1x49x16x128xf32>
 	%353="ufront.call"(%352){addargs=[('arg2', -2), ('arg3', -3)], func=swapaxes}:(tensor<1x49x16x128xf32>) -> tensor<1x16x49x128xf32>
-	%354="ufront.layer_norm"(%353){elementwise_affine=True, eps=1e-05, normalized_shape=(128,)}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
+	%354="ufront.layer_norm"(%353){elementwise_affine=true, eps=0.00001, normalized_shape=[128]}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
 	%355="ufront.linear"(%354):(tensor<1x16x49x128xf32>) -> tensor<1x16x49x384xf32>
 	%356, %357, %358="ufront.chunk"(%355){axis=-1, sizes=3}:(tensor<1x16x49x384xf32>) -> tensor<1x16x49x128xf32>, tensor<1x16x49x128xf32>, tensor<1x16x49x128xf32>
 	%359="ufront.reshape"(%356){shape=[1, 16, 49, 4, 32]}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x4x32xf32>
-	%360="ufront.transpose"(%359){perm=[0, 1, 3, 2, 4]}:(tensor<1x16x49x4x32xf32>) -> tensor<1x16x4x49x32xf32>
+	%360="ufront.transpose"(%359){perms=[0, 1, 3, 2, 4]}:(tensor<1x16x49x4x32xf32>) -> tensor<1x16x4x49x32xf32>
 	%361="ufront.reshape"(%357){shape=[1, 16, 49, 4, 32]}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x4x32xf32>
-	%362="ufront.transpose"(%361){perm=[0, 1, 3, 2, 4]}:(tensor<1x16x49x4x32xf32>) -> tensor<1x16x4x49x32xf32>
+	%362="ufront.transpose"(%361){perms=[0, 1, 3, 2, 4]}:(tensor<1x16x49x4x32xf32>) -> tensor<1x16x4x49x32xf32>
 	%363="ufront.reshape"(%358){shape=[1, 16, 49, 4, 32]}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x4x32xf32>
-	%364="ufront.transpose"(%363){perm=[0, 1, 3, 2, 4]}:(tensor<1x16x49x4x32xf32>) -> tensor<1x16x4x49x32xf32>
+	%364="ufront.transpose"(%363){perms=[0, 1, 3, 2, 4]}:(tensor<1x16x49x4x32xf32>) -> tensor<1x16x4x49x32xf32>
 	%365="ufront.smultiply"(%362){scalar=0.08838834764831845}:(tensor<1x16x4x49x32xf32>) -> tensor<1x16x4x49x32xf32>
 	%366="ufront.call"(%360, %365){addargs=[('arg1', 'B G H I D, B G H J D -> B G H I J')], func=einsum}:(tensor<1x16x4x49x32xf32>, tensor<1x16x4x49x32xf32>) -> tensor<1x16x4x49x49xf32>
-	%367="ufront.parameter"(%367){requires_grad=True}:(tensor<169x4xf32>) -> tensor<169x4xf32>
+	%367="ufront.parameter"(%367){requires_grad=true}:(tensor<169x4xf32>) -> tensor<169x4xf32>
 	%368="ufront.slice"(%367){output_shape=[2401, 4], slices=[84 83 82 ... 86 85 84]}:(tensor<169x4xf32>) -> tensor<2401x4xf32>
 	%369="ufront.reshape"(%368){shape=[49, 49, 4]}:(tensor<2401x4xf32>) -> tensor<49x49x4xf32>
-	%370="ufront.transpose"(%369){perm=[2, 0, 1]}:(tensor<49x49x4xf32>) -> tensor<4x49x49xf32>
+	%370="ufront.transpose"(%369){perms=[2, 0, 1]}:(tensor<49x49x4xf32>) -> tensor<4x49x49xf32>
 	%371="ufront.reshape"(%370){shape=[1, 4, 49, 49]}:(tensor<4x49x49xf32>) -> tensor<1x4x49x49xf32>
 	%372="ufront.add"(%366, %371):(tensor<1x16x4x49x49xf32>, tensor<1x4x49x49xf32>) -> tensor<1x16x4x49x49xf32>
 	%373="ufront.softmax"(%372):(tensor<1x16x4x49x49xf32>) -> tensor<1x16x4x49x49xf32>
 	%374="ufront.call"(%373, %364){addargs=[('arg1', 'B G H I J, B G H J D -> B G H I D')], func=einsum}:(tensor<1x16x4x49x49xf32>, tensor<1x16x4x49x32xf32>) -> tensor<1x16x4x49x32xf32>
-	%375="ufront.transpose"(%374){perm=[0, 1, 3, 2, 4]}:(tensor<1x16x4x49x32xf32>) -> tensor<1x16x49x4x32xf32>
+	%375="ufront.transpose"(%374){perms=[0, 1, 3, 2, 4]}:(tensor<1x16x4x49x32xf32>) -> tensor<1x16x49x4x32xf32>
 	%376="ufront.reshape"(%375){shape=[1, 16, 49, 128]}:(tensor<1x16x49x4x32xf32>) -> tensor<1x16x49x128xf32>
 	%377="ufront.linear"(%376):(tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
 	%378="ufront.dropout"(%377){rate=0.0, seed=0}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
 	%379="ufront.add"(%353, %378):(tensor<1x16x49x128xf32>, tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
-	%380="ufront.layer_norm"(%379){elementwise_affine=True, eps=1e-05, normalized_shape=(128,)}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
+	%380="ufront.layer_norm"(%379){elementwise_affine=true, eps=0.00001, normalized_shape=[128]}:(tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
 	%381="ufront.linear"(%380):(tensor<1x16x49x128xf32>) -> tensor<1x16x49x512xf32>
 	%382="ufront.gelu"(%381):(tensor<1x16x49x512xf32>) -> tensor<1x16x49x512xf32>
 	%383="ufront.linear"(%382):(tensor<1x16x49x512xf32>) -> tensor<1x16x49x128xf32>
@@ -372,16 +372,16 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%385="ufront.add"(%379, %384):(tensor<1x16x49x128xf32>, tensor<1x16x49x128xf32>) -> tensor<1x16x49x128xf32>
 	%386="ufront.call"(%385){addargs=[('arg2', -2), ('arg3', -3)], func=swapaxes}:(tensor<1x16x49x128xf32>) -> tensor<1x49x16x128xf32>
 	%387="ufront.reshape"(%386){shape=[1, 7, 7, 4, 4, 128]}:(tensor<1x49x16x128xf32>) -> tensor<1x7x7x4x4x128xf32>
-	%388="ufront.transpose"(%387){perm=[0, 5, 1, 3, 2, 4]}:(tensor<1x7x7x4x4x128xf32>) -> tensor<1x128x7x4x7x4xf32>
+	%388="ufront.transpose"(%387){perms=[0, 5, 1, 3, 2, 4]}:(tensor<1x7x7x4x4x128xf32>) -> tensor<1x128x7x4x7x4xf32>
 	%389="ufront.reshape"(%388){shape=[1, 128, 28, 28]}:(tensor<1x128x7x4x7x4xf32>) -> tensor<1x128x28x28xf32>
 	%390="ufront.pool2d"(%389){kernel=[3, 3], pad=[1, 1], pool_type="POOL_AVG", stride=[2, 2]}:(tensor<1x128x28x28xf32>) -> tensor<1x128x14x14xf32>
 	%391="ufront.conv2d"(%390){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x128x14x14xf32>) -> tensor<1x256x14x14xf32>
-	%392="ufront.batchnorm"(%389){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x128x28x28xf32>) -> tensor<1x128x28x28xf32>
+	%392="ufront.batchnorm"(%389){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x128x28x28xf32>) -> tensor<1x128x28x28xf32>
 	%393="ufront.conv2d"(%392){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x128x28x28xf32>) -> tensor<1x1024x28x28xf32>
-	%394="ufront.batchnorm"(%393){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x1024x28x28xf32>) -> tensor<1x1024x28x28xf32>
+	%394="ufront.batchnorm"(%393){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x1024x28x28xf32>) -> tensor<1x1024x28x28xf32>
 	%395="ufront.gelu"(%394):(tensor<1x1024x28x28xf32>) -> tensor<1x1024x28x28xf32>
 	%396="ufront.conv2d"(%395){groups=1024, kernel=[3, 3], pad=[1, 1], stride=[2, 2]}:(tensor<1x1024x28x28xf32>) -> tensor<1x1024x14x14xf32>
-	%397="ufront.batchnorm"(%396){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
+	%397="ufront.batchnorm"(%396){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
 	%398="ufront.gelu"(%397):(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
 	%399="ufront.pool2d"(%398){output_size=[1, 1], pool_type="POOL_ADAPTIVE"}:(tensor<1x1024x14x14xf32>) -> tensor<1x1024x1x1xf32>
 	%400="ufront.conv2d"(%399){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x1024x1x1xf32>) -> tensor<1x64x1x1xf32>
@@ -392,34 +392,34 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%405="ufront.conv2d"(%404){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x1024x14x14xf32>) -> tensor<1x256x14x14xf32>
 	%406="ufront.add"(%391, %405):(tensor<1x256x14x14xf32>, tensor<1x256x14x14xf32>) -> tensor<1x256x14x14xf32>
 	%407="ufront.reshape"(%406){shape=[1, 256, 2, 7, 2, 7]}:(tensor<1x256x14x14xf32>) -> tensor<1x256x2x7x2x7xf32>
-	%408="ufront.transpose"(%407){perm=[0, 2, 4, 3, 5, 1]}:(tensor<1x256x2x7x2x7xf32>) -> tensor<1x2x2x7x7x256xf32>
+	%408="ufront.transpose"(%407){perms=[0, 2, 4, 3, 5, 1]}:(tensor<1x256x2x7x2x7xf32>) -> tensor<1x2x2x7x7x256xf32>
 	%409="ufront.reshape"(%408){shape=[1, 4, 49, 256]}:(tensor<1x2x2x7x7x256xf32>) -> tensor<1x4x49x256xf32>
 	%410="ufront.identity"(%409):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
-	%411="ufront.layer_norm"(%410){elementwise_affine=True, eps=1e-05, normalized_shape=(256,)}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
+	%411="ufront.layer_norm"(%410){elementwise_affine=true, eps=0.00001, normalized_shape=[256]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%412="ufront.linear"(%411):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x768xf32>
 	%413, %414, %415="ufront.chunk"(%412){axis=-1, sizes=3}:(tensor<1x4x49x768xf32>) -> tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>
 	%416="ufront.reshape"(%413){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%417="ufront.transpose"(%416){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%417="ufront.transpose"(%416){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%418="ufront.reshape"(%414){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%419="ufront.transpose"(%418){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%419="ufront.transpose"(%418){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%420="ufront.reshape"(%415){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%421="ufront.transpose"(%420){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%421="ufront.transpose"(%420){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%422="ufront.smultiply"(%419){scalar=0.0625}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%423="ufront.call"(%417, %422){addargs=[('arg1', 'B G H I D, B G H J D -> B G H I J')], func=einsum}:(tensor<1x4x8x49x32xf32>, tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x49xf32>
-	%424="ufront.parameter"(%424){requires_grad=True}:(tensor<169x8xf32>) -> tensor<169x8xf32>
+	%424="ufront.parameter"(%424){requires_grad=true}:(tensor<169x8xf32>) -> tensor<169x8xf32>
 	%425="ufront.slice"(%424){output_shape=[2401, 8], slices=[84 83 82 ... 86 85 84]}:(tensor<169x8xf32>) -> tensor<2401x8xf32>
 	%426="ufront.reshape"(%425){shape=[49, 49, 8]}:(tensor<2401x8xf32>) -> tensor<49x49x8xf32>
-	%427="ufront.transpose"(%426){perm=[2, 0, 1]}:(tensor<49x49x8xf32>) -> tensor<8x49x49xf32>
+	%427="ufront.transpose"(%426){perms=[2, 0, 1]}:(tensor<49x49x8xf32>) -> tensor<8x49x49xf32>
 	%428="ufront.reshape"(%427){shape=[1, 8, 49, 49]}:(tensor<8x49x49xf32>) -> tensor<1x8x49x49xf32>
 	%429="ufront.add"(%423, %428):(tensor<1x4x8x49x49xf32>, tensor<1x8x49x49xf32>) -> tensor<1x4x8x49x49xf32>
 	%430="ufront.softmax"(%429):(tensor<1x4x8x49x49xf32>) -> tensor<1x4x8x49x49xf32>
 	%431="ufront.call"(%430, %421){addargs=[('arg1', 'B G H I J, B G H J D -> B G H I D')], func=einsum}:(tensor<1x4x8x49x49xf32>, tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x32xf32>
-	%432="ufront.transpose"(%431){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x49x8x32xf32>
+	%432="ufront.transpose"(%431){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x49x8x32xf32>
 	%433="ufront.reshape"(%432){shape=[1, 4, 49, 256]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x49x256xf32>
 	%434="ufront.linear"(%433):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%435="ufront.dropout"(%434){rate=0.0, seed=0}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%436="ufront.add"(%410, %435):(tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
-	%437="ufront.layer_norm"(%436){elementwise_affine=True, eps=1e-05, normalized_shape=(256,)}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
+	%437="ufront.layer_norm"(%436){elementwise_affine=true, eps=0.00001, normalized_shape=[256]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%438="ufront.linear"(%437):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x1024xf32>
 	%439="ufront.gelu"(%438):(tensor<1x4x49x1024xf32>) -> tensor<1x4x49x1024xf32>
 	%440="ufront.linear"(%439):(tensor<1x4x49x1024xf32>) -> tensor<1x4x49x256xf32>
@@ -427,37 +427,37 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%442="ufront.add"(%436, %441):(tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%443="ufront.identity"(%442):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%444="ufront.reshape"(%443){shape=[1, 2, 2, 7, 7, 256]}:(tensor<1x4x49x256xf32>) -> tensor<1x2x2x7x7x256xf32>
-	%445="ufront.transpose"(%444){perm=[0, 5, 1, 3, 2, 4]}:(tensor<1x2x2x7x7x256xf32>) -> tensor<1x256x2x7x2x7xf32>
+	%445="ufront.transpose"(%444){perms=[0, 5, 1, 3, 2, 4]}:(tensor<1x2x2x7x7x256xf32>) -> tensor<1x256x2x7x2x7xf32>
 	%446="ufront.reshape"(%445){shape=[1, 256, 14, 14]}:(tensor<1x256x2x7x2x7xf32>) -> tensor<1x256x14x14xf32>
 	%447="ufront.reshape"(%446){shape=[1, 256, 7, 2, 7, 2]}:(tensor<1x256x14x14xf32>) -> tensor<1x256x7x2x7x2xf32>
-	%448="ufront.transpose"(%447){perm=[0, 2, 4, 3, 5, 1]}:(tensor<1x256x7x2x7x2xf32>) -> tensor<1x7x7x2x2x256xf32>
+	%448="ufront.transpose"(%447){perms=[0, 2, 4, 3, 5, 1]}:(tensor<1x256x7x2x7x2xf32>) -> tensor<1x7x7x2x2x256xf32>
 	%449="ufront.reshape"(%448){shape=[1, 49, 4, 256]}:(tensor<1x7x7x2x2x256xf32>) -> tensor<1x49x4x256xf32>
 	%450="ufront.call"(%449){addargs=[('arg2', -2), ('arg3', -3)], func=swapaxes}:(tensor<1x49x4x256xf32>) -> tensor<1x4x49x256xf32>
-	%451="ufront.layer_norm"(%450){elementwise_affine=True, eps=1e-05, normalized_shape=(256,)}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
+	%451="ufront.layer_norm"(%450){elementwise_affine=true, eps=0.00001, normalized_shape=[256]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%452="ufront.linear"(%451):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x768xf32>
 	%453, %454, %455="ufront.chunk"(%452){axis=-1, sizes=3}:(tensor<1x4x49x768xf32>) -> tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>
 	%456="ufront.reshape"(%453){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%457="ufront.transpose"(%456){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%457="ufront.transpose"(%456){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%458="ufront.reshape"(%454){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%459="ufront.transpose"(%458){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%459="ufront.transpose"(%458){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%460="ufront.reshape"(%455){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%461="ufront.transpose"(%460){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%461="ufront.transpose"(%460){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%462="ufront.smultiply"(%459){scalar=0.0625}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%463="ufront.call"(%457, %462){addargs=[('arg1', 'B G H I D, B G H J D -> B G H I J')], func=einsum}:(tensor<1x4x8x49x32xf32>, tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x49xf32>
-	%464="ufront.parameter"(%464){requires_grad=True}:(tensor<169x8xf32>) -> tensor<169x8xf32>
+	%464="ufront.parameter"(%464){requires_grad=true}:(tensor<169x8xf32>) -> tensor<169x8xf32>
 	%465="ufront.slice"(%464){output_shape=[2401, 8], slices=[84 83 82 ... 86 85 84]}:(tensor<169x8xf32>) -> tensor<2401x8xf32>
 	%466="ufront.reshape"(%465){shape=[49, 49, 8]}:(tensor<2401x8xf32>) -> tensor<49x49x8xf32>
-	%467="ufront.transpose"(%466){perm=[2, 0, 1]}:(tensor<49x49x8xf32>) -> tensor<8x49x49xf32>
+	%467="ufront.transpose"(%466){perms=[2, 0, 1]}:(tensor<49x49x8xf32>) -> tensor<8x49x49xf32>
 	%468="ufront.reshape"(%467){shape=[1, 8, 49, 49]}:(tensor<8x49x49xf32>) -> tensor<1x8x49x49xf32>
 	%469="ufront.add"(%463, %468):(tensor<1x4x8x49x49xf32>, tensor<1x8x49x49xf32>) -> tensor<1x4x8x49x49xf32>
 	%470="ufront.softmax"(%469):(tensor<1x4x8x49x49xf32>) -> tensor<1x4x8x49x49xf32>
 	%471="ufront.call"(%470, %461){addargs=[('arg1', 'B G H I J, B G H J D -> B G H I D')], func=einsum}:(tensor<1x4x8x49x49xf32>, tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x32xf32>
-	%472="ufront.transpose"(%471){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x49x8x32xf32>
+	%472="ufront.transpose"(%471){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x49x8x32xf32>
 	%473="ufront.reshape"(%472){shape=[1, 4, 49, 256]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x49x256xf32>
 	%474="ufront.linear"(%473):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%475="ufront.dropout"(%474){rate=0.0, seed=0}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%476="ufront.add"(%450, %475):(tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
-	%477="ufront.layer_norm"(%476){elementwise_affine=True, eps=1e-05, normalized_shape=(256,)}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
+	%477="ufront.layer_norm"(%476){elementwise_affine=true, eps=0.00001, normalized_shape=[256]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%478="ufront.linear"(%477):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x1024xf32>
 	%479="ufront.gelu"(%478):(tensor<1x4x49x1024xf32>) -> tensor<1x4x49x1024xf32>
 	%480="ufront.linear"(%479):(tensor<1x4x49x1024xf32>) -> tensor<1x4x49x256xf32>
@@ -465,15 +465,15 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%482="ufront.add"(%476, %481):(tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%483="ufront.call"(%482){addargs=[('arg2', -2), ('arg3', -3)], func=swapaxes}:(tensor<1x4x49x256xf32>) -> tensor<1x49x4x256xf32>
 	%484="ufront.reshape"(%483){shape=[1, 7, 7, 2, 2, 256]}:(tensor<1x49x4x256xf32>) -> tensor<1x7x7x2x2x256xf32>
-	%485="ufront.transpose"(%484){perm=[0, 5, 1, 3, 2, 4]}:(tensor<1x7x7x2x2x256xf32>) -> tensor<1x256x7x2x7x2xf32>
+	%485="ufront.transpose"(%484){perms=[0, 5, 1, 3, 2, 4]}:(tensor<1x7x7x2x2x256xf32>) -> tensor<1x256x7x2x7x2xf32>
 	%486="ufront.reshape"(%485){shape=[1, 256, 14, 14]}:(tensor<1x256x7x2x7x2xf32>) -> tensor<1x256x14x14xf32>
 	%487="ufront.identity"(%486):(tensor<1x256x14x14xf32>) -> tensor<1x256x14x14xf32>
-	%488="ufront.batchnorm"(%486){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x256x14x14xf32>) -> tensor<1x256x14x14xf32>
+	%488="ufront.batchnorm"(%486){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x256x14x14xf32>) -> tensor<1x256x14x14xf32>
 	%489="ufront.conv2d"(%488){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x256x14x14xf32>) -> tensor<1x1024x14x14xf32>
-	%490="ufront.batchnorm"(%489){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
+	%490="ufront.batchnorm"(%489){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
 	%491="ufront.gelu"(%490):(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
 	%492="ufront.conv2d"(%491){groups=1024, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
-	%493="ufront.batchnorm"(%492){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
+	%493="ufront.batchnorm"(%492){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
 	%494="ufront.gelu"(%493):(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
 	%495="ufront.pool2d"(%494){output_size=[1, 1], pool_type="POOL_ADAPTIVE"}:(tensor<1x1024x14x14xf32>) -> tensor<1x1024x1x1xf32>
 	%496="ufront.conv2d"(%495){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x1024x1x1xf32>) -> tensor<1x64x1x1xf32>
@@ -484,34 +484,34 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%501="ufront.conv2d"(%500){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x1024x14x14xf32>) -> tensor<1x256x14x14xf32>
 	%502="ufront.add"(%487, %501):(tensor<1x256x14x14xf32>, tensor<1x256x14x14xf32>) -> tensor<1x256x14x14xf32>
 	%503="ufront.reshape"(%502){shape=[1, 256, 2, 7, 2, 7]}:(tensor<1x256x14x14xf32>) -> tensor<1x256x2x7x2x7xf32>
-	%504="ufront.transpose"(%503){perm=[0, 2, 4, 3, 5, 1]}:(tensor<1x256x2x7x2x7xf32>) -> tensor<1x2x2x7x7x256xf32>
+	%504="ufront.transpose"(%503){perms=[0, 2, 4, 3, 5, 1]}:(tensor<1x256x2x7x2x7xf32>) -> tensor<1x2x2x7x7x256xf32>
 	%505="ufront.reshape"(%504){shape=[1, 4, 49, 256]}:(tensor<1x2x2x7x7x256xf32>) -> tensor<1x4x49x256xf32>
 	%506="ufront.identity"(%505):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
-	%507="ufront.layer_norm"(%506){elementwise_affine=True, eps=1e-05, normalized_shape=(256,)}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
+	%507="ufront.layer_norm"(%506){elementwise_affine=true, eps=0.00001, normalized_shape=[256]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%508="ufront.linear"(%507):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x768xf32>
 	%509, %510, %511="ufront.chunk"(%508){axis=-1, sizes=3}:(tensor<1x4x49x768xf32>) -> tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>
 	%512="ufront.reshape"(%509){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%513="ufront.transpose"(%512){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%513="ufront.transpose"(%512){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%514="ufront.reshape"(%510){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%515="ufront.transpose"(%514){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%515="ufront.transpose"(%514){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%516="ufront.reshape"(%511){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%517="ufront.transpose"(%516){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%517="ufront.transpose"(%516){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%518="ufront.smultiply"(%515){scalar=0.0625}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%519="ufront.call"(%513, %518){addargs=[('arg1', 'B G H I D, B G H J D -> B G H I J')], func=einsum}:(tensor<1x4x8x49x32xf32>, tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x49xf32>
-	%520="ufront.parameter"(%520){requires_grad=True}:(tensor<169x8xf32>) -> tensor<169x8xf32>
+	%520="ufront.parameter"(%520){requires_grad=true}:(tensor<169x8xf32>) -> tensor<169x8xf32>
 	%521="ufront.slice"(%520){output_shape=[2401, 8], slices=[84 83 82 ... 86 85 84]}:(tensor<169x8xf32>) -> tensor<2401x8xf32>
 	%522="ufront.reshape"(%521){shape=[49, 49, 8]}:(tensor<2401x8xf32>) -> tensor<49x49x8xf32>
-	%523="ufront.transpose"(%522){perm=[2, 0, 1]}:(tensor<49x49x8xf32>) -> tensor<8x49x49xf32>
+	%523="ufront.transpose"(%522){perms=[2, 0, 1]}:(tensor<49x49x8xf32>) -> tensor<8x49x49xf32>
 	%524="ufront.reshape"(%523){shape=[1, 8, 49, 49]}:(tensor<8x49x49xf32>) -> tensor<1x8x49x49xf32>
 	%525="ufront.add"(%519, %524):(tensor<1x4x8x49x49xf32>, tensor<1x8x49x49xf32>) -> tensor<1x4x8x49x49xf32>
 	%526="ufront.softmax"(%525):(tensor<1x4x8x49x49xf32>) -> tensor<1x4x8x49x49xf32>
 	%527="ufront.call"(%526, %517){addargs=[('arg1', 'B G H I J, B G H J D -> B G H I D')], func=einsum}:(tensor<1x4x8x49x49xf32>, tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x32xf32>
-	%528="ufront.transpose"(%527){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x49x8x32xf32>
+	%528="ufront.transpose"(%527){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x49x8x32xf32>
 	%529="ufront.reshape"(%528){shape=[1, 4, 49, 256]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x49x256xf32>
 	%530="ufront.linear"(%529):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%531="ufront.dropout"(%530){rate=0.0, seed=0}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%532="ufront.add"(%506, %531):(tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
-	%533="ufront.layer_norm"(%532){elementwise_affine=True, eps=1e-05, normalized_shape=(256,)}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
+	%533="ufront.layer_norm"(%532){elementwise_affine=true, eps=0.00001, normalized_shape=[256]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%534="ufront.linear"(%533):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x1024xf32>
 	%535="ufront.gelu"(%534):(tensor<1x4x49x1024xf32>) -> tensor<1x4x49x1024xf32>
 	%536="ufront.linear"(%535):(tensor<1x4x49x1024xf32>) -> tensor<1x4x49x256xf32>
@@ -519,37 +519,37 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%538="ufront.add"(%532, %537):(tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%539="ufront.identity"(%538):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%540="ufront.reshape"(%539){shape=[1, 2, 2, 7, 7, 256]}:(tensor<1x4x49x256xf32>) -> tensor<1x2x2x7x7x256xf32>
-	%541="ufront.transpose"(%540){perm=[0, 5, 1, 3, 2, 4]}:(tensor<1x2x2x7x7x256xf32>) -> tensor<1x256x2x7x2x7xf32>
+	%541="ufront.transpose"(%540){perms=[0, 5, 1, 3, 2, 4]}:(tensor<1x2x2x7x7x256xf32>) -> tensor<1x256x2x7x2x7xf32>
 	%542="ufront.reshape"(%541){shape=[1, 256, 14, 14]}:(tensor<1x256x2x7x2x7xf32>) -> tensor<1x256x14x14xf32>
 	%543="ufront.reshape"(%542){shape=[1, 256, 7, 2, 7, 2]}:(tensor<1x256x14x14xf32>) -> tensor<1x256x7x2x7x2xf32>
-	%544="ufront.transpose"(%543){perm=[0, 2, 4, 3, 5, 1]}:(tensor<1x256x7x2x7x2xf32>) -> tensor<1x7x7x2x2x256xf32>
+	%544="ufront.transpose"(%543){perms=[0, 2, 4, 3, 5, 1]}:(tensor<1x256x7x2x7x2xf32>) -> tensor<1x7x7x2x2x256xf32>
 	%545="ufront.reshape"(%544){shape=[1, 49, 4, 256]}:(tensor<1x7x7x2x2x256xf32>) -> tensor<1x49x4x256xf32>
 	%546="ufront.call"(%545){addargs=[('arg2', -2), ('arg3', -3)], func=swapaxes}:(tensor<1x49x4x256xf32>) -> tensor<1x4x49x256xf32>
-	%547="ufront.layer_norm"(%546){elementwise_affine=True, eps=1e-05, normalized_shape=(256,)}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
+	%547="ufront.layer_norm"(%546){elementwise_affine=true, eps=0.00001, normalized_shape=[256]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%548="ufront.linear"(%547):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x768xf32>
 	%549, %550, %551="ufront.chunk"(%548){axis=-1, sizes=3}:(tensor<1x4x49x768xf32>) -> tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>
 	%552="ufront.reshape"(%549){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%553="ufront.transpose"(%552){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%553="ufront.transpose"(%552){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%554="ufront.reshape"(%550){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%555="ufront.transpose"(%554){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%555="ufront.transpose"(%554){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%556="ufront.reshape"(%551){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%557="ufront.transpose"(%556){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%557="ufront.transpose"(%556){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%558="ufront.smultiply"(%555){scalar=0.0625}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%559="ufront.call"(%553, %558){addargs=[('arg1', 'B G H I D, B G H J D -> B G H I J')], func=einsum}:(tensor<1x4x8x49x32xf32>, tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x49xf32>
-	%560="ufront.parameter"(%560){requires_grad=True}:(tensor<169x8xf32>) -> tensor<169x8xf32>
+	%560="ufront.parameter"(%560){requires_grad=true}:(tensor<169x8xf32>) -> tensor<169x8xf32>
 	%561="ufront.slice"(%560){output_shape=[2401, 8], slices=[84 83 82 ... 86 85 84]}:(tensor<169x8xf32>) -> tensor<2401x8xf32>
 	%562="ufront.reshape"(%561){shape=[49, 49, 8]}:(tensor<2401x8xf32>) -> tensor<49x49x8xf32>
-	%563="ufront.transpose"(%562){perm=[2, 0, 1]}:(tensor<49x49x8xf32>) -> tensor<8x49x49xf32>
+	%563="ufront.transpose"(%562){perms=[2, 0, 1]}:(tensor<49x49x8xf32>) -> tensor<8x49x49xf32>
 	%564="ufront.reshape"(%563){shape=[1, 8, 49, 49]}:(tensor<8x49x49xf32>) -> tensor<1x8x49x49xf32>
 	%565="ufront.add"(%559, %564):(tensor<1x4x8x49x49xf32>, tensor<1x8x49x49xf32>) -> tensor<1x4x8x49x49xf32>
 	%566="ufront.softmax"(%565):(tensor<1x4x8x49x49xf32>) -> tensor<1x4x8x49x49xf32>
 	%567="ufront.call"(%566, %557){addargs=[('arg1', 'B G H I J, B G H J D -> B G H I D')], func=einsum}:(tensor<1x4x8x49x49xf32>, tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x32xf32>
-	%568="ufront.transpose"(%567){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x49x8x32xf32>
+	%568="ufront.transpose"(%567){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x49x8x32xf32>
 	%569="ufront.reshape"(%568){shape=[1, 4, 49, 256]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x49x256xf32>
 	%570="ufront.linear"(%569):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%571="ufront.dropout"(%570){rate=0.0, seed=0}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%572="ufront.add"(%546, %571):(tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
-	%573="ufront.layer_norm"(%572){elementwise_affine=True, eps=1e-05, normalized_shape=(256,)}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
+	%573="ufront.layer_norm"(%572){elementwise_affine=true, eps=0.00001, normalized_shape=[256]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%574="ufront.linear"(%573):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x1024xf32>
 	%575="ufront.gelu"(%574):(tensor<1x4x49x1024xf32>) -> tensor<1x4x49x1024xf32>
 	%576="ufront.linear"(%575):(tensor<1x4x49x1024xf32>) -> tensor<1x4x49x256xf32>
@@ -557,15 +557,15 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%578="ufront.add"(%572, %577):(tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%579="ufront.call"(%578){addargs=[('arg2', -2), ('arg3', -3)], func=swapaxes}:(tensor<1x4x49x256xf32>) -> tensor<1x49x4x256xf32>
 	%580="ufront.reshape"(%579){shape=[1, 7, 7, 2, 2, 256]}:(tensor<1x49x4x256xf32>) -> tensor<1x7x7x2x2x256xf32>
-	%581="ufront.transpose"(%580){perm=[0, 5, 1, 3, 2, 4]}:(tensor<1x7x7x2x2x256xf32>) -> tensor<1x256x7x2x7x2xf32>
+	%581="ufront.transpose"(%580){perms=[0, 5, 1, 3, 2, 4]}:(tensor<1x7x7x2x2x256xf32>) -> tensor<1x256x7x2x7x2xf32>
 	%582="ufront.reshape"(%581){shape=[1, 256, 14, 14]}:(tensor<1x256x7x2x7x2xf32>) -> tensor<1x256x14x14xf32>
 	%583="ufront.identity"(%582):(tensor<1x256x14x14xf32>) -> tensor<1x256x14x14xf32>
-	%584="ufront.batchnorm"(%582){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x256x14x14xf32>) -> tensor<1x256x14x14xf32>
+	%584="ufront.batchnorm"(%582){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x256x14x14xf32>) -> tensor<1x256x14x14xf32>
 	%585="ufront.conv2d"(%584){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x256x14x14xf32>) -> tensor<1x1024x14x14xf32>
-	%586="ufront.batchnorm"(%585){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
+	%586="ufront.batchnorm"(%585){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
 	%587="ufront.gelu"(%586):(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
 	%588="ufront.conv2d"(%587){groups=1024, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
-	%589="ufront.batchnorm"(%588){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
+	%589="ufront.batchnorm"(%588){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
 	%590="ufront.gelu"(%589):(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
 	%591="ufront.pool2d"(%590){output_size=[1, 1], pool_type="POOL_ADAPTIVE"}:(tensor<1x1024x14x14xf32>) -> tensor<1x1024x1x1xf32>
 	%592="ufront.conv2d"(%591){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x1024x1x1xf32>) -> tensor<1x64x1x1xf32>
@@ -576,34 +576,34 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%597="ufront.conv2d"(%596){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x1024x14x14xf32>) -> tensor<1x256x14x14xf32>
 	%598="ufront.add"(%583, %597):(tensor<1x256x14x14xf32>, tensor<1x256x14x14xf32>) -> tensor<1x256x14x14xf32>
 	%599="ufront.reshape"(%598){shape=[1, 256, 2, 7, 2, 7]}:(tensor<1x256x14x14xf32>) -> tensor<1x256x2x7x2x7xf32>
-	%600="ufront.transpose"(%599){perm=[0, 2, 4, 3, 5, 1]}:(tensor<1x256x2x7x2x7xf32>) -> tensor<1x2x2x7x7x256xf32>
+	%600="ufront.transpose"(%599){perms=[0, 2, 4, 3, 5, 1]}:(tensor<1x256x2x7x2x7xf32>) -> tensor<1x2x2x7x7x256xf32>
 	%601="ufront.reshape"(%600){shape=[1, 4, 49, 256]}:(tensor<1x2x2x7x7x256xf32>) -> tensor<1x4x49x256xf32>
 	%602="ufront.identity"(%601):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
-	%603="ufront.layer_norm"(%602){elementwise_affine=True, eps=1e-05, normalized_shape=(256,)}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
+	%603="ufront.layer_norm"(%602){elementwise_affine=true, eps=0.00001, normalized_shape=[256]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%604="ufront.linear"(%603):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x768xf32>
 	%605, %606, %607="ufront.chunk"(%604){axis=-1, sizes=3}:(tensor<1x4x49x768xf32>) -> tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>
 	%608="ufront.reshape"(%605){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%609="ufront.transpose"(%608){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%609="ufront.transpose"(%608){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%610="ufront.reshape"(%606){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%611="ufront.transpose"(%610){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%611="ufront.transpose"(%610){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%612="ufront.reshape"(%607){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%613="ufront.transpose"(%612){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%613="ufront.transpose"(%612){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%614="ufront.smultiply"(%611){scalar=0.0625}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%615="ufront.call"(%609, %614){addargs=[('arg1', 'B G H I D, B G H J D -> B G H I J')], func=einsum}:(tensor<1x4x8x49x32xf32>, tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x49xf32>
-	%616="ufront.parameter"(%616){requires_grad=True}:(tensor<169x8xf32>) -> tensor<169x8xf32>
+	%616="ufront.parameter"(%616){requires_grad=true}:(tensor<169x8xf32>) -> tensor<169x8xf32>
 	%617="ufront.slice"(%616){output_shape=[2401, 8], slices=[84 83 82 ... 86 85 84]}:(tensor<169x8xf32>) -> tensor<2401x8xf32>
 	%618="ufront.reshape"(%617){shape=[49, 49, 8]}:(tensor<2401x8xf32>) -> tensor<49x49x8xf32>
-	%619="ufront.transpose"(%618){perm=[2, 0, 1]}:(tensor<49x49x8xf32>) -> tensor<8x49x49xf32>
+	%619="ufront.transpose"(%618){perms=[2, 0, 1]}:(tensor<49x49x8xf32>) -> tensor<8x49x49xf32>
 	%620="ufront.reshape"(%619){shape=[1, 8, 49, 49]}:(tensor<8x49x49xf32>) -> tensor<1x8x49x49xf32>
 	%621="ufront.add"(%615, %620):(tensor<1x4x8x49x49xf32>, tensor<1x8x49x49xf32>) -> tensor<1x4x8x49x49xf32>
 	%622="ufront.softmax"(%621):(tensor<1x4x8x49x49xf32>) -> tensor<1x4x8x49x49xf32>
 	%623="ufront.call"(%622, %613){addargs=[('arg1', 'B G H I J, B G H J D -> B G H I D')], func=einsum}:(tensor<1x4x8x49x49xf32>, tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x32xf32>
-	%624="ufront.transpose"(%623){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x49x8x32xf32>
+	%624="ufront.transpose"(%623){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x49x8x32xf32>
 	%625="ufront.reshape"(%624){shape=[1, 4, 49, 256]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x49x256xf32>
 	%626="ufront.linear"(%625):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%627="ufront.dropout"(%626){rate=0.0, seed=0}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%628="ufront.add"(%602, %627):(tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
-	%629="ufront.layer_norm"(%628){elementwise_affine=True, eps=1e-05, normalized_shape=(256,)}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
+	%629="ufront.layer_norm"(%628){elementwise_affine=true, eps=0.00001, normalized_shape=[256]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%630="ufront.linear"(%629):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x1024xf32>
 	%631="ufront.gelu"(%630):(tensor<1x4x49x1024xf32>) -> tensor<1x4x49x1024xf32>
 	%632="ufront.linear"(%631):(tensor<1x4x49x1024xf32>) -> tensor<1x4x49x256xf32>
@@ -611,37 +611,37 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%634="ufront.add"(%628, %633):(tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%635="ufront.identity"(%634):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%636="ufront.reshape"(%635){shape=[1, 2, 2, 7, 7, 256]}:(tensor<1x4x49x256xf32>) -> tensor<1x2x2x7x7x256xf32>
-	%637="ufront.transpose"(%636){perm=[0, 5, 1, 3, 2, 4]}:(tensor<1x2x2x7x7x256xf32>) -> tensor<1x256x2x7x2x7xf32>
+	%637="ufront.transpose"(%636){perms=[0, 5, 1, 3, 2, 4]}:(tensor<1x2x2x7x7x256xf32>) -> tensor<1x256x2x7x2x7xf32>
 	%638="ufront.reshape"(%637){shape=[1, 256, 14, 14]}:(tensor<1x256x2x7x2x7xf32>) -> tensor<1x256x14x14xf32>
 	%639="ufront.reshape"(%638){shape=[1, 256, 7, 2, 7, 2]}:(tensor<1x256x14x14xf32>) -> tensor<1x256x7x2x7x2xf32>
-	%640="ufront.transpose"(%639){perm=[0, 2, 4, 3, 5, 1]}:(tensor<1x256x7x2x7x2xf32>) -> tensor<1x7x7x2x2x256xf32>
+	%640="ufront.transpose"(%639){perms=[0, 2, 4, 3, 5, 1]}:(tensor<1x256x7x2x7x2xf32>) -> tensor<1x7x7x2x2x256xf32>
 	%641="ufront.reshape"(%640){shape=[1, 49, 4, 256]}:(tensor<1x7x7x2x2x256xf32>) -> tensor<1x49x4x256xf32>
 	%642="ufront.call"(%641){addargs=[('arg2', -2), ('arg3', -3)], func=swapaxes}:(tensor<1x49x4x256xf32>) -> tensor<1x4x49x256xf32>
-	%643="ufront.layer_norm"(%642){elementwise_affine=True, eps=1e-05, normalized_shape=(256,)}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
+	%643="ufront.layer_norm"(%642){elementwise_affine=true, eps=0.00001, normalized_shape=[256]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%644="ufront.linear"(%643):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x768xf32>
 	%645, %646, %647="ufront.chunk"(%644){axis=-1, sizes=3}:(tensor<1x4x49x768xf32>) -> tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>
 	%648="ufront.reshape"(%645){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%649="ufront.transpose"(%648){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%649="ufront.transpose"(%648){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%650="ufront.reshape"(%646){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%651="ufront.transpose"(%650){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%651="ufront.transpose"(%650){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%652="ufront.reshape"(%647){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%653="ufront.transpose"(%652){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%653="ufront.transpose"(%652){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%654="ufront.smultiply"(%651){scalar=0.0625}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%655="ufront.call"(%649, %654){addargs=[('arg1', 'B G H I D, B G H J D -> B G H I J')], func=einsum}:(tensor<1x4x8x49x32xf32>, tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x49xf32>
-	%656="ufront.parameter"(%656){requires_grad=True}:(tensor<169x8xf32>) -> tensor<169x8xf32>
+	%656="ufront.parameter"(%656){requires_grad=true}:(tensor<169x8xf32>) -> tensor<169x8xf32>
 	%657="ufront.slice"(%656){output_shape=[2401, 8], slices=[84 83 82 ... 86 85 84]}:(tensor<169x8xf32>) -> tensor<2401x8xf32>
 	%658="ufront.reshape"(%657){shape=[49, 49, 8]}:(tensor<2401x8xf32>) -> tensor<49x49x8xf32>
-	%659="ufront.transpose"(%658){perm=[2, 0, 1]}:(tensor<49x49x8xf32>) -> tensor<8x49x49xf32>
+	%659="ufront.transpose"(%658){perms=[2, 0, 1]}:(tensor<49x49x8xf32>) -> tensor<8x49x49xf32>
 	%660="ufront.reshape"(%659){shape=[1, 8, 49, 49]}:(tensor<8x49x49xf32>) -> tensor<1x8x49x49xf32>
 	%661="ufront.add"(%655, %660):(tensor<1x4x8x49x49xf32>, tensor<1x8x49x49xf32>) -> tensor<1x4x8x49x49xf32>
 	%662="ufront.softmax"(%661):(tensor<1x4x8x49x49xf32>) -> tensor<1x4x8x49x49xf32>
 	%663="ufront.call"(%662, %653){addargs=[('arg1', 'B G H I J, B G H J D -> B G H I D')], func=einsum}:(tensor<1x4x8x49x49xf32>, tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x32xf32>
-	%664="ufront.transpose"(%663){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x49x8x32xf32>
+	%664="ufront.transpose"(%663){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x49x8x32xf32>
 	%665="ufront.reshape"(%664){shape=[1, 4, 49, 256]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x49x256xf32>
 	%666="ufront.linear"(%665):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%667="ufront.dropout"(%666){rate=0.0, seed=0}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%668="ufront.add"(%642, %667):(tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
-	%669="ufront.layer_norm"(%668){elementwise_affine=True, eps=1e-05, normalized_shape=(256,)}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
+	%669="ufront.layer_norm"(%668){elementwise_affine=true, eps=0.00001, normalized_shape=[256]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%670="ufront.linear"(%669):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x1024xf32>
 	%671="ufront.gelu"(%670):(tensor<1x4x49x1024xf32>) -> tensor<1x4x49x1024xf32>
 	%672="ufront.linear"(%671):(tensor<1x4x49x1024xf32>) -> tensor<1x4x49x256xf32>
@@ -649,15 +649,15 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%674="ufront.add"(%668, %673):(tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%675="ufront.call"(%674){addargs=[('arg2', -2), ('arg3', -3)], func=swapaxes}:(tensor<1x4x49x256xf32>) -> tensor<1x49x4x256xf32>
 	%676="ufront.reshape"(%675){shape=[1, 7, 7, 2, 2, 256]}:(tensor<1x49x4x256xf32>) -> tensor<1x7x7x2x2x256xf32>
-	%677="ufront.transpose"(%676){perm=[0, 5, 1, 3, 2, 4]}:(tensor<1x7x7x2x2x256xf32>) -> tensor<1x256x7x2x7x2xf32>
+	%677="ufront.transpose"(%676){perms=[0, 5, 1, 3, 2, 4]}:(tensor<1x7x7x2x2x256xf32>) -> tensor<1x256x7x2x7x2xf32>
 	%678="ufront.reshape"(%677){shape=[1, 256, 14, 14]}:(tensor<1x256x7x2x7x2xf32>) -> tensor<1x256x14x14xf32>
 	%679="ufront.identity"(%678):(tensor<1x256x14x14xf32>) -> tensor<1x256x14x14xf32>
-	%680="ufront.batchnorm"(%678){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x256x14x14xf32>) -> tensor<1x256x14x14xf32>
+	%680="ufront.batchnorm"(%678){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x256x14x14xf32>) -> tensor<1x256x14x14xf32>
 	%681="ufront.conv2d"(%680){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x256x14x14xf32>) -> tensor<1x1024x14x14xf32>
-	%682="ufront.batchnorm"(%681){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
+	%682="ufront.batchnorm"(%681){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
 	%683="ufront.gelu"(%682):(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
 	%684="ufront.conv2d"(%683){groups=1024, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
-	%685="ufront.batchnorm"(%684){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
+	%685="ufront.batchnorm"(%684){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
 	%686="ufront.gelu"(%685):(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
 	%687="ufront.pool2d"(%686){output_size=[1, 1], pool_type="POOL_ADAPTIVE"}:(tensor<1x1024x14x14xf32>) -> tensor<1x1024x1x1xf32>
 	%688="ufront.conv2d"(%687){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x1024x1x1xf32>) -> tensor<1x64x1x1xf32>
@@ -668,34 +668,34 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%693="ufront.conv2d"(%692){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x1024x14x14xf32>) -> tensor<1x256x14x14xf32>
 	%694="ufront.add"(%679, %693):(tensor<1x256x14x14xf32>, tensor<1x256x14x14xf32>) -> tensor<1x256x14x14xf32>
 	%695="ufront.reshape"(%694){shape=[1, 256, 2, 7, 2, 7]}:(tensor<1x256x14x14xf32>) -> tensor<1x256x2x7x2x7xf32>
-	%696="ufront.transpose"(%695){perm=[0, 2, 4, 3, 5, 1]}:(tensor<1x256x2x7x2x7xf32>) -> tensor<1x2x2x7x7x256xf32>
+	%696="ufront.transpose"(%695){perms=[0, 2, 4, 3, 5, 1]}:(tensor<1x256x2x7x2x7xf32>) -> tensor<1x2x2x7x7x256xf32>
 	%697="ufront.reshape"(%696){shape=[1, 4, 49, 256]}:(tensor<1x2x2x7x7x256xf32>) -> tensor<1x4x49x256xf32>
 	%698="ufront.identity"(%697):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
-	%699="ufront.layer_norm"(%698){elementwise_affine=True, eps=1e-05, normalized_shape=(256,)}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
+	%699="ufront.layer_norm"(%698){elementwise_affine=true, eps=0.00001, normalized_shape=[256]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%700="ufront.linear"(%699):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x768xf32>
 	%701, %702, %703="ufront.chunk"(%700){axis=-1, sizes=3}:(tensor<1x4x49x768xf32>) -> tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>
 	%704="ufront.reshape"(%701){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%705="ufront.transpose"(%704){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%705="ufront.transpose"(%704){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%706="ufront.reshape"(%702){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%707="ufront.transpose"(%706){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%707="ufront.transpose"(%706){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%708="ufront.reshape"(%703){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%709="ufront.transpose"(%708){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%709="ufront.transpose"(%708){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%710="ufront.smultiply"(%707){scalar=0.0625}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%711="ufront.call"(%705, %710){addargs=[('arg1', 'B G H I D, B G H J D -> B G H I J')], func=einsum}:(tensor<1x4x8x49x32xf32>, tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x49xf32>
-	%712="ufront.parameter"(%712){requires_grad=True}:(tensor<169x8xf32>) -> tensor<169x8xf32>
+	%712="ufront.parameter"(%712){requires_grad=true}:(tensor<169x8xf32>) -> tensor<169x8xf32>
 	%713="ufront.slice"(%712){output_shape=[2401, 8], slices=[84 83 82 ... 86 85 84]}:(tensor<169x8xf32>) -> tensor<2401x8xf32>
 	%714="ufront.reshape"(%713){shape=[49, 49, 8]}:(tensor<2401x8xf32>) -> tensor<49x49x8xf32>
-	%715="ufront.transpose"(%714){perm=[2, 0, 1]}:(tensor<49x49x8xf32>) -> tensor<8x49x49xf32>
+	%715="ufront.transpose"(%714){perms=[2, 0, 1]}:(tensor<49x49x8xf32>) -> tensor<8x49x49xf32>
 	%716="ufront.reshape"(%715){shape=[1, 8, 49, 49]}:(tensor<8x49x49xf32>) -> tensor<1x8x49x49xf32>
 	%717="ufront.add"(%711, %716):(tensor<1x4x8x49x49xf32>, tensor<1x8x49x49xf32>) -> tensor<1x4x8x49x49xf32>
 	%718="ufront.softmax"(%717):(tensor<1x4x8x49x49xf32>) -> tensor<1x4x8x49x49xf32>
 	%719="ufront.call"(%718, %709){addargs=[('arg1', 'B G H I J, B G H J D -> B G H I D')], func=einsum}:(tensor<1x4x8x49x49xf32>, tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x32xf32>
-	%720="ufront.transpose"(%719){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x49x8x32xf32>
+	%720="ufront.transpose"(%719){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x49x8x32xf32>
 	%721="ufront.reshape"(%720){shape=[1, 4, 49, 256]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x49x256xf32>
 	%722="ufront.linear"(%721):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%723="ufront.dropout"(%722){rate=0.0, seed=0}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%724="ufront.add"(%698, %723):(tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
-	%725="ufront.layer_norm"(%724){elementwise_affine=True, eps=1e-05, normalized_shape=(256,)}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
+	%725="ufront.layer_norm"(%724){elementwise_affine=true, eps=0.00001, normalized_shape=[256]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%726="ufront.linear"(%725):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x1024xf32>
 	%727="ufront.gelu"(%726):(tensor<1x4x49x1024xf32>) -> tensor<1x4x49x1024xf32>
 	%728="ufront.linear"(%727):(tensor<1x4x49x1024xf32>) -> tensor<1x4x49x256xf32>
@@ -703,37 +703,37 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%730="ufront.add"(%724, %729):(tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%731="ufront.identity"(%730):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%732="ufront.reshape"(%731){shape=[1, 2, 2, 7, 7, 256]}:(tensor<1x4x49x256xf32>) -> tensor<1x2x2x7x7x256xf32>
-	%733="ufront.transpose"(%732){perm=[0, 5, 1, 3, 2, 4]}:(tensor<1x2x2x7x7x256xf32>) -> tensor<1x256x2x7x2x7xf32>
+	%733="ufront.transpose"(%732){perms=[0, 5, 1, 3, 2, 4]}:(tensor<1x2x2x7x7x256xf32>) -> tensor<1x256x2x7x2x7xf32>
 	%734="ufront.reshape"(%733){shape=[1, 256, 14, 14]}:(tensor<1x256x2x7x2x7xf32>) -> tensor<1x256x14x14xf32>
 	%735="ufront.reshape"(%734){shape=[1, 256, 7, 2, 7, 2]}:(tensor<1x256x14x14xf32>) -> tensor<1x256x7x2x7x2xf32>
-	%736="ufront.transpose"(%735){perm=[0, 2, 4, 3, 5, 1]}:(tensor<1x256x7x2x7x2xf32>) -> tensor<1x7x7x2x2x256xf32>
+	%736="ufront.transpose"(%735){perms=[0, 2, 4, 3, 5, 1]}:(tensor<1x256x7x2x7x2xf32>) -> tensor<1x7x7x2x2x256xf32>
 	%737="ufront.reshape"(%736){shape=[1, 49, 4, 256]}:(tensor<1x7x7x2x2x256xf32>) -> tensor<1x49x4x256xf32>
 	%738="ufront.call"(%737){addargs=[('arg2', -2), ('arg3', -3)], func=swapaxes}:(tensor<1x49x4x256xf32>) -> tensor<1x4x49x256xf32>
-	%739="ufront.layer_norm"(%738){elementwise_affine=True, eps=1e-05, normalized_shape=(256,)}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
+	%739="ufront.layer_norm"(%738){elementwise_affine=true, eps=0.00001, normalized_shape=[256]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%740="ufront.linear"(%739):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x768xf32>
 	%741, %742, %743="ufront.chunk"(%740){axis=-1, sizes=3}:(tensor<1x4x49x768xf32>) -> tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>
 	%744="ufront.reshape"(%741){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%745="ufront.transpose"(%744){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%745="ufront.transpose"(%744){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%746="ufront.reshape"(%742){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%747="ufront.transpose"(%746){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%747="ufront.transpose"(%746){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%748="ufront.reshape"(%743){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%749="ufront.transpose"(%748){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%749="ufront.transpose"(%748){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%750="ufront.smultiply"(%747){scalar=0.0625}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%751="ufront.call"(%745, %750){addargs=[('arg1', 'B G H I D, B G H J D -> B G H I J')], func=einsum}:(tensor<1x4x8x49x32xf32>, tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x49xf32>
-	%752="ufront.parameter"(%752){requires_grad=True}:(tensor<169x8xf32>) -> tensor<169x8xf32>
+	%752="ufront.parameter"(%752){requires_grad=true}:(tensor<169x8xf32>) -> tensor<169x8xf32>
 	%753="ufront.slice"(%752){output_shape=[2401, 8], slices=[84 83 82 ... 86 85 84]}:(tensor<169x8xf32>) -> tensor<2401x8xf32>
 	%754="ufront.reshape"(%753){shape=[49, 49, 8]}:(tensor<2401x8xf32>) -> tensor<49x49x8xf32>
-	%755="ufront.transpose"(%754){perm=[2, 0, 1]}:(tensor<49x49x8xf32>) -> tensor<8x49x49xf32>
+	%755="ufront.transpose"(%754){perms=[2, 0, 1]}:(tensor<49x49x8xf32>) -> tensor<8x49x49xf32>
 	%756="ufront.reshape"(%755){shape=[1, 8, 49, 49]}:(tensor<8x49x49xf32>) -> tensor<1x8x49x49xf32>
 	%757="ufront.add"(%751, %756):(tensor<1x4x8x49x49xf32>, tensor<1x8x49x49xf32>) -> tensor<1x4x8x49x49xf32>
 	%758="ufront.softmax"(%757):(tensor<1x4x8x49x49xf32>) -> tensor<1x4x8x49x49xf32>
 	%759="ufront.call"(%758, %749){addargs=[('arg1', 'B G H I J, B G H J D -> B G H I D')], func=einsum}:(tensor<1x4x8x49x49xf32>, tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x32xf32>
-	%760="ufront.transpose"(%759){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x49x8x32xf32>
+	%760="ufront.transpose"(%759){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x49x8x32xf32>
 	%761="ufront.reshape"(%760){shape=[1, 4, 49, 256]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x49x256xf32>
 	%762="ufront.linear"(%761):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%763="ufront.dropout"(%762){rate=0.0, seed=0}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%764="ufront.add"(%738, %763):(tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
-	%765="ufront.layer_norm"(%764){elementwise_affine=True, eps=1e-05, normalized_shape=(256,)}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
+	%765="ufront.layer_norm"(%764){elementwise_affine=true, eps=0.00001, normalized_shape=[256]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%766="ufront.linear"(%765):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x1024xf32>
 	%767="ufront.gelu"(%766):(tensor<1x4x49x1024xf32>) -> tensor<1x4x49x1024xf32>
 	%768="ufront.linear"(%767):(tensor<1x4x49x1024xf32>) -> tensor<1x4x49x256xf32>
@@ -741,15 +741,15 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%770="ufront.add"(%764, %769):(tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%771="ufront.call"(%770){addargs=[('arg2', -2), ('arg3', -3)], func=swapaxes}:(tensor<1x4x49x256xf32>) -> tensor<1x49x4x256xf32>
 	%772="ufront.reshape"(%771){shape=[1, 7, 7, 2, 2, 256]}:(tensor<1x49x4x256xf32>) -> tensor<1x7x7x2x2x256xf32>
-	%773="ufront.transpose"(%772){perm=[0, 5, 1, 3, 2, 4]}:(tensor<1x7x7x2x2x256xf32>) -> tensor<1x256x7x2x7x2xf32>
+	%773="ufront.transpose"(%772){perms=[0, 5, 1, 3, 2, 4]}:(tensor<1x7x7x2x2x256xf32>) -> tensor<1x256x7x2x7x2xf32>
 	%774="ufront.reshape"(%773){shape=[1, 256, 14, 14]}:(tensor<1x256x7x2x7x2xf32>) -> tensor<1x256x14x14xf32>
 	%775="ufront.identity"(%774):(tensor<1x256x14x14xf32>) -> tensor<1x256x14x14xf32>
-	%776="ufront.batchnorm"(%774){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x256x14x14xf32>) -> tensor<1x256x14x14xf32>
+	%776="ufront.batchnorm"(%774){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x256x14x14xf32>) -> tensor<1x256x14x14xf32>
 	%777="ufront.conv2d"(%776){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x256x14x14xf32>) -> tensor<1x1024x14x14xf32>
-	%778="ufront.batchnorm"(%777){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
+	%778="ufront.batchnorm"(%777){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
 	%779="ufront.gelu"(%778):(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
 	%780="ufront.conv2d"(%779){groups=1024, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
-	%781="ufront.batchnorm"(%780){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
+	%781="ufront.batchnorm"(%780){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
 	%782="ufront.gelu"(%781):(tensor<1x1024x14x14xf32>) -> tensor<1x1024x14x14xf32>
 	%783="ufront.pool2d"(%782){output_size=[1, 1], pool_type="POOL_ADAPTIVE"}:(tensor<1x1024x14x14xf32>) -> tensor<1x1024x1x1xf32>
 	%784="ufront.conv2d"(%783){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x1024x1x1xf32>) -> tensor<1x64x1x1xf32>
@@ -760,34 +760,34 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%789="ufront.conv2d"(%788){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x1024x14x14xf32>) -> tensor<1x256x14x14xf32>
 	%790="ufront.add"(%775, %789):(tensor<1x256x14x14xf32>, tensor<1x256x14x14xf32>) -> tensor<1x256x14x14xf32>
 	%791="ufront.reshape"(%790){shape=[1, 256, 2, 7, 2, 7]}:(tensor<1x256x14x14xf32>) -> tensor<1x256x2x7x2x7xf32>
-	%792="ufront.transpose"(%791){perm=[0, 2, 4, 3, 5, 1]}:(tensor<1x256x2x7x2x7xf32>) -> tensor<1x2x2x7x7x256xf32>
+	%792="ufront.transpose"(%791){perms=[0, 2, 4, 3, 5, 1]}:(tensor<1x256x2x7x2x7xf32>) -> tensor<1x2x2x7x7x256xf32>
 	%793="ufront.reshape"(%792){shape=[1, 4, 49, 256]}:(tensor<1x2x2x7x7x256xf32>) -> tensor<1x4x49x256xf32>
 	%794="ufront.identity"(%793):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
-	%795="ufront.layer_norm"(%794){elementwise_affine=True, eps=1e-05, normalized_shape=(256,)}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
+	%795="ufront.layer_norm"(%794){elementwise_affine=true, eps=0.00001, normalized_shape=[256]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%796="ufront.linear"(%795):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x768xf32>
 	%797, %798, %799="ufront.chunk"(%796){axis=-1, sizes=3}:(tensor<1x4x49x768xf32>) -> tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>
 	%800="ufront.reshape"(%797){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%801="ufront.transpose"(%800){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%801="ufront.transpose"(%800){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%802="ufront.reshape"(%798){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%803="ufront.transpose"(%802){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%803="ufront.transpose"(%802){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%804="ufront.reshape"(%799){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%805="ufront.transpose"(%804){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%805="ufront.transpose"(%804){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%806="ufront.smultiply"(%803){scalar=0.0625}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%807="ufront.call"(%801, %806){addargs=[('arg1', 'B G H I D, B G H J D -> B G H I J')], func=einsum}:(tensor<1x4x8x49x32xf32>, tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x49xf32>
-	%808="ufront.parameter"(%808){requires_grad=True}:(tensor<169x8xf32>) -> tensor<169x8xf32>
+	%808="ufront.parameter"(%808){requires_grad=true}:(tensor<169x8xf32>) -> tensor<169x8xf32>
 	%809="ufront.slice"(%808){output_shape=[2401, 8], slices=[84 83 82 ... 86 85 84]}:(tensor<169x8xf32>) -> tensor<2401x8xf32>
 	%810="ufront.reshape"(%809){shape=[49, 49, 8]}:(tensor<2401x8xf32>) -> tensor<49x49x8xf32>
-	%811="ufront.transpose"(%810){perm=[2, 0, 1]}:(tensor<49x49x8xf32>) -> tensor<8x49x49xf32>
+	%811="ufront.transpose"(%810){perms=[2, 0, 1]}:(tensor<49x49x8xf32>) -> tensor<8x49x49xf32>
 	%812="ufront.reshape"(%811){shape=[1, 8, 49, 49]}:(tensor<8x49x49xf32>) -> tensor<1x8x49x49xf32>
 	%813="ufront.add"(%807, %812):(tensor<1x4x8x49x49xf32>, tensor<1x8x49x49xf32>) -> tensor<1x4x8x49x49xf32>
 	%814="ufront.softmax"(%813):(tensor<1x4x8x49x49xf32>) -> tensor<1x4x8x49x49xf32>
 	%815="ufront.call"(%814, %805){addargs=[('arg1', 'B G H I J, B G H J D -> B G H I D')], func=einsum}:(tensor<1x4x8x49x49xf32>, tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x32xf32>
-	%816="ufront.transpose"(%815){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x49x8x32xf32>
+	%816="ufront.transpose"(%815){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x49x8x32xf32>
 	%817="ufront.reshape"(%816){shape=[1, 4, 49, 256]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x49x256xf32>
 	%818="ufront.linear"(%817):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%819="ufront.dropout"(%818){rate=0.0, seed=0}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%820="ufront.add"(%794, %819):(tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
-	%821="ufront.layer_norm"(%820){elementwise_affine=True, eps=1e-05, normalized_shape=(256,)}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
+	%821="ufront.layer_norm"(%820){elementwise_affine=true, eps=0.00001, normalized_shape=[256]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%822="ufront.linear"(%821):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x1024xf32>
 	%823="ufront.gelu"(%822):(tensor<1x4x49x1024xf32>) -> tensor<1x4x49x1024xf32>
 	%824="ufront.linear"(%823):(tensor<1x4x49x1024xf32>) -> tensor<1x4x49x256xf32>
@@ -795,37 +795,37 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%826="ufront.add"(%820, %825):(tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%827="ufront.identity"(%826):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%828="ufront.reshape"(%827){shape=[1, 2, 2, 7, 7, 256]}:(tensor<1x4x49x256xf32>) -> tensor<1x2x2x7x7x256xf32>
-	%829="ufront.transpose"(%828){perm=[0, 5, 1, 3, 2, 4]}:(tensor<1x2x2x7x7x256xf32>) -> tensor<1x256x2x7x2x7xf32>
+	%829="ufront.transpose"(%828){perms=[0, 5, 1, 3, 2, 4]}:(tensor<1x2x2x7x7x256xf32>) -> tensor<1x256x2x7x2x7xf32>
 	%830="ufront.reshape"(%829){shape=[1, 256, 14, 14]}:(tensor<1x256x2x7x2x7xf32>) -> tensor<1x256x14x14xf32>
 	%831="ufront.reshape"(%830){shape=[1, 256, 7, 2, 7, 2]}:(tensor<1x256x14x14xf32>) -> tensor<1x256x7x2x7x2xf32>
-	%832="ufront.transpose"(%831){perm=[0, 2, 4, 3, 5, 1]}:(tensor<1x256x7x2x7x2xf32>) -> tensor<1x7x7x2x2x256xf32>
+	%832="ufront.transpose"(%831){perms=[0, 2, 4, 3, 5, 1]}:(tensor<1x256x7x2x7x2xf32>) -> tensor<1x7x7x2x2x256xf32>
 	%833="ufront.reshape"(%832){shape=[1, 49, 4, 256]}:(tensor<1x7x7x2x2x256xf32>) -> tensor<1x49x4x256xf32>
 	%834="ufront.call"(%833){addargs=[('arg2', -2), ('arg3', -3)], func=swapaxes}:(tensor<1x49x4x256xf32>) -> tensor<1x4x49x256xf32>
-	%835="ufront.layer_norm"(%834){elementwise_affine=True, eps=1e-05, normalized_shape=(256,)}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
+	%835="ufront.layer_norm"(%834){elementwise_affine=true, eps=0.00001, normalized_shape=[256]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%836="ufront.linear"(%835):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x768xf32>
 	%837, %838, %839="ufront.chunk"(%836){axis=-1, sizes=3}:(tensor<1x4x49x768xf32>) -> tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>
 	%840="ufront.reshape"(%837){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%841="ufront.transpose"(%840){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%841="ufront.transpose"(%840){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%842="ufront.reshape"(%838){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%843="ufront.transpose"(%842){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%843="ufront.transpose"(%842){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%844="ufront.reshape"(%839){shape=[1, 4, 49, 8, 32]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x8x32xf32>
-	%845="ufront.transpose"(%844){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
+	%845="ufront.transpose"(%844){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%846="ufront.smultiply"(%843){scalar=0.0625}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x32xf32>
 	%847="ufront.call"(%841, %846){addargs=[('arg1', 'B G H I D, B G H J D -> B G H I J')], func=einsum}:(tensor<1x4x8x49x32xf32>, tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x49xf32>
-	%848="ufront.parameter"(%848){requires_grad=True}:(tensor<169x8xf32>) -> tensor<169x8xf32>
+	%848="ufront.parameter"(%848){requires_grad=true}:(tensor<169x8xf32>) -> tensor<169x8xf32>
 	%849="ufront.slice"(%848){output_shape=[2401, 8], slices=[84 83 82 ... 86 85 84]}:(tensor<169x8xf32>) -> tensor<2401x8xf32>
 	%850="ufront.reshape"(%849){shape=[49, 49, 8]}:(tensor<2401x8xf32>) -> tensor<49x49x8xf32>
-	%851="ufront.transpose"(%850){perm=[2, 0, 1]}:(tensor<49x49x8xf32>) -> tensor<8x49x49xf32>
+	%851="ufront.transpose"(%850){perms=[2, 0, 1]}:(tensor<49x49x8xf32>) -> tensor<8x49x49xf32>
 	%852="ufront.reshape"(%851){shape=[1, 8, 49, 49]}:(tensor<8x49x49xf32>) -> tensor<1x8x49x49xf32>
 	%853="ufront.add"(%847, %852):(tensor<1x4x8x49x49xf32>, tensor<1x8x49x49xf32>) -> tensor<1x4x8x49x49xf32>
 	%854="ufront.softmax"(%853):(tensor<1x4x8x49x49xf32>) -> tensor<1x4x8x49x49xf32>
 	%855="ufront.call"(%854, %845){addargs=[('arg1', 'B G H I J, B G H J D -> B G H I D')], func=einsum}:(tensor<1x4x8x49x49xf32>, tensor<1x4x8x49x32xf32>) -> tensor<1x4x8x49x32xf32>
-	%856="ufront.transpose"(%855){perm=[0, 1, 3, 2, 4]}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x49x8x32xf32>
+	%856="ufront.transpose"(%855){perms=[0, 1, 3, 2, 4]}:(tensor<1x4x8x49x32xf32>) -> tensor<1x4x49x8x32xf32>
 	%857="ufront.reshape"(%856){shape=[1, 4, 49, 256]}:(tensor<1x4x49x8x32xf32>) -> tensor<1x4x49x256xf32>
 	%858="ufront.linear"(%857):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%859="ufront.dropout"(%858){rate=0.0, seed=0}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%860="ufront.add"(%834, %859):(tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
-	%861="ufront.layer_norm"(%860){elementwise_affine=True, eps=1e-05, normalized_shape=(256,)}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
+	%861="ufront.layer_norm"(%860){elementwise_affine=true, eps=0.00001, normalized_shape=[256]}:(tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%862="ufront.linear"(%861):(tensor<1x4x49x256xf32>) -> tensor<1x4x49x1024xf32>
 	%863="ufront.gelu"(%862):(tensor<1x4x49x1024xf32>) -> tensor<1x4x49x1024xf32>
 	%864="ufront.linear"(%863):(tensor<1x4x49x1024xf32>) -> tensor<1x4x49x256xf32>
@@ -833,16 +833,16 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%866="ufront.add"(%860, %865):(tensor<1x4x49x256xf32>, tensor<1x4x49x256xf32>) -> tensor<1x4x49x256xf32>
 	%867="ufront.call"(%866){addargs=[('arg2', -2), ('arg3', -3)], func=swapaxes}:(tensor<1x4x49x256xf32>) -> tensor<1x49x4x256xf32>
 	%868="ufront.reshape"(%867){shape=[1, 7, 7, 2, 2, 256]}:(tensor<1x49x4x256xf32>) -> tensor<1x7x7x2x2x256xf32>
-	%869="ufront.transpose"(%868){perm=[0, 5, 1, 3, 2, 4]}:(tensor<1x7x7x2x2x256xf32>) -> tensor<1x256x7x2x7x2xf32>
+	%869="ufront.transpose"(%868){perms=[0, 5, 1, 3, 2, 4]}:(tensor<1x7x7x2x2x256xf32>) -> tensor<1x256x7x2x7x2xf32>
 	%870="ufront.reshape"(%869){shape=[1, 256, 14, 14]}:(tensor<1x256x7x2x7x2xf32>) -> tensor<1x256x14x14xf32>
 	%871="ufront.pool2d"(%870){kernel=[3, 3], pad=[1, 1], pool_type="POOL_AVG", stride=[2, 2]}:(tensor<1x256x14x14xf32>) -> tensor<1x256x7x7xf32>
 	%872="ufront.conv2d"(%871){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x256x7x7xf32>) -> tensor<1x512x7x7xf32>
-	%873="ufront.batchnorm"(%870){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x256x14x14xf32>) -> tensor<1x256x14x14xf32>
+	%873="ufront.batchnorm"(%870){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x256x14x14xf32>) -> tensor<1x256x14x14xf32>
 	%874="ufront.conv2d"(%873){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x256x14x14xf32>) -> tensor<1x2048x14x14xf32>
-	%875="ufront.batchnorm"(%874){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x2048x14x14xf32>) -> tensor<1x2048x14x14xf32>
+	%875="ufront.batchnorm"(%874){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x2048x14x14xf32>) -> tensor<1x2048x14x14xf32>
 	%876="ufront.gelu"(%875):(tensor<1x2048x14x14xf32>) -> tensor<1x2048x14x14xf32>
 	%877="ufront.conv2d"(%876){groups=2048, kernel=[3, 3], pad=[1, 1], stride=[2, 2]}:(tensor<1x2048x14x14xf32>) -> tensor<1x2048x7x7xf32>
-	%878="ufront.batchnorm"(%877){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x2048x7x7xf32>) -> tensor<1x2048x7x7xf32>
+	%878="ufront.batchnorm"(%877){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x2048x7x7xf32>) -> tensor<1x2048x7x7xf32>
 	%879="ufront.gelu"(%878):(tensor<1x2048x7x7xf32>) -> tensor<1x2048x7x7xf32>
 	%880="ufront.pool2d"(%879){output_size=[1, 1], pool_type="POOL_ADAPTIVE"}:(tensor<1x2048x7x7xf32>) -> tensor<1x2048x1x1xf32>
 	%881="ufront.conv2d"(%880){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x2048x1x1xf32>) -> tensor<1x128x1x1xf32>
@@ -853,34 +853,34 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%886="ufront.conv2d"(%885){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x2048x7x7xf32>) -> tensor<1x512x7x7xf32>
 	%887="ufront.add"(%872, %886):(tensor<1x512x7x7xf32>, tensor<1x512x7x7xf32>) -> tensor<1x512x7x7xf32>
 	%888="ufront.reshape"(%887){shape=[1, 512, 1, 7, 1, 7]}:(tensor<1x512x7x7xf32>) -> tensor<1x512x1x7x1x7xf32>
-	%889="ufront.transpose"(%888){perm=[0, 2, 4, 3, 5, 1]}:(tensor<1x512x1x7x1x7xf32>) -> tensor<1x1x1x7x7x512xf32>
+	%889="ufront.transpose"(%888){perms=[0, 2, 4, 3, 5, 1]}:(tensor<1x512x1x7x1x7xf32>) -> tensor<1x1x1x7x7x512xf32>
 	%890="ufront.reshape"(%889){shape=[1, 1, 49, 512]}:(tensor<1x1x1x7x7x512xf32>) -> tensor<1x1x49x512xf32>
 	%891="ufront.identity"(%890):(tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
-	%892="ufront.layer_norm"(%891){elementwise_affine=True, eps=1e-05, normalized_shape=(512,)}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
+	%892="ufront.layer_norm"(%891){elementwise_affine=true, eps=0.00001, normalized_shape=[512]}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
 	%893="ufront.linear"(%892):(tensor<1x1x49x512xf32>) -> tensor<1x1x49x1536xf32>
 	%894, %895, %896="ufront.chunk"(%893){axis=-1, sizes=3}:(tensor<1x1x49x1536xf32>) -> tensor<1x1x49x512xf32>, tensor<1x1x49x512xf32>, tensor<1x1x49x512xf32>
 	%897="ufront.reshape"(%894){shape=[1, 1, 49, 16, 32]}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x16x32xf32>
-	%898="ufront.transpose"(%897){perm=[0, 1, 3, 2, 4]}:(tensor<1x1x49x16x32xf32>) -> tensor<1x1x16x49x32xf32>
+	%898="ufront.transpose"(%897){perms=[0, 1, 3, 2, 4]}:(tensor<1x1x49x16x32xf32>) -> tensor<1x1x16x49x32xf32>
 	%899="ufront.reshape"(%895){shape=[1, 1, 49, 16, 32]}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x16x32xf32>
-	%900="ufront.transpose"(%899){perm=[0, 1, 3, 2, 4]}:(tensor<1x1x49x16x32xf32>) -> tensor<1x1x16x49x32xf32>
+	%900="ufront.transpose"(%899){perms=[0, 1, 3, 2, 4]}:(tensor<1x1x49x16x32xf32>) -> tensor<1x1x16x49x32xf32>
 	%901="ufront.reshape"(%896){shape=[1, 1, 49, 16, 32]}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x16x32xf32>
-	%902="ufront.transpose"(%901){perm=[0, 1, 3, 2, 4]}:(tensor<1x1x49x16x32xf32>) -> tensor<1x1x16x49x32xf32>
+	%902="ufront.transpose"(%901){perms=[0, 1, 3, 2, 4]}:(tensor<1x1x49x16x32xf32>) -> tensor<1x1x16x49x32xf32>
 	%903="ufront.smultiply"(%900){scalar=0.04419417382415922}:(tensor<1x1x16x49x32xf32>) -> tensor<1x1x16x49x32xf32>
 	%904="ufront.call"(%898, %903){addargs=[('arg1', 'B G H I D, B G H J D -> B G H I J')], func=einsum}:(tensor<1x1x16x49x32xf32>, tensor<1x1x16x49x32xf32>) -> tensor<1x1x16x49x49xf32>
-	%905="ufront.parameter"(%905){requires_grad=True}:(tensor<169x16xf32>) -> tensor<169x16xf32>
+	%905="ufront.parameter"(%905){requires_grad=true}:(tensor<169x16xf32>) -> tensor<169x16xf32>
 	%906="ufront.slice"(%905){output_shape=[2401, 16], slices=[84 83 82 ... 86 85 84]}:(tensor<169x16xf32>) -> tensor<2401x16xf32>
 	%907="ufront.reshape"(%906){shape=[49, 49, 16]}:(tensor<2401x16xf32>) -> tensor<49x49x16xf32>
-	%908="ufront.transpose"(%907){perm=[2, 0, 1]}:(tensor<49x49x16xf32>) -> tensor<16x49x49xf32>
+	%908="ufront.transpose"(%907){perms=[2, 0, 1]}:(tensor<49x49x16xf32>) -> tensor<16x49x49xf32>
 	%909="ufront.reshape"(%908){shape=[1, 16, 49, 49]}:(tensor<16x49x49xf32>) -> tensor<1x16x49x49xf32>
 	%910="ufront.add"(%904, %909):(tensor<1x1x16x49x49xf32>, tensor<1x16x49x49xf32>) -> tensor<1x1x16x49x49xf32>
 	%911="ufront.softmax"(%910):(tensor<1x1x16x49x49xf32>) -> tensor<1x1x16x49x49xf32>
 	%912="ufront.call"(%911, %902){addargs=[('arg1', 'B G H I J, B G H J D -> B G H I D')], func=einsum}:(tensor<1x1x16x49x49xf32>, tensor<1x1x16x49x32xf32>) -> tensor<1x1x16x49x32xf32>
-	%913="ufront.transpose"(%912){perm=[0, 1, 3, 2, 4]}:(tensor<1x1x16x49x32xf32>) -> tensor<1x1x49x16x32xf32>
+	%913="ufront.transpose"(%912){perms=[0, 1, 3, 2, 4]}:(tensor<1x1x16x49x32xf32>) -> tensor<1x1x49x16x32xf32>
 	%914="ufront.reshape"(%913){shape=[1, 1, 49, 512]}:(tensor<1x1x49x16x32xf32>) -> tensor<1x1x49x512xf32>
 	%915="ufront.linear"(%914):(tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
 	%916="ufront.dropout"(%915){rate=0.0, seed=0}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
 	%917="ufront.add"(%891, %916):(tensor<1x1x49x512xf32>, tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
-	%918="ufront.layer_norm"(%917){elementwise_affine=True, eps=1e-05, normalized_shape=(512,)}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
+	%918="ufront.layer_norm"(%917){elementwise_affine=true, eps=0.00001, normalized_shape=[512]}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
 	%919="ufront.linear"(%918):(tensor<1x1x49x512xf32>) -> tensor<1x1x49x2048xf32>
 	%920="ufront.gelu"(%919):(tensor<1x1x49x2048xf32>) -> tensor<1x1x49x2048xf32>
 	%921="ufront.linear"(%920):(tensor<1x1x49x2048xf32>) -> tensor<1x1x49x512xf32>
@@ -888,37 +888,37 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%923="ufront.add"(%917, %922):(tensor<1x1x49x512xf32>, tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
 	%924="ufront.identity"(%923):(tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
 	%925="ufront.reshape"(%924){shape=[1, 1, 1, 7, 7, 512]}:(tensor<1x1x49x512xf32>) -> tensor<1x1x1x7x7x512xf32>
-	%926="ufront.transpose"(%925){perm=[0, 5, 1, 3, 2, 4]}:(tensor<1x1x1x7x7x512xf32>) -> tensor<1x512x1x7x1x7xf32>
+	%926="ufront.transpose"(%925){perms=[0, 5, 1, 3, 2, 4]}:(tensor<1x1x1x7x7x512xf32>) -> tensor<1x512x1x7x1x7xf32>
 	%927="ufront.reshape"(%926){shape=[1, 512, 7, 7]}:(tensor<1x512x1x7x1x7xf32>) -> tensor<1x512x7x7xf32>
 	%928="ufront.reshape"(%927){shape=[1, 512, 7, 1, 7, 1]}:(tensor<1x512x7x7xf32>) -> tensor<1x512x7x1x7x1xf32>
-	%929="ufront.transpose"(%928){perm=[0, 2, 4, 3, 5, 1]}:(tensor<1x512x7x1x7x1xf32>) -> tensor<1x7x7x1x1x512xf32>
+	%929="ufront.transpose"(%928){perms=[0, 2, 4, 3, 5, 1]}:(tensor<1x512x7x1x7x1xf32>) -> tensor<1x7x7x1x1x512xf32>
 	%930="ufront.reshape"(%929){shape=[1, 49, 1, 512]}:(tensor<1x7x7x1x1x512xf32>) -> tensor<1x49x1x512xf32>
 	%931="ufront.call"(%930){addargs=[('arg2', -2), ('arg3', -3)], func=swapaxes}:(tensor<1x49x1x512xf32>) -> tensor<1x1x49x512xf32>
-	%932="ufront.layer_norm"(%931){elementwise_affine=True, eps=1e-05, normalized_shape=(512,)}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
+	%932="ufront.layer_norm"(%931){elementwise_affine=true, eps=0.00001, normalized_shape=[512]}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
 	%933="ufront.linear"(%932):(tensor<1x1x49x512xf32>) -> tensor<1x1x49x1536xf32>
 	%934, %935, %936="ufront.chunk"(%933){axis=-1, sizes=3}:(tensor<1x1x49x1536xf32>) -> tensor<1x1x49x512xf32>, tensor<1x1x49x512xf32>, tensor<1x1x49x512xf32>
 	%937="ufront.reshape"(%934){shape=[1, 1, 49, 16, 32]}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x16x32xf32>
-	%938="ufront.transpose"(%937){perm=[0, 1, 3, 2, 4]}:(tensor<1x1x49x16x32xf32>) -> tensor<1x1x16x49x32xf32>
+	%938="ufront.transpose"(%937){perms=[0, 1, 3, 2, 4]}:(tensor<1x1x49x16x32xf32>) -> tensor<1x1x16x49x32xf32>
 	%939="ufront.reshape"(%935){shape=[1, 1, 49, 16, 32]}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x16x32xf32>
-	%940="ufront.transpose"(%939){perm=[0, 1, 3, 2, 4]}:(tensor<1x1x49x16x32xf32>) -> tensor<1x1x16x49x32xf32>
+	%940="ufront.transpose"(%939){perms=[0, 1, 3, 2, 4]}:(tensor<1x1x49x16x32xf32>) -> tensor<1x1x16x49x32xf32>
 	%941="ufront.reshape"(%936){shape=[1, 1, 49, 16, 32]}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x16x32xf32>
-	%942="ufront.transpose"(%941){perm=[0, 1, 3, 2, 4]}:(tensor<1x1x49x16x32xf32>) -> tensor<1x1x16x49x32xf32>
+	%942="ufront.transpose"(%941){perms=[0, 1, 3, 2, 4]}:(tensor<1x1x49x16x32xf32>) -> tensor<1x1x16x49x32xf32>
 	%943="ufront.smultiply"(%940){scalar=0.04419417382415922}:(tensor<1x1x16x49x32xf32>) -> tensor<1x1x16x49x32xf32>
 	%944="ufront.call"(%938, %943){addargs=[('arg1', 'B G H I D, B G H J D -> B G H I J')], func=einsum}:(tensor<1x1x16x49x32xf32>, tensor<1x1x16x49x32xf32>) -> tensor<1x1x16x49x49xf32>
-	%945="ufront.parameter"(%945){requires_grad=True}:(tensor<169x16xf32>) -> tensor<169x16xf32>
+	%945="ufront.parameter"(%945){requires_grad=true}:(tensor<169x16xf32>) -> tensor<169x16xf32>
 	%946="ufront.slice"(%945){output_shape=[2401, 16], slices=[84 83 82 ... 86 85 84]}:(tensor<169x16xf32>) -> tensor<2401x16xf32>
 	%947="ufront.reshape"(%946){shape=[49, 49, 16]}:(tensor<2401x16xf32>) -> tensor<49x49x16xf32>
-	%948="ufront.transpose"(%947){perm=[2, 0, 1]}:(tensor<49x49x16xf32>) -> tensor<16x49x49xf32>
+	%948="ufront.transpose"(%947){perms=[2, 0, 1]}:(tensor<49x49x16xf32>) -> tensor<16x49x49xf32>
 	%949="ufront.reshape"(%948){shape=[1, 16, 49, 49]}:(tensor<16x49x49xf32>) -> tensor<1x16x49x49xf32>
 	%950="ufront.add"(%944, %949):(tensor<1x1x16x49x49xf32>, tensor<1x16x49x49xf32>) -> tensor<1x1x16x49x49xf32>
 	%951="ufront.softmax"(%950):(tensor<1x1x16x49x49xf32>) -> tensor<1x1x16x49x49xf32>
 	%952="ufront.call"(%951, %942){addargs=[('arg1', 'B G H I J, B G H J D -> B G H I D')], func=einsum}:(tensor<1x1x16x49x49xf32>, tensor<1x1x16x49x32xf32>) -> tensor<1x1x16x49x32xf32>
-	%953="ufront.transpose"(%952){perm=[0, 1, 3, 2, 4]}:(tensor<1x1x16x49x32xf32>) -> tensor<1x1x49x16x32xf32>
+	%953="ufront.transpose"(%952){perms=[0, 1, 3, 2, 4]}:(tensor<1x1x16x49x32xf32>) -> tensor<1x1x49x16x32xf32>
 	%954="ufront.reshape"(%953){shape=[1, 1, 49, 512]}:(tensor<1x1x49x16x32xf32>) -> tensor<1x1x49x512xf32>
 	%955="ufront.linear"(%954):(tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
 	%956="ufront.dropout"(%955){rate=0.0, seed=0}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
 	%957="ufront.add"(%931, %956):(tensor<1x1x49x512xf32>, tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
-	%958="ufront.layer_norm"(%957){elementwise_affine=True, eps=1e-05, normalized_shape=(512,)}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
+	%958="ufront.layer_norm"(%957){elementwise_affine=true, eps=0.00001, normalized_shape=[512]}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
 	%959="ufront.linear"(%958):(tensor<1x1x49x512xf32>) -> tensor<1x1x49x2048xf32>
 	%960="ufront.gelu"(%959):(tensor<1x1x49x2048xf32>) -> tensor<1x1x49x2048xf32>
 	%961="ufront.linear"(%960):(tensor<1x1x49x2048xf32>) -> tensor<1x1x49x512xf32>
@@ -926,15 +926,15 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%963="ufront.add"(%957, %962):(tensor<1x1x49x512xf32>, tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
 	%964="ufront.call"(%963){addargs=[('arg2', -2), ('arg3', -3)], func=swapaxes}:(tensor<1x1x49x512xf32>) -> tensor<1x49x1x512xf32>
 	%965="ufront.reshape"(%964){shape=[1, 7, 7, 1, 1, 512]}:(tensor<1x49x1x512xf32>) -> tensor<1x7x7x1x1x512xf32>
-	%966="ufront.transpose"(%965){perm=[0, 5, 1, 3, 2, 4]}:(tensor<1x7x7x1x1x512xf32>) -> tensor<1x512x7x1x7x1xf32>
+	%966="ufront.transpose"(%965){perms=[0, 5, 1, 3, 2, 4]}:(tensor<1x7x7x1x1x512xf32>) -> tensor<1x512x7x1x7x1xf32>
 	%967="ufront.reshape"(%966){shape=[1, 512, 7, 7]}:(tensor<1x512x7x1x7x1xf32>) -> tensor<1x512x7x7xf32>
 	%968="ufront.identity"(%967):(tensor<1x512x7x7xf32>) -> tensor<1x512x7x7xf32>
-	%969="ufront.batchnorm"(%967){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x512x7x7xf32>) -> tensor<1x512x7x7xf32>
+	%969="ufront.batchnorm"(%967){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x512x7x7xf32>) -> tensor<1x512x7x7xf32>
 	%970="ufront.conv2d"(%969){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x512x7x7xf32>) -> tensor<1x2048x7x7xf32>
-	%971="ufront.batchnorm"(%970){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x2048x7x7xf32>) -> tensor<1x2048x7x7xf32>
+	%971="ufront.batchnorm"(%970){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x2048x7x7xf32>) -> tensor<1x2048x7x7xf32>
 	%972="ufront.gelu"(%971):(tensor<1x2048x7x7xf32>) -> tensor<1x2048x7x7xf32>
 	%973="ufront.conv2d"(%972){groups=2048, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<1x2048x7x7xf32>) -> tensor<1x2048x7x7xf32>
-	%974="ufront.batchnorm"(%973){affine=True, eps=0.001, momentum=0.99, track_running_stats=True}:(tensor<1x2048x7x7xf32>) -> tensor<1x2048x7x7xf32>
+	%974="ufront.batchnorm"(%973){affine=true, eps=0.001, momentum=0.99, track_running_stats=true}:(tensor<1x2048x7x7xf32>) -> tensor<1x2048x7x7xf32>
 	%975="ufront.gelu"(%974):(tensor<1x2048x7x7xf32>) -> tensor<1x2048x7x7xf32>
 	%976="ufront.pool2d"(%975){output_size=[1, 1], pool_type="POOL_ADAPTIVE"}:(tensor<1x2048x7x7xf32>) -> tensor<1x2048x1x1xf32>
 	%977="ufront.conv2d"(%976){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x2048x1x1xf32>) -> tensor<1x128x1x1xf32>
@@ -945,34 +945,34 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%982="ufront.conv2d"(%981){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x2048x7x7xf32>) -> tensor<1x512x7x7xf32>
 	%983="ufront.add"(%968, %982):(tensor<1x512x7x7xf32>, tensor<1x512x7x7xf32>) -> tensor<1x512x7x7xf32>
 	%984="ufront.reshape"(%983){shape=[1, 512, 1, 7, 1, 7]}:(tensor<1x512x7x7xf32>) -> tensor<1x512x1x7x1x7xf32>
-	%985="ufront.transpose"(%984){perm=[0, 2, 4, 3, 5, 1]}:(tensor<1x512x1x7x1x7xf32>) -> tensor<1x1x1x7x7x512xf32>
+	%985="ufront.transpose"(%984){perms=[0, 2, 4, 3, 5, 1]}:(tensor<1x512x1x7x1x7xf32>) -> tensor<1x1x1x7x7x512xf32>
 	%986="ufront.reshape"(%985){shape=[1, 1, 49, 512]}:(tensor<1x1x1x7x7x512xf32>) -> tensor<1x1x49x512xf32>
 	%987="ufront.identity"(%986):(tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
-	%988="ufront.layer_norm"(%987){elementwise_affine=True, eps=1e-05, normalized_shape=(512,)}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
+	%988="ufront.layer_norm"(%987){elementwise_affine=true, eps=0.00001, normalized_shape=[512]}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
 	%989="ufront.linear"(%988):(tensor<1x1x49x512xf32>) -> tensor<1x1x49x1536xf32>
 	%990, %991, %992="ufront.chunk"(%989){axis=-1, sizes=3}:(tensor<1x1x49x1536xf32>) -> tensor<1x1x49x512xf32>, tensor<1x1x49x512xf32>, tensor<1x1x49x512xf32>
 	%993="ufront.reshape"(%990){shape=[1, 1, 49, 16, 32]}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x16x32xf32>
-	%994="ufront.transpose"(%993){perm=[0, 1, 3, 2, 4]}:(tensor<1x1x49x16x32xf32>) -> tensor<1x1x16x49x32xf32>
+	%994="ufront.transpose"(%993){perms=[0, 1, 3, 2, 4]}:(tensor<1x1x49x16x32xf32>) -> tensor<1x1x16x49x32xf32>
 	%995="ufront.reshape"(%991){shape=[1, 1, 49, 16, 32]}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x16x32xf32>
-	%996="ufront.transpose"(%995){perm=[0, 1, 3, 2, 4]}:(tensor<1x1x49x16x32xf32>) -> tensor<1x1x16x49x32xf32>
+	%996="ufront.transpose"(%995){perms=[0, 1, 3, 2, 4]}:(tensor<1x1x49x16x32xf32>) -> tensor<1x1x16x49x32xf32>
 	%997="ufront.reshape"(%992){shape=[1, 1, 49, 16, 32]}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x16x32xf32>
-	%998="ufront.transpose"(%997){perm=[0, 1, 3, 2, 4]}:(tensor<1x1x49x16x32xf32>) -> tensor<1x1x16x49x32xf32>
+	%998="ufront.transpose"(%997){perms=[0, 1, 3, 2, 4]}:(tensor<1x1x49x16x32xf32>) -> tensor<1x1x16x49x32xf32>
 	%999="ufront.smultiply"(%996){scalar=0.04419417382415922}:(tensor<1x1x16x49x32xf32>) -> tensor<1x1x16x49x32xf32>
 	%1000="ufront.call"(%994, %999){addargs=[('arg1', 'B G H I D, B G H J D -> B G H I J')], func=einsum}:(tensor<1x1x16x49x32xf32>, tensor<1x1x16x49x32xf32>) -> tensor<1x1x16x49x49xf32>
-	%1001="ufront.parameter"(%1001){requires_grad=True}:(tensor<169x16xf32>) -> tensor<169x16xf32>
+	%1001="ufront.parameter"(%1001){requires_grad=true}:(tensor<169x16xf32>) -> tensor<169x16xf32>
 	%1002="ufront.slice"(%1001){output_shape=[2401, 16], slices=[84 83 82 ... 86 85 84]}:(tensor<169x16xf32>) -> tensor<2401x16xf32>
 	%1003="ufront.reshape"(%1002){shape=[49, 49, 16]}:(tensor<2401x16xf32>) -> tensor<49x49x16xf32>
-	%1004="ufront.transpose"(%1003){perm=[2, 0, 1]}:(tensor<49x49x16xf32>) -> tensor<16x49x49xf32>
+	%1004="ufront.transpose"(%1003){perms=[2, 0, 1]}:(tensor<49x49x16xf32>) -> tensor<16x49x49xf32>
 	%1005="ufront.reshape"(%1004){shape=[1, 16, 49, 49]}:(tensor<16x49x49xf32>) -> tensor<1x16x49x49xf32>
 	%1006="ufront.add"(%1000, %1005):(tensor<1x1x16x49x49xf32>, tensor<1x16x49x49xf32>) -> tensor<1x1x16x49x49xf32>
 	%1007="ufront.softmax"(%1006):(tensor<1x1x16x49x49xf32>) -> tensor<1x1x16x49x49xf32>
 	%1008="ufront.call"(%1007, %998){addargs=[('arg1', 'B G H I J, B G H J D -> B G H I D')], func=einsum}:(tensor<1x1x16x49x49xf32>, tensor<1x1x16x49x32xf32>) -> tensor<1x1x16x49x32xf32>
-	%1009="ufront.transpose"(%1008){perm=[0, 1, 3, 2, 4]}:(tensor<1x1x16x49x32xf32>) -> tensor<1x1x49x16x32xf32>
+	%1009="ufront.transpose"(%1008){perms=[0, 1, 3, 2, 4]}:(tensor<1x1x16x49x32xf32>) -> tensor<1x1x49x16x32xf32>
 	%1010="ufront.reshape"(%1009){shape=[1, 1, 49, 512]}:(tensor<1x1x49x16x32xf32>) -> tensor<1x1x49x512xf32>
 	%1011="ufront.linear"(%1010):(tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
 	%1012="ufront.dropout"(%1011){rate=0.0, seed=0}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
 	%1013="ufront.add"(%987, %1012):(tensor<1x1x49x512xf32>, tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
-	%1014="ufront.layer_norm"(%1013){elementwise_affine=True, eps=1e-05, normalized_shape=(512,)}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
+	%1014="ufront.layer_norm"(%1013){elementwise_affine=true, eps=0.00001, normalized_shape=[512]}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
 	%1015="ufront.linear"(%1014):(tensor<1x1x49x512xf32>) -> tensor<1x1x49x2048xf32>
 	%1016="ufront.gelu"(%1015):(tensor<1x1x49x2048xf32>) -> tensor<1x1x49x2048xf32>
 	%1017="ufront.linear"(%1016):(tensor<1x1x49x2048xf32>) -> tensor<1x1x49x512xf32>
@@ -980,37 +980,37 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%1019="ufront.add"(%1013, %1018):(tensor<1x1x49x512xf32>, tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
 	%1020="ufront.identity"(%1019):(tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
 	%1021="ufront.reshape"(%1020){shape=[1, 1, 1, 7, 7, 512]}:(tensor<1x1x49x512xf32>) -> tensor<1x1x1x7x7x512xf32>
-	%1022="ufront.transpose"(%1021){perm=[0, 5, 1, 3, 2, 4]}:(tensor<1x1x1x7x7x512xf32>) -> tensor<1x512x1x7x1x7xf32>
+	%1022="ufront.transpose"(%1021){perms=[0, 5, 1, 3, 2, 4]}:(tensor<1x1x1x7x7x512xf32>) -> tensor<1x512x1x7x1x7xf32>
 	%1023="ufront.reshape"(%1022){shape=[1, 512, 7, 7]}:(tensor<1x512x1x7x1x7xf32>) -> tensor<1x512x7x7xf32>
 	%1024="ufront.reshape"(%1023){shape=[1, 512, 7, 1, 7, 1]}:(tensor<1x512x7x7xf32>) -> tensor<1x512x7x1x7x1xf32>
-	%1025="ufront.transpose"(%1024){perm=[0, 2, 4, 3, 5, 1]}:(tensor<1x512x7x1x7x1xf32>) -> tensor<1x7x7x1x1x512xf32>
+	%1025="ufront.transpose"(%1024){perms=[0, 2, 4, 3, 5, 1]}:(tensor<1x512x7x1x7x1xf32>) -> tensor<1x7x7x1x1x512xf32>
 	%1026="ufront.reshape"(%1025){shape=[1, 49, 1, 512]}:(tensor<1x7x7x1x1x512xf32>) -> tensor<1x49x1x512xf32>
 	%1027="ufront.call"(%1026){addargs=[('arg2', -2), ('arg3', -3)], func=swapaxes}:(tensor<1x49x1x512xf32>) -> tensor<1x1x49x512xf32>
-	%1028="ufront.layer_norm"(%1027){elementwise_affine=True, eps=1e-05, normalized_shape=(512,)}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
+	%1028="ufront.layer_norm"(%1027){elementwise_affine=true, eps=0.00001, normalized_shape=[512]}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
 	%1029="ufront.linear"(%1028):(tensor<1x1x49x512xf32>) -> tensor<1x1x49x1536xf32>
 	%1030, %1031, %1032="ufront.chunk"(%1029){axis=-1, sizes=3}:(tensor<1x1x49x1536xf32>) -> tensor<1x1x49x512xf32>, tensor<1x1x49x512xf32>, tensor<1x1x49x512xf32>
 	%1033="ufront.reshape"(%1030){shape=[1, 1, 49, 16, 32]}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x16x32xf32>
-	%1034="ufront.transpose"(%1033){perm=[0, 1, 3, 2, 4]}:(tensor<1x1x49x16x32xf32>) -> tensor<1x1x16x49x32xf32>
+	%1034="ufront.transpose"(%1033){perms=[0, 1, 3, 2, 4]}:(tensor<1x1x49x16x32xf32>) -> tensor<1x1x16x49x32xf32>
 	%1035="ufront.reshape"(%1031){shape=[1, 1, 49, 16, 32]}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x16x32xf32>
-	%1036="ufront.transpose"(%1035){perm=[0, 1, 3, 2, 4]}:(tensor<1x1x49x16x32xf32>) -> tensor<1x1x16x49x32xf32>
+	%1036="ufront.transpose"(%1035){perms=[0, 1, 3, 2, 4]}:(tensor<1x1x49x16x32xf32>) -> tensor<1x1x16x49x32xf32>
 	%1037="ufront.reshape"(%1032){shape=[1, 1, 49, 16, 32]}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x16x32xf32>
-	%1038="ufront.transpose"(%1037){perm=[0, 1, 3, 2, 4]}:(tensor<1x1x49x16x32xf32>) -> tensor<1x1x16x49x32xf32>
+	%1038="ufront.transpose"(%1037){perms=[0, 1, 3, 2, 4]}:(tensor<1x1x49x16x32xf32>) -> tensor<1x1x16x49x32xf32>
 	%1039="ufront.smultiply"(%1036){scalar=0.04419417382415922}:(tensor<1x1x16x49x32xf32>) -> tensor<1x1x16x49x32xf32>
 	%1040="ufront.call"(%1034, %1039){addargs=[('arg1', 'B G H I D, B G H J D -> B G H I J')], func=einsum}:(tensor<1x1x16x49x32xf32>, tensor<1x1x16x49x32xf32>) -> tensor<1x1x16x49x49xf32>
-	%1041="ufront.parameter"(%1041){requires_grad=True}:(tensor<169x16xf32>) -> tensor<169x16xf32>
+	%1041="ufront.parameter"(%1041){requires_grad=true}:(tensor<169x16xf32>) -> tensor<169x16xf32>
 	%1042="ufront.slice"(%1041){output_shape=[2401, 16], slices=[84 83 82 ... 86 85 84]}:(tensor<169x16xf32>) -> tensor<2401x16xf32>
 	%1043="ufront.reshape"(%1042){shape=[49, 49, 16]}:(tensor<2401x16xf32>) -> tensor<49x49x16xf32>
-	%1044="ufront.transpose"(%1043){perm=[2, 0, 1]}:(tensor<49x49x16xf32>) -> tensor<16x49x49xf32>
+	%1044="ufront.transpose"(%1043){perms=[2, 0, 1]}:(tensor<49x49x16xf32>) -> tensor<16x49x49xf32>
 	%1045="ufront.reshape"(%1044){shape=[1, 16, 49, 49]}:(tensor<16x49x49xf32>) -> tensor<1x16x49x49xf32>
 	%1046="ufront.add"(%1040, %1045):(tensor<1x1x16x49x49xf32>, tensor<1x16x49x49xf32>) -> tensor<1x1x16x49x49xf32>
 	%1047="ufront.softmax"(%1046):(tensor<1x1x16x49x49xf32>) -> tensor<1x1x16x49x49xf32>
 	%1048="ufront.call"(%1047, %1038){addargs=[('arg1', 'B G H I J, B G H J D -> B G H I D')], func=einsum}:(tensor<1x1x16x49x49xf32>, tensor<1x1x16x49x32xf32>) -> tensor<1x1x16x49x32xf32>
-	%1049="ufront.transpose"(%1048){perm=[0, 1, 3, 2, 4]}:(tensor<1x1x16x49x32xf32>) -> tensor<1x1x49x16x32xf32>
+	%1049="ufront.transpose"(%1048){perms=[0, 1, 3, 2, 4]}:(tensor<1x1x16x49x32xf32>) -> tensor<1x1x49x16x32xf32>
 	%1050="ufront.reshape"(%1049){shape=[1, 1, 49, 512]}:(tensor<1x1x49x16x32xf32>) -> tensor<1x1x49x512xf32>
 	%1051="ufront.linear"(%1050):(tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
 	%1052="ufront.dropout"(%1051){rate=0.0, seed=0}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
 	%1053="ufront.add"(%1027, %1052):(tensor<1x1x49x512xf32>, tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
-	%1054="ufront.layer_norm"(%1053){elementwise_affine=True, eps=1e-05, normalized_shape=(512,)}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
+	%1054="ufront.layer_norm"(%1053){elementwise_affine=true, eps=0.00001, normalized_shape=[512]}:(tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
 	%1055="ufront.linear"(%1054):(tensor<1x1x49x512xf32>) -> tensor<1x1x49x2048xf32>
 	%1056="ufront.gelu"(%1055):(tensor<1x1x49x2048xf32>) -> tensor<1x1x49x2048xf32>
 	%1057="ufront.linear"(%1056):(tensor<1x1x49x2048xf32>) -> tensor<1x1x49x512xf32>
@@ -1018,14 +1018,13 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%1059="ufront.add"(%1053, %1058):(tensor<1x1x49x512xf32>, tensor<1x1x49x512xf32>) -> tensor<1x1x49x512xf32>
 	%1060="ufront.call"(%1059){addargs=[('arg2', -2), ('arg3', -3)], func=swapaxes}:(tensor<1x1x49x512xf32>) -> tensor<1x49x1x512xf32>
 	%1061="ufront.reshape"(%1060){shape=[1, 7, 7, 1, 1, 512]}:(tensor<1x49x1x512xf32>) -> tensor<1x7x7x1x1x512xf32>
-	%1062="ufront.transpose"(%1061){perm=[0, 5, 1, 3, 2, 4]}:(tensor<1x7x7x1x1x512xf32>) -> tensor<1x512x7x1x7x1xf32>
+	%1062="ufront.transpose"(%1061){perms=[0, 5, 1, 3, 2, 4]}:(tensor<1x7x7x1x1x512xf32>) -> tensor<1x512x7x1x7x1xf32>
 	%1063="ufront.reshape"(%1062){shape=[1, 512, 7, 7]}:(tensor<1x512x7x1x7x1xf32>) -> tensor<1x512x7x7xf32>
 	%1064="ufront.pool2d"(%1063){output_size=[1, 1], pool_type="POOL_ADAPTIVE"}:(tensor<1x512x7x7xf32>) -> tensor<1x512x1x1xf32>
 	%1065="ufront.flat"(%1064){end_dim=-1, start_dim=1}:(tensor<1x512x1x1xf32>) -> tensor<1x512xf32>
-	%1066="ufront.layer_norm"(%1065){elementwise_affine=True, eps=1e-05, normalized_shape=(512,)}:(tensor<1x512xf32>) -> tensor<1x512xf32>
+	%1066="ufront.layer_norm"(%1065){elementwise_affine=true, eps=0.00001, normalized_shape=[512]}:(tensor<1x512xf32>) -> tensor<1x512xf32>
 	%1067="ufront.linear"(%1066):(tensor<1x512xf32>) -> tensor<1x512xf32>
 	%1068="ufront.tanh"(%1067):(tensor<1x512xf32>) -> tensor<1x512xf32>
 	%1069="ufront.linear"(%1068):(tensor<1x512xf32>) -> tensor<1x1000xf32>
-	%1070="ufront.softmax"(%1069):(tensor<1x1000xf32>) -> tensor<1x1000xf32>
-	return %1070: tensor<1x1000xf32>
+	return %1069: tensor<1x1000xf32>
 }

@@ -73,3 +73,5 @@ docs/_build/
 
 *.ff
 *.onnx
+*.gz
+*.compiler

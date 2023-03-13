@@ -533,9 +533,9 @@ impl Operator {
                 // output shape = input_shape[perm2, perm1, perm0, ...]
                 match &mut self.inputs[0].tensor {
                     Some(v) => {
-                        assert!(self.params.contains_key("perm"));
+                        assert!(self.params.contains_key("perms"));
 
-                        let output_idx : Vec<usize> = self.params["perm"].replace(['[', ']'], "").split(",").map(|x| x.trim().parse::<usize>().unwrap()).collect();
+                        let output_idx : Vec<usize> = self.params["perms"].replace(['[', ']'], "").split(",").map(|x| x.trim().parse::<usize>().unwrap()).collect();
                         let mut output_shape : Vec<usize>  = vec![];
                         for i in 0..v.shape.len() {
                             let idx = output_idx[i];
@@ -884,6 +884,9 @@ impl Operator {
         } else if self.op_type == OpType::PARAMETER {
             params.remove("dtype");
             params.remove("np_tensor");
+            if params.contains_key("requires_grad") {
+                params["requires_grad"] = params["requires_grad"].to_lowercase();
+            }
         } else if self.op_type == OpType::CALL {
             params.remove("argtypes");
             params.remove("callback");
@@ -899,6 +902,31 @@ impl Operator {
             }
         } else if self.op_type == OpType::MASKEDFILL {
             params.remove("mask");
+        } else if self.op_type == OpType::LAYER_NORM {
+            //elementwise_affine True/False -> true/false
+            if params.contains_key("elementwise_affine") {
+                params["elementwise_affine"] = params["elementwise_affine"].to_lowercase();
+            }
+            //normalized_shape
+            //eps
+            if params.contains_key("eps") {
+                let eps = params["eps"].parse::<f32>().unwrap();
+                params["eps"] = eps.to_string();
+            }
+        } else if self.op_type == OpType::BATCH_NORM {
+            //track_running_stats True/False -> true/false
+            if params.contains_key("track_running_stats") {
+                params["track_running_stats"] = params["track_running_stats"].to_lowercase();
+            }
+            //affine True/False -> true/false
+            if params.contains_key("affine") {
+                params["affine"] = params["affine"].to_lowercase();
+            }
+            //eps
+            if params.contains_key("eps") {
+                let eps = params["eps"].parse::<f32>().unwrap();
+                params["eps"] = eps.to_string();
+            }
         }
 
         params.remove("activation"); //fused activation not supported at the moment

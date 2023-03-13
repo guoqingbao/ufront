@@ -16,9 +16,9 @@ if __name__ == "__main__":
     input = torch.ones((batch_size, 3, 224, 224), dtype=torch.float32)
 
     #Multihead attention
-    #input = torch.empty(1, 512, 128).normal_(std=0.02)
-    #mask = MultiHeadAttention.gen_history_mask(input)
-    #net = MultiHeadAttention(128, 16)
+    # input = torch.empty(1, 512, 128).normal_(std=0.02)
+    # mask = MultiHeadAttention.gen_history_mask(input)
+    # net = MultiHeadAttention(128, 16)
     #out = net(input, input, input, mask)
 
     # net = ComplexCNN()
@@ -32,11 +32,11 @@ if __name__ == "__main__":
     # net = convnext_small(pretrained=False)
     # net = efficientnet_v2_s(pretrained=False)
     # net = inception_v3(pretrained=False) #net.train(False) important!
-    net.train(False) #False for inception_v3
+    
 
     # net = models.vision_transformer.vit_b_16(weights=False)
     # net = models.swin_transformer.swin_t(weights=None)
-    # net.train(False)
+    net.train(False) #False for inception_v3
     # b = net(input)
 
     # resnet.train(mode=False)
