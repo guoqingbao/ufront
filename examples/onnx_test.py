@@ -1,25 +1,35 @@
 from ufront.onnx.model import ONNXModel, ONNXModelKeras, UFrontONNX
-
+import io
 import numpy as np
 import torch
+import onnx
 from torch.onnx import TrainingMode
 from torch_def import SimpleCNN, ComplexCNN
+from torchvision.models import resnet18, resnet50, squeezenet1_1, regnet_x_32gf, maxvit_t, shufflenet_v2_x1_5, inception_v3, mobilenet_v3_small, efficientnet_v2_s, densenet121, convnext_small
 
 if __name__ == "__main__":
-    batch_size = 32
-    input = np.zeros((batch_size, 3, 32, 32), dtype=np.float32)
-    model_name = "ComplexCNN"
-    torch.onnx.export(model=ComplexCNN(), args=(torch.from_numpy(input), torch.from_numpy(input)), f="cifar10_cnn_pt.onnx", export_params=False, training=TrainingMode.TRAINING)
+    batch_size = 1
+    input = np.zeros((batch_size, 3, 224, 224), dtype=np.float32)
     
-    model = UFrontONNX(onnx_model="cifar10_cnn_pt.onnx", batch_size=batch_size)
+
+    # torch_model = ComplexCNN()
+    torch_model = shufflenet_v2_x1_5(pretrained=False)
+    f = io.BytesIO()
+    model_name = torch_model.__class__.__name__ #"ComplexCNN"
+    torch.onnx.export(model=torch_model, args=(torch.from_numpy(input)), f=f, export_params=False, training=TrainingMode.TRAINING)
+    onnx_model = onnx.load_model_from_string(f.getvalue())
+
+    model = UFrontONNX(onnx_model=onnx_model, batch_size=batch_size)
 
     #This will trigger Rust frontend for model conversion and graph building
     #operators can also be managed by python side (each operator here corresponding to an operator in the Rust computation graph)
-    output_tensors = model(inputs=[input, input])
+    output_tensors = model(inputs=[input])
 
     #The output of the model (forward pass have not been triggered at the moment!)
-    output = model.softmax(input=output_tensors[0], name="softmax")
-    print(output.shape)
+    if model_name not in ["MaxVit", "SwinTransformer", "VisionTransformer", "MultiHeadAttention"]:
+      output = model.softmax(input=output_tensors[0], name="softmax_out")
+      print(output.shape)
+    
 
     #The Rust frontend will build computation graph and initialize temporary inputs and outputs for each operator
     total_memory = 0

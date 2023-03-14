@@ -391,5 +391,6 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%390="ufront.transpose"(%389){perms=[0, 3, 1, 2]}:(tensor<1x1x1x768xf32>) -> tensor<1x768x1x1xf32>
 	%391="ufront.flat"(%390){end_dim=-1, start_dim=1}:(tensor<1x768x1x1xf32>) -> tensor<1x768xf32>
 	%392="ufront.linear"(%391):(tensor<1x768xf32>) -> tensor<1x1000xf32>
-	return %392: tensor<1x1000xf32>
+	%393="ufront.softmax"(%392):(tensor<1x1000xf32>) -> tensor<1x1000xf32>
+	return %393: tensor<1x1000xf32>
 }

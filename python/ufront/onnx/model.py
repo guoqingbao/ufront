@@ -17,6 +17,7 @@
 # Enflame Tech. (ERA)
 from collections import OrderedDict
 import logging
+import math
 try:
     import onnx
 except:
@@ -37,6 +38,8 @@ def onnx_to_ff_dt(datatype):
         return DataType.Int64
     elif datatype == onnx.TensorProto.FLOAT16:
         return DataType.Half
+    elif datatype == onnx.TensorProto.BOOL:
+        return DataType.Bool
     else:
         assert 0, "Unsupported datatype"
 
@@ -141,8 +144,8 @@ class ONNXModel(object):
 
     def handleGlobalAveragePool(self, node, node_to_output):
         input = node_to_output[node.input[0]]
-        return self.ufront_model.pool2d(input=input, kernel=[input.dims[2], input.dims[3]], 
-                            stride=[1, 1], pad=[0, 0], pool_type=PoolType.POOL_AVG, name=node.name)
+        return self.ufront_model.pool2d(input=input, output_size=[1, 1], 
+                            stride=[1, 1], pad=[0, 0], pool_type=PoolType.POOL_ADAPTIVE, name=node.name)
 
     def handleBatchNormalization(self, node, node_to_output):
         input = node_to_output[node.input[0]]
@@ -175,14 +178,26 @@ class ONNXModel(object):
 
     def handleDropout(self, node, node_to_output):
         input = node_to_output[node.input[0]]
-        attribute = {x.name: x for x in node.attribute}
-        rate = attribute["ratio"].f
+        inplace = False
+        if len(node.attribute) > 0:
+            attribute = {x.name: x for x in node.attribute}
+            rate = attribute["ratio"].f
+        else:
+            rate = node_to_output[node.input[1]]
+            if len(node.input) > 2:
+                inplace = node_to_output[node.input[2]]
         seed = 0
         return self.ufront_model.dropout(input=input, rate=rate, seed=0, name=node.name)
 
     def handleFlatten(self, node, node_to_output):
         input = node_to_output[node.input[0]]
-        return self.ufront_model.flat(input=input, name=node.name)
+        if len(node.attribute) > 0:
+            attribute = {x.name: x for x in node.attribute}
+            axis = attribute["axis"].i
+        else:
+            axis = 1
+
+        return self.ufront_model.flat(input=input, start_dim=axis, end_dim=-1, name=node.name)
 
     # def handleGemm(self, node):
     #     input = self.symbol_table[node.input[0]]
@@ -233,8 +248,13 @@ class ONNXModel(object):
 
     def handleReshape(self, node, node_to_output):
         input = node_to_output[node.input[0]]
+        size = math.prod(input.shape)
         shape = node_to_output[node.input[1]]
-        return self.ufront_model.reshape(input=input, shape=list(shape.int64_data), name=node.name)
+        for i in range(len(shape)):
+            if shape[i] == -1:
+                shape[i] = 1
+                shape[i] = int(size/math.prod(shape))
+        return self.ufront_model.reshape(input=input, shape=shape if type(shape)==list else list(shape.int64_data), name=node.name)
     
     def handleCast(self, node, node_to_output):
         # TODO: add cast
@@ -259,20 +279,38 @@ class ONNXModel(object):
             output = self.ufront_model.create_tensor(tensor.dims, DataType.Float, True, "constant_tensor" + str(ONNXModel.const_tensor_idx))
             ONNXModel.const_tensor_idx += 1
         else:
-            values = []
-            for i in range(tensor.dims[0]):
+            if len(tensor.dims) > 0:
+                values = []
+                for i in range(tensor.dims[0]):
+                    if data_type == DataType.Float:
+                        value = struct.unpack('f', raw_data[i*4:(i+1)*4])
+                    elif data_type == DataType.Int32:
+                        value = struct.unpack('i', raw_data[i*4:(i+1)*4])
+                    elif data_type == DataType.Int64:
+                        value = struct.unpack('l', raw_data[i*8:(i+1)*8])
+                    elif data_type == DataType.Double:
+                        value = struct.unpack('d', raw_data[i*8:(i+1)*8])
+                    elif data_type == DataType.Half:
+                        value = struct.unpack('e', raw_data[i*2:(i+1)*2])
+                    elif data_type == DataType.Bool:
+                        value = struct.unpack('?', raw_data[i*2:(i+1)*2])
+                    values.append(value[0])
+                output = values
+            else:
+                i = 0
                 if data_type == DataType.Float:
                     value = struct.unpack('f', raw_data[i*4:(i+1)*4])
                 elif data_type == DataType.Int32:
                     value = struct.unpack('i', raw_data[i*4:(i+1)*4])
-                if data_type == DataType.Int64:
+                elif data_type == DataType.Int64:
                     value = struct.unpack('l', raw_data[i*8:(i+1)*8])
                 elif data_type == DataType.Double:
                     value = struct.unpack('d', raw_data[i*8:(i+1)*8])
                 elif data_type == DataType.Half:
                     value = struct.unpack('e', raw_data[i*2:(i+1)*2])
-                values.append(value[0])
-            output = values
+                elif data_type == DataType.Bool:
+                    value = struct.unpack('?', raw_data[i*2:(i+1)*2])
+                output = value[0]
 
         return output
         
@@ -283,6 +321,25 @@ class ONNXModel(object):
         delta = node_to_output[node.input[2]]
         return start
 
+    def handleMatMul(self, node, node_to_output):
+        input = node_to_output[node.input[0]]
+        dim = self.inputs[node.input[1]].dims[1]
+        return self.ufront_model.dense(input = input, out_dim=dim, use_bias=False, name=node.name)
+        
+    def handleTranspose(self, node, node_to_output):
+        input = node_to_output[node.input[0]]
+        attribute = {x.name: x for x in node.attribute}
+        perm = attribute["perm"].ints
+        # output = input
+        # return output
+        return self.ufront_model.transpose(
+            input=input, perms=perm, name=node.name,
+        )
+    
+    def handleShape(self, node, node_to_output):
+        input = node_to_output[node.input[0]]
+        return input.shape
+    
     def apply(self, input_tensors):
         self._fusion()
         node_to_output = OrderedDict()
@@ -310,8 +367,8 @@ class ONNXModel(object):
             outputs[output.name] = output
 
         node_to_output.update(inputs)
-        # for node in self.model.graph.node:
-        #     print(node.name)
+        for node in self.model.graph.node:
+            print(node.name)
 
         for node in self.model.graph.node:
             handler_name = 'handle' + node.op_type
@@ -319,16 +376,16 @@ class ONNXModel(object):
                 handler = getattr(self, handler_name)
                 operator = handler(node, node_to_output)
                 
-                if node.op_type == "Transpose" or node.op_type == "Constant":
-                    node_output = operator
-                elif node.op_type == "Split":
+                if type(operator) == PyOperator:
                     self.operators.append(operator)
-                    node_output = []
-                    for i in range(operator.num_of_outputs()):
-                        node_output.append(operator.get_output(i))
+                    if node.op_type == "Split":
+                        node_output = []
+                        for i in range(operator.num_of_outputs()):
+                            node_output.append(operator.get_output(i))
+                    else:
+                        node_output = operator.get_output(0)
                 else:
-                    self.operators.append(operator)
-                    node_output = operator.get_output(0)
+                    node_output = operator
             else:
                 logging.warning("Can't handle: {}".format(node.op_type))
 

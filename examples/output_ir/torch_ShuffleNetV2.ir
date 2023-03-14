@@ -228,5 +228,6 @@ func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%239="ufront.relu"(%238):(tensor<1x1024x7x7xf32>) -> tensor<1x1024x7x7xf32>
 	%240="ufront.mean"(%239){dims=[2, 3], keepdims=False}:(tensor<1x1024x7x7xf32>) -> tensor<1x1024xf32>
 	%241="ufront.linear"(%240):(tensor<1x1024xf32>) -> tensor<1x1000xf32>
-	return %241: tensor<1x1000xf32>
+	%242="ufront.softmax"(%241):(tensor<1x1000xf32>) -> tensor<1x1000xf32>
+	return %242: tensor<1x1000xf32>
 }

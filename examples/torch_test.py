@@ -22,7 +22,7 @@ if __name__ == "__main__":
     #out = net(input, input, input, mask)
 
     # net = ComplexCNN()
-    net = maxvit_t(pretrained=False)
+    # net = maxvit_t(pretrained=False)
     # net = squeezenet1_1(pretrained=False)
     # net = regnet_x_32gf(pretrained=False)
     # net = resnet50(pretrained=False)
@@ -31,7 +31,7 @@ if __name__ == "__main__":
     # net = densenet121(pretrained=False)
     # net = convnext_small(pretrained=False)
     # net = efficientnet_v2_s(pretrained=False)
-    # net = inception_v3(pretrained=False) #net.train(False) important!
+    net = inception_v3(pretrained=False) #net.train(False) important!
     
 
     # net = models.vision_transformer.vit_b_16(weights=False)
@@ -42,6 +42,7 @@ if __name__ == "__main__":
     # resnet.train(mode=False)
     model = UFrontTorch(net, batch_size=batch_size) # convert torch model to ufront model
 
+       
     # model = UFrontTorch(ComplexCNN(), batch_size=batch_size) # convert torch model to ufront model
 
     #save model to file (compatible with flexflow)
@@ -55,8 +56,9 @@ if __name__ == "__main__":
     output_tensors = model(inputs = [input])
 
     #The output of the model (forward pass have not been triggered at the moment!)
-    # output = model.softmax(input=output_tensors[0], name="softmax_out")
-    # print(output.shape)
+    if model.model.__class__.__name__ not in ["MaxVit", "SwinTransformer", "VisionTransformer", "MultiHeadAttention"]:
+      output = model.softmax(input=output_tensors[0], name="softmax_out")
+      print(output.shape)
 
     #The Rust frontend will build computation graph and initialize temporary inputs and outputs for each operator
     total_memory = 0
