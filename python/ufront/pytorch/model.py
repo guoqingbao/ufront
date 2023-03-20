@@ -22,6 +22,7 @@ from typing import List
 import typing
 import numpy as np
 import math
+import io
 
 from ..ufront import (OpType, ActiMode, AggrMode, PoolType, TensorF32, DataType, ParamSyncType, Initializer)
 from ..ufront import Model, PyOperator, TensorF32, Optimizer, LossType, MetricsType #Rust frontend
@@ -1166,7 +1167,7 @@ class FunctionNode(Node):
         elif name.find("floordiv") >= 0 or name.find("floor_divide") >= 0:
             return ScalarFloorDivNode(node)
         elif name.find("truediv") >= 0: return ScalarTrueDivNode(node)
-        elif name.find("cat") >= 0: return ConcatNode(node)
+        elif name.find("cat") == 0: return ConcatNode(node)
         elif name.find("split") >= 0: return SplitChunkNode(node, OpType.SPLIT)
         elif name.find("chunk") >= 0: return SplitChunkNode(node, OpType.CHUNK)
         elif name.find("flatten") >= 0: return FlattenNode(node, None)
@@ -1180,8 +1181,8 @@ class FunctionNode(Node):
         elif name.find("permute") >= 0: return PermuteNode(node)
         elif name.find("softmax") >= 0: return SoftmaxFNode(node)
         elif name.find("view") >= 0: return ViewNode(node)
-        elif name.find("to") >= 0: return ToNode(node)
-        elif name.find("pow") >= 0: return PowNode(node)
+        elif name.find("to") == 0: return ToNode(node)
+        elif name.find("pow") == 0: return PowNode(node)
         elif name.find("mean") >= 0: return MeanNode(node)
         elif name.find("rsqrt") >= 0: return RsqrtNode(node)
         elif name.find("unsqueeze") >= 0: return UnsqueezeNode(node)
@@ -1191,9 +1192,9 @@ class FunctionNode(Node):
         elif name.find("contiguous") >= 0: return ContiguousNode(node)
         elif name.find("tanh") >= 0: return TanhFNode(node)
         elif name.find("gelu") >= 0: return GeluFNode(node)
-        elif name.find("eq") >= 0: return EqNode(node)
+        elif name.find("eq") == 0: return EqNode(node)
         elif name.find("_assert") >= 0: return AssertNode(node)
-        elif name.find("dim") >= 0: return GetAttrNode(node)
+        elif name.find("dim") == 0: return GetAttrNode(node)
         elif name.find("dims") >= 0: return GetAttrNode(node)
         elif name.find("shape") >= 0: return GetAttrNode(node)
         elif name.find("size") >= 0: return GetAttrNode(node)
@@ -1658,23 +1659,30 @@ class GetItemNode(FunctionNode):
             return input_tensor[index]
         except ValueError:
             # Get item from a tensor by slicing
+            # TODO
             slice_strings = data.items[4:]
             slices = GetItemNode.strings_to_slices(slice_strings)
-            output_shape = np.zeros(shape=input_tensor.shape, dtype=np.float)[slices].shape
-            return ffmodel.slice_tensor(input=input_tensor, output_shape=list(output_shape), slices=slices, name=data.items[0])
+            output_shape = np.zeros(shape=input_tensor.shape, dtype=np.float32)[slices].shape
+            return ffmodel.slice_tensor(x=input_tensor, y=slices, output_shape=list(output_shape),  name=data.items[0])
 
     def to_ff(self, ffmodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         if type(input_tensor) is TensorF32:
             slices = self.innodes[1]
             if hasattr(slices, "name"):
-                slices = node_to_output[slices.name]
-                slices = slices.ndarray.astype(Node.ff_to_numpy_dtype(slices.dtype))
+                slice_tensor = node_to_output[slices.name]
+                np_slices = slice_tensor.ndarray.astype(Node.ff_to_numpy_dtype(slice_tensor.dtype))
+                output_shape = np.zeros(shape=input_tensor.shape, dtype=np.float32)[np_slices].shape
             else:
                 assert type(slices) is tuple, f"Expected tuple slices but got {type(slices)}"
-
-            output_shape = np.zeros(shape=input_tensor.shape, dtype=np.float)[slices].shape
-            return ffmodel.slice_tensor(input=input_tensor, output_shape=list(output_shape), slices=slices, name=self.name)
+                slice_tensor = slices
+                output_shape = np.zeros(shape=input_tensor.shape, dtype=np.float32)[slice_tensor].shape
+            
+            # print(np.max(slices), " ", np.min(slices), " : ", list(slices))
+            if type(slice_tensor) == TensorF32:
+                return ffmodel.slice_tensor(x=input_tensor, y=slice_tensor, output_shape=list(output_shape), name=self.name)
+            else:
+                return ffmodel.slice_tensor(input=input_tensor, slices=slices, output_shape=list(output_shape), name=self.name)
 
         assert type(input_tensor) is list or \
             type(input_tensor) is tuple, \
@@ -2328,7 +2336,7 @@ class MeanNode(FunctionNode):
             if dims[i] == -1:
                 dims[i] = len(input_tensor.dims) - 1
             assert dims[i] >= 0 and dims[i] < input_tensor.dims if type(input_tensor.dims)==int else len(input_tensor.dims)
-        #TODO implement mean function
+
         return ffmodel.mean(
             input=input_tensor, dims=dims, keepdims=keepdims, name=self.name,
         )
@@ -2717,22 +2725,17 @@ class AttributeNode(Node):
         # TODO support tensor dtypes of Int32, Int64
         # ff_dtype = DataType.Float
         np_tensor = np_tensor.astype(np.float32)
-        if type(self.attr) == torch.nn.Parameter:
-            return ffmodel.parameter(
-                np_tensor=np_tensor, dtype=ff_dtype, requires_grad=requires_grad, name=self.attr_name
-            )
-        else:
-            ff_tensor = ffmodel.create_tensor(
-                shape=torch_tensor.shape, dtype=ff_dtype, requires_grad=requires_grad, name=self.attr_name
-            )
-            ff_tensor.ndarray = np_tensor
-            return ff_tensor
-        # delay set_tensor, add to ffmodel
-        # ffmodel.attr_tensors[ff_tensor] = np_tensor
-        # ff_tensor.set_tensor(
-        #     ffmodel, np_tensor
-        # )
+        raw_array = np_tensor.astype(Node.ff_to_numpy_dtype(ff_dtype))
+
+        output = io.BytesIO()
+        np.savez_compressed(output, x=raw_array)
+        raw_bytes = str(output.getvalue().hex())
         
+        if type(self.attr) == torch.nn.Parameter:
+            return ffmodel.parameter(np_tensor=np_tensor, dtype=ff_dtype, requires_grad=requires_grad, initializer=raw_bytes, name=self.attr_name)
+        else:
+            return ffmodel.tensor(np_tensor=np_tensor, dtype=ff_dtype, requires_grad=requires_grad, initializer=raw_bytes, name=self.attr_name)
+    
                     
 class CallNode(FunctionNode):
     def __init__(self, node, callback):
@@ -3022,8 +3025,10 @@ class UFrontTorch():
         name_to_module = {}
         for name, module in self.model.named_modules():
             name_to_module[name] = module
+            # print(name)
         graph = []
         for fx_node in traced.graph.nodes:
+            print(fx_node.op, " : ", fx_node.name)
             if fx_node.op == "call_module":
                 module_name = fx_node.target
                 module = name_to_module[module_name]
@@ -3170,9 +3175,6 @@ class UFrontTorch():
         Returns:
             output_tensors (List[Tensor]): Output tensors of the model.
         """
-        # assert not torch.cuda.is_available(), \
-        #     "FlexFlow cannot work with CUDA version of PyTorch; " \
-        #     "please install the CPU version."
         graph = self._trace_model()
         output_tensors = []
         node_to_output = OrderedDict()
@@ -3196,24 +3198,9 @@ class UFrontTorch():
                 node.to_ff(self.ufront_model, node_to_output, output_tensors)
                 node_output = None
             else:
-                # if isinstance(node, GetItemNode):
-                #     print("GetItemNode")
-                #     node_output = node.to_ff(self.ufront_model, node_to_output)
-                # elif isinstance(node, GetAttrNode):
-                #     print("GetAttrNode")
-                #     node_output = node.to_ff(self.ufront_model, node_to_output)
-                # elif isinstance(node, EqNode):
-                #     print("EqNode")
-                #     node_output = node.to_ff(self.ufront_model, node_to_output)
                 if type(node) in [GetItemNode, GetAttrNode, AttributeNode, EqNode, AssertNode, ScalarAddNode, ScalarFloorDivNode, ScalarMulNode, ScalarSubNode, ScalarTrueDivNode]:
                     print(type(node), ": ", node.name)
-                #     operator = node.to_ff(self.ufront_model, node_to_output)
-                #     if type(operator) == PyOperator:
-                #         self.operators.append(operator)
-                #         node_output = operator.get_output(0)
-                #     else:
-                #         node_output = operator
-                # else:
+
                 operator = node.to_ff(self.ufront_model, node_to_output)
                 if type(operator) == PyOperator:
                     self.operators.append(operator)

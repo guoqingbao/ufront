@@ -436,7 +436,9 @@ impl Model {
                     } else {
                         panic! {"Missing important arguments (tensors?)"};
                     }
-                } else if op_type == OpType::ADD || op_type == OpType::MULTIPLY || op_type == OpType::BATCH_MATMUL {
+                } else if op_type == OpType::ADD || op_type == OpType::MULTIPLY || 
+                        op_type == OpType::BATCH_MATMUL || op_type == OpType::LESS ||
+                        ((op_type == OpType::SLICE) && para.contains("input").is_err() )    {
                     if para.contains("x").is_ok() && para.contains("y").is_ok() {
                         let x = para.get_item("x").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
                         let y = para.get_item("y").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
@@ -478,7 +480,7 @@ impl Model {
                     } else {
                         panic! {"Missing important arguments (q, k, or v?)"};
                     }
-                } else if op_type == OpType::PARAMETER {
+                } else if op_type == OpType::PARAMETER || op_type == OpType::TENSOR {
                     if para.contains("np_tensor").is_ok() && para.contains("dtype").is_ok() {
                         let np_tensor = para
                             .get_item("np_tensor")
@@ -610,6 +612,11 @@ impl Model {
     #[pyo3(signature = (**kwds))]
     pub fn parameter(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::PARAMETER, kwds)
+    }
+
+    #[pyo3(signature = (**kwds))]
+    pub fn tensor(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
+        self.handle_operator(OpType::TENSOR, kwds)
     }
 
     #[pyo3(signature = (**kwds))]
@@ -967,5 +974,20 @@ impl Model {
     #[pyo3(signature = (**kwds))]
     pub fn repeat(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator>  {
         self.handle_operator(OpType::REPEAT, kwds)
+    }
+
+    #[pyo3(signature = (**kwds))]
+    pub fn uniform_like(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator>  {
+        self.handle_operator(OpType::UNIFORM_LIKE, kwds)
+    }
+
+    #[pyo3(signature = (**kwds))]
+    pub fn less(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator>  {
+        self.handle_operator(OpType::LESS, kwds)
+    }
+
+    #[pyo3(signature = (**kwds))]
+    pub fn cast(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator>  {
+        self.handle_operator(OpType::CAST, kwds)
     }
 }

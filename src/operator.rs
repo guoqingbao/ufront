@@ -144,19 +144,24 @@ impl Operator {
         });
     }
 
-    pub fn add_output(&mut self, x: Tensor<f32>) {
+    pub fn add_output(&mut self, x: Tensor<f32>, dtype: Option<DataType>) {
+        let _dtype = match dtype {
+            Some(t) => { t }
+            _ => { DataType::Float }
+        };
+
         if !self.outputs.is_empty() {
             let name = format!("{}_{}", self.params["name"], self.outputs.len());
             self.outputs.push(TensorF32 {
                 tensor: Some(x),
                 name,
-                dtype: DataType::Float,
+                dtype: _dtype,
             });
         } else {
             self.outputs.push(TensorF32 {
                 tensor: Some(x),
                 name: self.params["name"].to_string(),
-                dtype: DataType::Float,
+                dtype: _dtype,
             });
         }
     }
@@ -204,7 +209,7 @@ impl Operator {
                                 shape: output_shape,
                                 data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
                             };
-                            self.add_output(tensor);
+                            self.add_output(tensor, Some(self.inputs[0].dtype));
                         }
                         _ => {
                             panic!("Invalid inputs!");
@@ -231,7 +236,7 @@ impl Operator {
                                 shape: output_shape,
                                 data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
                             };
-                            self.add_output(tensor);
+                            self.add_output(tensor, Some(self.inputs[0].dtype));
                         }
                         _ => {
                             panic!("Invalid inputs!");
@@ -254,7 +259,7 @@ impl Operator {
                                 shape: output_shape,
                                 data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
                             };
-                            self.add_output(tensor);
+                            self.add_output(tensor, Some(self.inputs[0].dtype));
                         }
                         _ => {
                             panic!("Invalid inputs!");
@@ -285,6 +290,9 @@ impl Operator {
             | OpType::SOFTMAX
             | OpType::BATCH_NORM
             | OpType::LAYER_NORM
+            | OpType::UNIFORM_LIKE
+            | OpType::LESS //TODO Bool results
+            | OpType::CAST //TODO results cast into given type
             | OpType::EQ //output shape of equal op (compare a tensor with a scalar) is the shape of input
             | OpType::MASKEDFILL //output shape of masked_fill is equal to the input
             | OpType:: MULTIHEAD_ATTENTION //output shape of multiheaded attention is equal to shape of input "q" (first item in input list) when batch_first=True
@@ -307,7 +315,7 @@ impl Operator {
                                 v.shape.iter().product()
                             ]),
                         };
-                        self.add_output(tensor);
+                        self.add_output(tensor, Some(self.inputs[0].dtype));
                     }
                     _ => {
                         panic!("Invalid inputs!");
@@ -355,7 +363,7 @@ impl Operator {
                                 output_shape.iter().product()
                             ]),
                         };
-                        self.add_output(tensor);
+                        self.add_output(tensor, Some(self.inputs[0].dtype));
                     }
                     _ => {
                         panic!("Invalid inputs!");
@@ -390,7 +398,7 @@ impl Operator {
                     shape: output_shape,
                     data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
                 };
-                self.add_output(tensor);
+                self.add_output(tensor, Some(self.inputs[0].dtype));
             }
             OpType::SPLIT | OpType::CHUNK => {
                 //formula 1 for sizes of int
@@ -442,7 +450,7 @@ impl Operator {
                                     shape: output_shape.clone(),
                                     data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
                                 };
-                                self.add_output(tensor);
+                                self.add_output(tensor, Some(self.inputs[0].dtype));
                                 println!("Output tensor with shape {:?} created within Rust for operator {:?}!", output_shape, self.op_type);
                             }
 
@@ -490,7 +498,7 @@ impl Operator {
                             shape: output_shape.clone(),
                             data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
                         };
-                        self.add_output(tensor);
+                        self.add_output(tensor, Some(self.inputs[0].dtype));
                         println!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
                             output_shape,
@@ -515,7 +523,7 @@ impl Operator {
                             shape: output_shape.clone(),
                             data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
                         };
-                        self.add_output(tensor);
+                        self.add_output(tensor, Some(self.inputs[0].dtype));
                         println!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
                             output_shape,
@@ -546,7 +554,7 @@ impl Operator {
                             shape: output_shape.clone(),
                             data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
                         };
-                        self.add_output(tensor);
+                        self.add_output(tensor, Some(self.inputs[0].dtype));
                         println!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
                             output_shape,
@@ -580,7 +588,7 @@ impl Operator {
                             shape: output_shape.clone(),
                             data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
                         };
-                        self.add_output(tensor);
+                        self.add_output(tensor, Some(self.inputs[0].dtype));
                         println!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
                             output_shape,
@@ -610,7 +618,7 @@ impl Operator {
                             shape: output_shape.clone(),
                             data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
                         };
-                        self.add_output(tensor);
+                        self.add_output(tensor, Some(self.inputs[0].dtype));
                         println!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
                             output_shape,
@@ -636,7 +644,7 @@ impl Operator {
                             shape: output_shape.clone(),
                             data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
                         };
-                        self.add_output(tensor);
+                        self.add_output(tensor, Some(self.inputs[0].dtype));
                         println!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
                             output_shape,
@@ -649,7 +657,7 @@ impl Operator {
                 }
             }
 
-            OpType::PARAMETER => {
+            OpType::PARAMETER | OpType::TENSOR => {
                 //formula
                 //output_shape = input_shape
                 match &mut self.inputs[0].tensor {
@@ -660,7 +668,7 @@ impl Operator {
                             shape: output_shape.clone(),
                             data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
                         };
-                        self.add_output(tensor);
+                        self.add_output(tensor, Some(self.inputs[0].dtype));
                         println!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
                             output_shape,
@@ -710,7 +718,7 @@ impl Operator {
                             shape: output_shape.clone(),
                             data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
                         };
-                        self.add_output(tensor);
+                        self.add_output(tensor, Some(self.inputs[0].dtype));
                         println!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
                             output_shape,
@@ -767,7 +775,7 @@ impl Operator {
                                 output_shape.iter().product()
                             ]),
                         };
-                        self.add_output(tensor);
+                        self.add_output(tensor, Some(self.inputs[0].dtype));
                     }
                     _ => {
                         panic!("Invalid inputs!");
@@ -798,7 +806,7 @@ impl Operator {
                             shape: output_shape.clone(),
                             data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
                         };
-                        self.add_output(tensor);
+                        self.add_output(tensor, Some(self.inputs[0].dtype));
                         println!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
                             output_shape,
@@ -881,11 +889,14 @@ impl Operator {
             params.remove("q");
             params.remove("k");
             params.remove("v");
-        } else if self.op_type == OpType::PARAMETER {
-            params.remove("dtype");
+        } else if self.op_type == OpType::PARAMETER || self.op_type == OpType::TENSOR {
+            // params.remove("dtype");
             params.remove("np_tensor");
             if params.contains_key("requires_grad") {
                 params["requires_grad"] = params["requires_grad"].to_lowercase();
+            }
+            if params.contains_key("initializer") {
+                params["initializer"] = params["initializer"].replace('\n', "");
             }
         } else if self.op_type == OpType::CALL {
             params.remove("argtypes");
@@ -1194,7 +1205,7 @@ impl PyOperator {
                             shape: v.shape.to_vec(),
                             data_buffer: v.data_buffer.clone(),
                         };
-                        (*operator).add_output(tensor);
+                        (*operator).add_output(tensor, Some(x.dtype));
                     }
                     _ => {
                         panic!("Invalid tensor outputs!")
@@ -1240,7 +1251,7 @@ impl PyOperator {
                                     TensorF32 {
                                         tensor: Some(tensor),
                                         name: tensorf32.name.clone(),
-                                        dtype: DataType::Float,
+                                        dtype: tensorf32.dtype,
                                     },
                                 )
                                 .unwrap()

@@ -268,20 +268,10 @@ class ONNXModel(object):
         axes = attribute["axes"].ints
         return input
 
-    #TODO fix constant  
-    def handleConstant(self, node, node_to_output):
-        attribute = {x.name: x for x in node.attribute}
-        tensor = attribute["value"].t
-        data_type = onnx_to_ff_dt(tensor.data_type)
-        raw_data = tensor.raw_data
-        
-        if len(tensor.dims) > 1: #TODO set raw_data array to constant tensor
-            output = self.ufront_model.create_tensor(tensor.dims, DataType.Float, True, "constant_tensor" + str(ONNXModel.const_tensor_idx))
-            ONNXModel.const_tensor_idx += 1
-        else:
-            if len(tensor.dims) > 0:
+    def unpack_rawdata(self, raw_data, data_type, dims):
+        if dims > 0:
                 values = []
-                for i in range(tensor.dims[0]):
+                for i in range(dims):
                     if data_type == DataType.Float:
                         value = struct.unpack('f', raw_data[i*4:(i+1)*4])
                     elif data_type == DataType.Int32:
@@ -296,7 +286,7 @@ class ONNXModel(object):
                         value = struct.unpack('?', raw_data[i*2:(i+1)*2])
                     values.append(value[0])
                 output = values
-            else:
+        else:
                 i = 0
                 if data_type == DataType.Float:
                     value = struct.unpack('f', raw_data[i*4:(i+1)*4])
@@ -311,6 +301,51 @@ class ONNXModel(object):
                 elif data_type == DataType.Bool:
                     value = struct.unpack('?', raw_data[i*2:(i+1)*2])
                 output = value[0]
+        return output
+    
+    def handleConstant(self, node, node_to_output):
+        attribute = {x.name: x for x in node.attribute}
+        tensor = attribute["value"].t
+        data_type = onnx_to_ff_dt(tensor.data_type)
+        raw_data = tensor.raw_data
+        
+        if len(tensor.dims) > 1: #TODO set raw_data array to constant tensor
+            output = self.ufront_model.create_tensor(tensor.dims, DataType.Float, True, "constant_tensor" + str(ONNXModel.const_tensor_idx))
+            ONNXModel.const_tensor_idx += 1
+        else:
+            output = self.unpack_rawdata(raw_data, data_type, tensor.dims[0] if len(tensor.dims) > 0 else 0)
+            # if len(tensor.dims) > 0:
+            #     values = []
+            #     for i in range(tensor.dims[0]):
+            #         if data_type == DataType.Float:
+            #             value = struct.unpack('f', raw_data[i*4:(i+1)*4])
+            #         elif data_type == DataType.Int32:
+            #             value = struct.unpack('i', raw_data[i*4:(i+1)*4])
+            #         elif data_type == DataType.Int64:
+            #             value = struct.unpack('l', raw_data[i*8:(i+1)*8])
+            #         elif data_type == DataType.Double:
+            #             value = struct.unpack('d', raw_data[i*8:(i+1)*8])
+            #         elif data_type == DataType.Half:
+            #             value = struct.unpack('e', raw_data[i*2:(i+1)*2])
+            #         elif data_type == DataType.Bool:
+            #             value = struct.unpack('?', raw_data[i*2:(i+1)*2])
+            #         values.append(value[0])
+            #     output = values
+            # else:
+            #     i = 0
+            #     if data_type == DataType.Float:
+            #         value = struct.unpack('f', raw_data[i*4:(i+1)*4])
+            #     elif data_type == DataType.Int32:
+            #         value = struct.unpack('i', raw_data[i*4:(i+1)*4])
+            #     elif data_type == DataType.Int64:
+            #         value = struct.unpack('l', raw_data[i*8:(i+1)*8])
+            #     elif data_type == DataType.Double:
+            #         value = struct.unpack('d', raw_data[i*8:(i+1)*8])
+            #     elif data_type == DataType.Half:
+            #         value = struct.unpack('e', raw_data[i*2:(i+1)*2])
+            #     elif data_type == DataType.Bool:
+            #         value = struct.unpack('?', raw_data[i*2:(i+1)*2])
+            #     output = value[0]
 
         return output
         
@@ -340,6 +375,77 @@ class ONNXModel(object):
         input = node_to_output[node.input[0]]
         return input.shape
     
+    def handleIdentity(self, node, node_to_output):
+        input = node_to_output[node.input[0]]
+        return self.ufront_model.identify(input = input, name=node.name)
+    
+    def handleConstantOfShape(self, node, node_to_output):
+        value = node_to_output[node.input[0]]
+        return value
+    
+    def handleSigmoid(self, node, node_to_output):
+        input = node_to_output[node.input[0]]
+        return self.ufront_model.sigmoid(input = input, name=node.name)
+    
+    def handleRandomUniformLike(self, node, node_to_output):
+        input = node_to_output[node.input[0]]
+        return self.ufront_model.uniform_like(input = input, name=node.name)
+
+    def handleLess(self, node, node_to_output):
+        input1 = node_to_output[node.input[0]]
+        input2 = node_to_output[node.input[1]]
+        return self.ufront_model.less(x = input1, y=input2, name=node.name)
+    
+    def handleCast(self, node, node_to_output):
+        input = node_to_output[node.input[0]]
+        attribute = {x.name: x for x in node.attribute}
+        dtype = attribute["to"].i
+        dtype = onnx_to_ff_dt(dtype)
+        return self.ufront_model.cast(input = input, dtype=dtype, name=node.name)
+    
+    def handleDiv(self, node, node_to_output):
+        input1 = node_to_output[node.input[0]]
+        scalar = node_to_output[node.input[1]]
+        return self.ufront_model.divide(input = input1, scalar=scalar, name=node.name)
+    
+    def handleReduceMean(self, node, node_to_output):
+        input = node_to_output[node.input[0]]
+        attribute = {x.name: x for x in node.attribute}
+        dims = attribute["axes"].ints
+
+        return self.ufront_model.mean(
+            input=input, dims=dims, keepdims=True, name=node.name,
+        )
+    
+    def handleSlice(self, node, node_to_output):
+        input = node_to_output[node.input[0]]
+        starts = node_to_output[node.input[1]][0]
+        ends = node_to_output[node.input[2]][0]
+        axis = node_to_output[node.input[3]][0]
+
+        # return self.ufront_model.divide(input = input1, scalar=scalar, name=node.name)
+        output_shape = input.shape
+        output_shape[axis] = ends - starts
+        # output_shape = np.zeros(shape=input_tensor.shape, dtype=np.float)[slices].shape
+        return self.ufront_model.slice_tensor(input=input, output_shape=list(output_shape), axis=axis, start=starts, end=ends, name=node.name)
+    
+    def handleLayerNormalization(self, node, node_to_output):
+        input_tensor = node_to_output[node.input[0]]
+        weight_tensor = node_to_output[node.input[1]]
+        attribute = {x.name: x for x in node.attribute}
+        eps = attribute["epsilon"].f
+        shape = weight_tensor.type.tensor_type.shape.dim
+        weight_shape = []
+        for i in range(len(shape)):
+            weight_shape.append(shape[i].dim_value)
+        return self.ufront_model.layer_norm(input=input_tensor, normalized_shape=weight_shape, 
+                                  eps=eps, elementwise_affine=True, name=node.name)
+    
+    def process_initializer(self, inputs, initializer):
+        for item in initializer:
+            values = self.unpack_rawdata(item.raw_data, onnx_to_ff_dt(item.data_type), item.dims[0] if len(item.dims) > 0 else 0)
+            inputs[item.name] = values
+        
     def apply(self, input_tensors):
         self._fusion()
         node_to_output = OrderedDict()
@@ -347,7 +453,7 @@ class ONNXModel(object):
         inputs = {}
         for i in range(len(self.model.graph.input)):
             input = self.model.graph.input[i]
-            if input.name.find("input") >=0:
+            if input.name.find("input") >=0 or (i==0 and input.name.find("x") >=0):
                 if type(input_tensors) == list:
                     input_tensor = input_tensors[i]
                     if type(input_tensor) != TensorF32:
@@ -360,8 +466,19 @@ class ONNXModel(object):
                     inputs[input.name] = input_tensor
                 else:
                     assert 0, "Not a valid input type!"
+            else:
+                inputs[input.name] = input
+            print("input ", i, ": ", input.name)
 
+        print("\r\n")
         outputs = OrderedDict()
+        
+        # self.node_value_info = OrderedDict()
+        # # print(self.model.graph.value_info)
+        # for info in self.model.graph.value_info:
+        #     self.node_value_info[info.name] = info.type
+
+        self.process_initializer(inputs, self.model.graph.initializer)
 
         for output in self.model.graph.output:
             outputs[output.name] = output

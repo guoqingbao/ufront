@@ -146,7 +146,11 @@ pub enum OpType {
     HARDSIGMOID,
     SILU,
     MASKEDFILL,
-    REPEAT
+    REPEAT,
+    UNIFORM_LIKE,
+    LESS,
+    CAST,
+    TENSOR,
 }
 
 #[pymethods]
@@ -216,7 +220,10 @@ impl OpType {
             OpType::SILU => "silu",
             OpType::MASKEDFILL => "masked_fill",
             OpType::REPEAT => "repeat",
-
+            OpType::UNIFORM_LIKE => "uniform_like",
+            OpType::LESS => "less",
+            OpType::CAST => "cast",
+            OpType::TENSOR => "tensor",
             // _ => panic!("Not supported operator!"),
         }
     }
@@ -286,7 +293,10 @@ impl OpType {
             "silu" => OpType::SILU,
             "masked_fill" => OpType::MASKEDFILL,
             "repeat" => OpType::REPEAT,
-
+            "uniform_like" => OpType::UNIFORM_LIKE,
+            "less" => OpType::LESS,
+            "cast" => OpType::CAST,
+            "tensor" => OpType::TENSOR,
             _ => {
                 panic!("Not supported type!");
             }
