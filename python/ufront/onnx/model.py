@@ -17,11 +17,16 @@
 # Enflame Tech. (ERA)
 from collections import OrderedDict
 import logging
-import math
+from functools import reduce
 try:
     import onnx
 except:
     print("You need to first install onnx package before using onnx models!")
+
+try:
+    import onnxsim
+except:
+    print("Some of the onnx models requires onnxsim library, please install onnxsim before usage!")
 
 import struct
 from ..ufront import (OpType, ActiMode, AggrMode, PoolType, TensorF32, DataType, ParamSyncType, Initializer)
@@ -42,6 +47,9 @@ def onnx_to_ff_dt(datatype):
         return DataType.Bool
     else:
         assert 0, "Unsupported datatype"
+
+def mullist(lst):
+    return reduce(lambda x, y: x*y, lst)
 
 class ONNXTensor(object):
     def __init__(self, name, dims, flag):
@@ -73,6 +81,18 @@ class ONNXModel(object):
         if type(onnx_model) == str:
             model = onnx.load(onnx_model)
         else:
+            try:
+                    # simply onnx models, for example, merge sub operators in onnx for chunk, remove redundant operators
+                    onnx_model_, check = onnxsim.simplify(onnx_model) 
+                    if check:
+                        onnx_model = onnx_model_
+                        # import onnx 
+                        # onnx.save(onnx_model, "keras_efficientb0.onnx")
+                    else:
+                        print("Simplified ONNX model could not be validated")
+            except:
+                    print("Some of the ONNX models requires onnxsim library!")
+        
             model = onnx_model
 
         self.inputs = {}
@@ -89,18 +109,53 @@ class ONNXModel(object):
     def handleAdd(self, node, node_to_output):
         input0 = node_to_output[node.input[0]]
         input1 = node_to_output[node.input[1]]
-        return self.ufront_model.add(x=input0, y=input1, name=node.name)
-        
+        # return self.ufront_model.add(x=input0, y=input1, name=node.name)
+        if type(input0) == TensorF32 and type(input1) == TensorF32:
+            return self.ufront_model.add(x=input0, y=input1, name=node.name)
+        elif type(input0) == TensorF32:
+            return self.ufront_model.sadd(
+                input=input0, scalar=input1, name=node.name
+            )
+        elif type(input1) == TensorF32:
+            return self.ufront_model.sadd(
+                input=input1, scalar=input0, name=node.name
+            )
+        else:
+            return input0 + input1
+    
     def handleSub(self, node, node_to_output):
         print(node)
         input0 = node_to_output[node.input[0]]
         input1 = node_to_output[node.input[1]]
-        return self.ufront_model.subtract(x=input0, y=input1, name=node.name)
+    
+        if type(input0) == TensorF32 and type(input1) == TensorF32:
+            return self.ufront_model.subtract(x=input0, y=input1, name=node.name)
+        elif type(input0) == TensorF32:
+            return self.ufront_model.ssub(
+                input=input0, scalar=input1, name=node.name
+            )
+        elif type(input1) == TensorF32:
+            return self.ufront_model.ssub(
+                input=input1, scalar=input0, name=node.name
+            )
+        else:
+            return input0 - input1
         
     def handleMul(self, node, node_to_output):
         input0 = node_to_output[node.input[0]]
         input1 = node_to_output[node.input[1]]
-        return self.ufront_model.multiply(x=input0, y=input1, name=node.name)
+        if type(input0) == TensorF32 and type(input1) == TensorF32:
+            return self.ufront_model.multiply(x=input0, y=input1, name=node.name)
+        elif type(input0) == TensorF32:
+            return self.ufront_model.smultiply(
+                input=input0, scalar=input1, name=node.name
+            )
+        elif type(input1) == TensorF32:
+            return self.ufront_model.smultiply(
+                input=input1, scalar=input0, name=node.name
+            )
+        else:
+            return input0 * input1
 
     def handleConcat(self, node, node_to_output):
         inputs = [node_to_output[i] for i in node.input]
@@ -148,8 +203,23 @@ class ONNXModel(object):
                             stride=[1, 1], pad=[0, 0], pool_type=PoolType.POOL_ADAPTIVE, name=node.name)
 
     def handleBatchNormalization(self, node, node_to_output):
+        attribute = {x.name: x for x in node.attribute}
+
+        momentum=0.99,
+        eps=1e-3,
+        training_mode = True
+
+        if "epsilon" in attribute:
+            eps = attribute["epsilon"].f
+
+        if "momentum" in attribute:
+            momentum = attribute["momentum"].f
+
+        if "training_mode" in attribute:
+            training_mode = attribute["training_mode"].i == 1
+
         input = node_to_output[node.input[0]]
-        return self.ufront_model.batch_norm(input=input)
+        return self.ufront_model.batch_norm(input=input, affine=True, eps=eps, momentum=momentum, track_running_stats=training_mode)
 
     def handleConv(self, node, node_to_output):
         input = node_to_output[node.input[0]]
@@ -198,6 +268,11 @@ class ONNXModel(object):
             axis = 1
 
         return self.ufront_model.flat(input=input, start_dim=axis, end_dim=-1, name=node.name)
+    
+    def handleSqueeze(self, node, node_to_output):
+        input = node_to_output[node.input[0]]
+        axes = node_to_output[node.input[1]]
+        return self.ufront_model.flat(input=input, start_dim=axes[0] - 1, end_dim=-1, name=node.name)
 
     # def handleGemm(self, node):
     #     input = self.symbol_table[node.input[0]]
@@ -248,12 +323,12 @@ class ONNXModel(object):
 
     def handleReshape(self, node, node_to_output):
         input = node_to_output[node.input[0]]
-        size = math.prod(input.shape)
+        size = mullist(input.shape)
         shape = node_to_output[node.input[1]]
         for i in range(len(shape)):
             if shape[i] == -1:
                 shape[i] = 1
-                shape[i] = int(size/math.prod(shape))
+                shape[i] = int(size/mullist(shape))
         return self.ufront_model.reshape(input=input, shape=shape if type(shape)==list else list(shape.int64_data), name=node.name)
     
     def handleCast(self, node, node_to_output):
@@ -268,39 +343,49 @@ class ONNXModel(object):
         axes = attribute["axes"].ints
         return input
 
-    def unpack_rawdata(self, raw_data, data_type, dims):
-        if dims > 0:
-                values = []
-                for i in range(dims):
-                    if data_type == DataType.Float:
-                        value = struct.unpack('f', raw_data[i*4:(i+1)*4])
-                    elif data_type == DataType.Int32:
-                        value = struct.unpack('i', raw_data[i*4:(i+1)*4])
-                    elif data_type == DataType.Int64:
-                        value = struct.unpack('l', raw_data[i*8:(i+1)*8])
-                    elif data_type == DataType.Double:
-                        value = struct.unpack('d', raw_data[i*8:(i+1)*8])
-                    elif data_type == DataType.Half:
-                        value = struct.unpack('e', raw_data[i*2:(i+1)*2])
-                    elif data_type == DataType.Bool:
-                        value = struct.unpack('?', raw_data[i*2:(i+1)*2])
-                    values.append(value[0])
-                output = values
+    def unpack_rawdata(self, raw_data, data_type, shape):
+        if len(shape) == 0:
+            length = 1
+            shape = [1]
         else:
-                i = 0
-                if data_type == DataType.Float:
-                    value = struct.unpack('f', raw_data[i*4:(i+1)*4])
-                elif data_type == DataType.Int32:
-                    value = struct.unpack('i', raw_data[i*4:(i+1)*4])
-                elif data_type == DataType.Int64:
-                    value = struct.unpack('l', raw_data[i*8:(i+1)*8])
-                elif data_type == DataType.Double:
-                    value = struct.unpack('d', raw_data[i*8:(i+1)*8])
-                elif data_type == DataType.Half:
-                    value = struct.unpack('e', raw_data[i*2:(i+1)*2])
-                elif data_type == DataType.Bool:
-                    value = struct.unpack('?', raw_data[i*2:(i+1)*2])
-                output = value[0]
+            length = mullist(shape)
+
+        #         i = 0
+        #         if data_type == DataType.Float:
+        #             value = struct.unpack('f', raw_data[i*4:(i+1)*4])
+        #         elif data_type == DataType.Int32:
+        #             value = struct.unpack('i', raw_data[i*4:(i+1)*4])
+        #         elif data_type == DataType.Int64:
+        #             value = struct.unpack('q', raw_data[i*8:(i+1)*8])
+        #         elif data_type == DataType.Double:
+        #             value = struct.unpack('d', raw_data[i*8:(i+1)*8])
+        #         elif data_type == DataType.Half:
+        #             value = struct.unpack('e', raw_data[i*2:(i+1)*2])
+        #         elif data_type == DataType.Bool:
+        #             value = struct.unpack('?', raw_data[i*2:(i+1)*2])
+        #         output = value[0]
+
+        if data_type == DataType.Float:
+            fmt = "<%df" % (length)
+        elif data_type == DataType.Int32:
+            fmt = "<%di" % (length)
+        elif data_type == DataType.Int64:
+            fmt = "<%dq" % (length)
+        elif data_type == DataType.Double:
+            fmt = "<%dd" % (length)
+        elif data_type == DataType.Half:
+            fmt = "<%de" % (length)
+        elif data_type == DataType.Bool:
+            fmt = "<%d?" % (length)
+        import numpy as np
+        output = np.array(struct.unpack(fmt, raw_data))
+
+        if length > 1:
+            output = output.reshape(shape).tolist() # ndarray
+        else:
+            output = output[0] #scalar
+        # else:
+
         return output
     
     def handleConstant(self, node, node_to_output):
@@ -313,39 +398,7 @@ class ONNXModel(object):
             output = self.ufront_model.create_tensor(tensor.dims, DataType.Float, True, "constant_tensor" + str(ONNXModel.const_tensor_idx))
             ONNXModel.const_tensor_idx += 1
         else:
-            output = self.unpack_rawdata(raw_data, data_type, tensor.dims[0] if len(tensor.dims) > 0 else 0)
-            # if len(tensor.dims) > 0:
-            #     values = []
-            #     for i in range(tensor.dims[0]):
-            #         if data_type == DataType.Float:
-            #             value = struct.unpack('f', raw_data[i*4:(i+1)*4])
-            #         elif data_type == DataType.Int32:
-            #             value = struct.unpack('i', raw_data[i*4:(i+1)*4])
-            #         elif data_type == DataType.Int64:
-            #             value = struct.unpack('l', raw_data[i*8:(i+1)*8])
-            #         elif data_type == DataType.Double:
-            #             value = struct.unpack('d', raw_data[i*8:(i+1)*8])
-            #         elif data_type == DataType.Half:
-            #             value = struct.unpack('e', raw_data[i*2:(i+1)*2])
-            #         elif data_type == DataType.Bool:
-            #             value = struct.unpack('?', raw_data[i*2:(i+1)*2])
-            #         values.append(value[0])
-            #     output = values
-            # else:
-            #     i = 0
-            #     if data_type == DataType.Float:
-            #         value = struct.unpack('f', raw_data[i*4:(i+1)*4])
-            #     elif data_type == DataType.Int32:
-            #         value = struct.unpack('i', raw_data[i*4:(i+1)*4])
-            #     elif data_type == DataType.Int64:
-            #         value = struct.unpack('l', raw_data[i*8:(i+1)*8])
-            #     elif data_type == DataType.Double:
-            #         value = struct.unpack('d', raw_data[i*8:(i+1)*8])
-            #     elif data_type == DataType.Half:
-            #         value = struct.unpack('e', raw_data[i*2:(i+1)*2])
-            #     elif data_type == DataType.Bool:
-            #         value = struct.unpack('?', raw_data[i*2:(i+1)*2])
-            #     output = value[0]
+            output = self.unpack_rawdata(raw_data, data_type, tensor.dims)
 
         return output
         
@@ -419,14 +472,11 @@ class ONNXModel(object):
     
     def handleSlice(self, node, node_to_output):
         input = node_to_output[node.input[0]]
-        starts = node_to_output[node.input[1]][0]
-        ends = node_to_output[node.input[2]][0]
-        axis = node_to_output[node.input[3]][0]
-
-        # return self.ufront_model.divide(input = input1, scalar=scalar, name=node.name)
+        starts = node_to_output[node.input[1]]
+        ends = node_to_output[node.input[2]]
+        axis = node_to_output[node.input[3]]
         output_shape = input.shape
         output_shape[axis] = ends - starts
-        # output_shape = np.zeros(shape=input_tensor.shape, dtype=np.float)[slices].shape
         return self.ufront_model.slice_tensor(input=input, output_shape=list(output_shape), axis=axis, start=starts, end=ends, name=node.name)
     
     def handleLayerNormalization(self, node, node_to_output):
@@ -442,8 +492,22 @@ class ONNXModel(object):
                                   eps=eps, elementwise_affine=True, name=node.name)
     
     def process_initializer(self, inputs, initializer):
+        print("Processing initializer...")
         for item in initializer:
-            values = self.unpack_rawdata(item.raw_data, onnx_to_ff_dt(item.data_type), item.dims[0] if len(item.dims) > 0 else 0)
+            print(item.dims, " ", item.data_type, " ", item.name, ": ", len(item.raw_data))
+            datatype = onnx_to_ff_dt(item.data_type)
+            if len(item.raw_data) > 0:
+                values = self.unpack_rawdata(item.raw_data, datatype, item.dims)
+            else:
+                if datatype == DataType.Float:
+                    values = item.float_data
+                elif datatype == DataType.Int32:
+                    values = item.int32_data
+                elif datatype == DataType.Int64:
+                    values = item.int64_data
+                else:
+                    assert 0, "Not supported data type!"
+
             inputs[item.name] = values
         
     def apply(self, input_tensors):
@@ -477,7 +541,9 @@ class ONNXModel(object):
         # # print(self.model.graph.value_info)
         # for info in self.model.graph.value_info:
         #     self.node_value_info[info.name] = info.type
-
+        # for i in range(3):
+        #     item = self.model.graph.initializer[i]
+        #     print(item.dims, " ", item.data_type, " ", item.name, ": ", len(item.raw_data))
         self.process_initializer(inputs, self.model.graph.initializer)
 
         for output in self.model.graph.output:
@@ -576,12 +642,25 @@ class ONNXModelKeras(ONNXModel):
         return self.ufront_model.dense(input = input, out_dim=dim, use_bias=False, name=node.name)
         
     def handleTranspose(self, node, node_to_output):
-        input = node_to_output[node.input[0]]
-        output = input
-        return output
+        input_tensor = node_to_output[node.input[0]]
+        perms = node_to_output[node.input[1]] #TODO
+
+        return self.ufront_model.transpose(
+            input=input_tensor, perms=perms, name=node.name,
+        )
+    
         
     def handleReshape(self, node, node_to_output):
-        return self.handleFlatten(node, node_to_output)
+        input_tensor = node_to_output[node.input[0]]
+        shape = node_to_output[node.input[1]]
+        valid_shape = list(filter(lambda x: x > 0, shape))
+
+        for i in range(len(shape)):
+            if shape[i] == -1:
+                shape[i] = mullist(input_tensor.shape) // mullist(valid_shape)
+                break
+
+        return self.ufront_model.reshape(input=input_tensor, shape=list(shape), name=node.name)
 
     #TODO fix constant
     def _create_initializer_tensor(self, ffconfig, input):

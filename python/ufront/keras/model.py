@@ -36,6 +36,7 @@ class Tensor(object):
   def __init__(self, batch_size,
                key,
                shape,
+               name,
                batch_shape=None,
                dtype=None):
 
@@ -63,6 +64,7 @@ class Tensor(object):
     #print(self.batch_shape)
     self.num_dims = len(self.batch_shape)
     self.key = key
+    self.name = name
 
   @property
   def ffhandle(self):
@@ -110,7 +112,7 @@ class Tensor(object):
       assert self.batch_shape[i] == self._ffhandle.shape[i], "[Tensor]: please check shape dim %d (%d == %d)" %(i, self.batch_shape[i], self._ffhandle.dims[i])
 
   def __verify_ffhandle_dtype(self):
-    assert self.dtype == self._ffhandle.data_type
+    assert self.dtype == self._ffhandle.dtype
 
 class BaseModel(object):
   def __init__(self, inputs, onnx_model, batch_size):
@@ -119,7 +121,7 @@ class BaseModel(object):
     self._input_tensors = []
     for key in inputs:
       input_tensor = inputs[key]
-      t = Tensor(batch_size=batch_size, key=key, shape=input_tensor.shape, dtype=input_tensor.dtype)
+      t = Tensor(batch_size=batch_size, key=key, name=input_tensor.name, shape=input_tensor.shape, dtype=input_tensor.dtype)
       self._input_tensors.append(t)
     
     self._loss = None
@@ -271,7 +273,7 @@ class BaseModel(object):
     self._train(epochs, callbacks, eval=False)
 
   def _create_label_tensor(self):
-    self._label_tensor = Tensor(batch_size=self.batch_size, key="label", shape=(self.batch_size, 1), dtype=self._label_type)
+    self._label_tensor = Tensor(batch_size=self.batch_size, key="label", name="label", shape=(self.batch_size, 1), dtype=self._label_type)
 
   def _create_input_tensors(self):
     idx = 0
@@ -281,10 +283,12 @@ class BaseModel(object):
       
   def _create_flexflow_layers(self):
     self._my_onnx_model = ONNXModelKeras(self._onnx_model, self.ufront_model)
+    # import onnx 
+    # onnx.save_model(self._my_onnx_model.model, f="keras_ResNet50_sim.onnx")
+    
     input_dict = {}
     for input_tensor in self._input_tensors:
-      key = "input_" + str(input_tensor.key)
-      input_dict[key] = input_tensor.ffhandle
+      input_dict[input_tensor.name] = input_tensor.ffhandle
     self._output_tensor = self._my_onnx_model.apply(input_dict)
       
   def _verify_tensors(self, input_arrays, label_array):
@@ -392,10 +396,11 @@ class UFrontKeras(tf_keras_Model):
   def __init__(self, inputs, outputs, 
             batch_size, verbose=False, name=None):
     super(UFrontKeras, self).__init__(inputs=inputs, outputs=outputs, name=name)
-    
     if (isinstance(inputs, dict) == True):
-      onnx_model = tf2onnx.convert.from_keras(self)
+      onnx_model = tf2onnx.convert.from_keras(self, opset=17)
       self._base_model = BaseModel(inputs=inputs, onnx_model=onnx_model[0], batch_size=batch_size)
+    else:
+      assert 0, "Inputs must be in dict format, e.g., {1: input_tensor1}"
 
   def dump_ir(self):
     return self._base_model.ufront_model.dump_ir()

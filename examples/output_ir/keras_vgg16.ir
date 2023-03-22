@@ -1,0 +1,41 @@
+func.func @forward(%input1: tensor<32x3x224x224xf32>) -> tensor<32x1000xf32>  { 
+	%1="ufront.conv2d"(%input1){groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<32x3x224x224xf32>) -> tensor<32x64x224x224xf32>
+	%2="ufront.relu"(%1):(tensor<32x64x224x224xf32>) -> tensor<32x64x224x224xf32>
+	%3="ufront.conv2d"(%2){groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<32x64x224x224xf32>) -> tensor<32x64x224x224xf32>
+	%4="ufront.relu"(%3):(tensor<32x64x224x224xf32>) -> tensor<32x64x224x224xf32>
+	%5="ufront.pool2d"(%4){kernel=[2, 2], pad=[0, 0], pool_type="POOL_MAX", stride=[2, 2]}:(tensor<32x64x224x224xf32>) -> tensor<32x64x112x112xf32>
+	%6="ufront.conv2d"(%5){groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<32x64x112x112xf32>) -> tensor<32x128x112x112xf32>
+	%7="ufront.relu"(%6):(tensor<32x128x112x112xf32>) -> tensor<32x128x112x112xf32>
+	%8="ufront.conv2d"(%7){groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<32x128x112x112xf32>) -> tensor<32x128x112x112xf32>
+	%9="ufront.relu"(%8):(tensor<32x128x112x112xf32>) -> tensor<32x128x112x112xf32>
+	%10="ufront.pool2d"(%9){kernel=[2, 2], pad=[0, 0], pool_type="POOL_MAX", stride=[2, 2]}:(tensor<32x128x112x112xf32>) -> tensor<32x128x56x56xf32>
+	%11="ufront.conv2d"(%10){groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<32x128x56x56xf32>) -> tensor<32x256x56x56xf32>
+	%12="ufront.relu"(%11):(tensor<32x256x56x56xf32>) -> tensor<32x256x56x56xf32>
+	%13="ufront.conv2d"(%12){groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<32x256x56x56xf32>) -> tensor<32x256x56x56xf32>
+	%14="ufront.relu"(%13):(tensor<32x256x56x56xf32>) -> tensor<32x256x56x56xf32>
+	%15="ufront.conv2d"(%14){groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<32x256x56x56xf32>) -> tensor<32x256x56x56xf32>
+	%16="ufront.relu"(%15):(tensor<32x256x56x56xf32>) -> tensor<32x256x56x56xf32>
+	%17="ufront.pool2d"(%16){kernel=[2, 2], pad=[0, 0], pool_type="POOL_MAX", stride=[2, 2]}:(tensor<32x256x56x56xf32>) -> tensor<32x256x28x28xf32>
+	%18="ufront.conv2d"(%17){groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<32x256x28x28xf32>) -> tensor<32x512x28x28xf32>
+	%19="ufront.relu"(%18):(tensor<32x512x28x28xf32>) -> tensor<32x512x28x28xf32>
+	%20="ufront.conv2d"(%19){groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<32x512x28x28xf32>) -> tensor<32x512x28x28xf32>
+	%21="ufront.relu"(%20):(tensor<32x512x28x28xf32>) -> tensor<32x512x28x28xf32>
+	%22="ufront.conv2d"(%21){groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<32x512x28x28xf32>) -> tensor<32x512x28x28xf32>
+	%23="ufront.relu"(%22):(tensor<32x512x28x28xf32>) -> tensor<32x512x28x28xf32>
+	%24="ufront.pool2d"(%23){kernel=[2, 2], pad=[0, 0], pool_type="POOL_MAX", stride=[2, 2]}:(tensor<32x512x28x28xf32>) -> tensor<32x512x14x14xf32>
+	%25="ufront.conv2d"(%24){groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<32x512x14x14xf32>) -> tensor<32x512x14x14xf32>
+	%26="ufront.relu"(%25):(tensor<32x512x14x14xf32>) -> tensor<32x512x14x14xf32>
+	%27="ufront.conv2d"(%26){groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<32x512x14x14xf32>) -> tensor<32x512x14x14xf32>
+	%28="ufront.relu"(%27):(tensor<32x512x14x14xf32>) -> tensor<32x512x14x14xf32>
+	%29="ufront.conv2d"(%28){groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<32x512x14x14xf32>) -> tensor<32x512x14x14xf32>
+	%30="ufront.relu"(%29):(tensor<32x512x14x14xf32>) -> tensor<32x512x14x14xf32>
+	%31="ufront.pool2d"(%30){kernel=[2, 2], pad=[0, 0], pool_type="POOL_MAX", stride=[2, 2]}:(tensor<32x512x14x14xf32>) -> tensor<32x512x7x7xf32>
+	%32="ufront.flat"(%31){end_dim=-1, start_dim=1}:(tensor<32x512x7x7xf32>) -> tensor<32x25088xf32>
+	%33="ufront.linear"(%32):(tensor<32x25088xf32>) -> tensor<32x4096xf32>
+	%34="ufront.relu"(%33):(tensor<32x4096xf32>) -> tensor<32x4096xf32>
+	%35="ufront.linear"(%34):(tensor<32x4096xf32>) -> tensor<32x4096xf32>
+	%36="ufront.relu"(%35):(tensor<32x4096xf32>) -> tensor<32x4096xf32>
+	%37="ufront.linear"(%36):(tensor<32x4096xf32>) -> tensor<32x1000xf32>
+	%38="ufront.softmax"(%37):(tensor<32x1000xf32>) -> tensor<32x1000xf32>
+	return %38: tensor<32x1000xf32>
+}

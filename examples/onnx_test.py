@@ -34,9 +34,9 @@ if __name__ == "__main__":
     torch.onnx.export(model=torch_model, args=(torch.from_numpy(input)), f=f, export_params=False, training=TrainingMode.TRAINING, opset_version=17)
     onnx_model = onnx.load_model_from_string(f.getvalue())
 
-    onnx_model, check = onnxsim.simplify(onnx_model) # simply onnx models, for example, merge sub operators in onnx for chunk, remove redundant operators
+    # onnx_model, check = onnxsim.simplify(onnx_model) # simply onnx models, for example, merge sub operators in onnx for chunk, remove redundant operators
     # onnx.save_model(onnx_model, f=model_name+"_sim.onnx")
-    assert check, "Simplified ONNX model could not be validated"
+    # assert check, "Simplified ONNX model could not be validated"
 
     model = UFrontONNX(onnx_model=onnx_model, batch_size=batch_size)
 

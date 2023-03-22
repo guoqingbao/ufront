@@ -26,15 +26,17 @@ if __name__ == "__main__":
     # print(net)
     # net = squeezenet1_1(pretrained=False)
     # net = regnet_x_32gf(pretrained=False)
+    # net = resnet18(pretrained=False)
+
     # net = resnet50(pretrained=False)
     # net = shufflenet_v2_x1_5(pretrained=False)
     # net = mobilenet_v3_small(pretrained=False)
     # net = densenet121(pretrained=False)
-    net = convnext_small(pretrained=False)
+    # net = convnext_small(pretrained=False)
     # net = efficientnet_v2_s(pretrained=False)
     # net = inception_v3(pretrained=False) #net.train(False) important!
 
-    # net = models.vision_transformer.vit_b_16(weights=False)
+    net = models.vision_transformer.vit_b_16(weights=False)
     # net = models.swin_transformer.swin_t(weights=None)
     net.train(False) #False for inception_v3
     # b = net(input)
