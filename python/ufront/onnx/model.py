@@ -16,7 +16,9 @@
 # Revised for Unified Computing Frontend (UFront)
 # Enflame Tech. (ERA)
 from collections import OrderedDict
+import io
 import logging
+import numpy as np
 from functools import reduce
 try:
     import onnx
@@ -31,25 +33,7 @@ except:
 import struct
 from ..ufront import (OpType, ActiMode, AggrMode, PoolType, TensorF32, DataType, ParamSyncType, Initializer)
 from ..ufront import Model, PyOperator, TensorF32, Optimizer, LossType, MetricsType #Rust frontend
-
-def onnx_to_ff_dt(datatype):
-    if datatype == onnx.TensorProto.FLOAT:
-        return DataType.Float
-    elif datatype == onnx.TensorProto.DOUBLE:
-        return DataType.Double
-    elif datatype == onnx.TensorProto.INT32:
-        return DataType.Int32
-    elif datatype == onnx.TensorProto.INT64:
-        return DataType.Int64
-    elif datatype == onnx.TensorProto.FLOAT16:
-        return DataType.Half
-    elif datatype == onnx.TensorProto.BOOL:
-        return DataType.Bool
-    else:
-        assert 0, "Unsupported datatype"
-
-def mullist(lst):
-    return reduce(lambda x, y: x*y, lst)
+from ..utils import list_product, onnx_to_ufront_dtype, numpy_to_ufront_dtype, ufront_to_numpy_dtype
 
 class ONNXTensor(object):
     def __init__(self, name, dims, flag):
@@ -113,13 +97,25 @@ class ONNXModel(object):
         if type(input0) == TensorF32 and type(input1) == TensorF32:
             return self.ufront_model.add(x=input0, y=input1, name=node.name)
         elif type(input0) == TensorF32:
-            return self.ufront_model.sadd(
-                input=input0, scalar=input1, name=node.name
-            )
+            if type(input1) in [float, int, np.float32, np.float64, np.int32, np.int64, np.half]:
+                return self.ufront_model.sadd(
+                    input=input0, scalar=input1, name=node.name
+                )
+            else: 
+                assert type(input1) == np.ndarray, "The given input is not an ndarray!"
+                return self.ufront_model.sadd(
+                    input=input0, operand=input1.tolist(), name=node.name
+                )
         elif type(input1) == TensorF32:
-            return self.ufront_model.sadd(
-                input=input1, scalar=input0, name=node.name
-            )
+            if type(input0) in [float, int, np.float32, np.float64, np.int32, np.int64, np.half]:
+                return self.ufront_model.sadd(
+                    input=input1, scalar=input0, name=node.name
+                )
+            else:
+                assert type(input0) == np.ndarray, "The given input is not an ndarray!"
+                return self.ufront_model.sadd(
+                    input=input1, operand=input0.tolist(), name=node.name
+                )
         else:
             return input0 + input1
     
@@ -131,13 +127,18 @@ class ONNXModel(object):
         if type(input0) == TensorF32 and type(input1) == TensorF32:
             return self.ufront_model.subtract(x=input0, y=input1, name=node.name)
         elif type(input0) == TensorF32:
-            return self.ufront_model.ssub(
-                input=input0, scalar=input1, name=node.name
-            )
+            if type(input1) in [float, int, np.float32, np.float64, np.int32, np.int64, np.half]:
+                return self.ufront_model.ssub(input=input0, scalar=input1, name=node.name)
+            else:
+                assert type(input1) == np.ndarray, "The given input is not an ndarray!"
+                return self.ufront_model.ssub(input=input0, operand=input1.tolist(), name=node.name)
+            
         elif type(input1) == TensorF32:
-            return self.ufront_model.ssub(
-                input=input1, scalar=input0, name=node.name
-            )
+            if type(input0) in [float, int, np.float32, np.float64, np.int32, np.int64, np.half]:
+                return self.ufront_model.ssub(input=input1, scalar=input0, name=node.name)
+            else:
+                assert type(input0) == np.ndarray, "The given input is not an ndarray!"
+                return self.ufront_model.ssub(input=input1, operand=input0.tolist(), name=node.name)   
         else:
             return input0 - input1
         
@@ -147,13 +148,25 @@ class ONNXModel(object):
         if type(input0) == TensorF32 and type(input1) == TensorF32:
             return self.ufront_model.multiply(x=input0, y=input1, name=node.name)
         elif type(input0) == TensorF32:
-            return self.ufront_model.smultiply(
-                input=input0, scalar=input1, name=node.name
-            )
+            if type(input1) in [float, int, np.float32, np.float64, np.int32, np.int64, np.half]:
+                return self.ufront_model.smultiply(
+                    input=input0, scalar=input1, name=node.name
+                )
+            else:
+                assert type(input1) == np.ndarray, "The given input is not an ndarray!"
+                return self.ufront_model.smultiply(
+                    input=input0, operand=input1.tolist(), name=node.name
+                )
         elif type(input1) == TensorF32:
-            return self.ufront_model.smultiply(
-                input=input1, scalar=input0, name=node.name
-            )
+            if type(input0) in [float, int, np.float32, np.float64, np.int32, np.int64, np.half]:
+                return self.ufront_model.smultiply(
+                    input=input1, scalar=input0, name=node.name
+                )
+            else:
+                assert type(input0) == np.ndarray, "The given input is not an ndarray!"
+                return self.ufront_model.smultiply(
+                    input=input1, operand=input0.tolist(), name=node.name
+                )
         else:
             return input0 * input1
 
@@ -323,13 +336,13 @@ class ONNXModel(object):
 
     def handleReshape(self, node, node_to_output):
         input = node_to_output[node.input[0]]
-        size = mullist(input.shape)
+        size = list_product(input.shape)
         shape = node_to_output[node.input[1]]
         for i in range(len(shape)):
             if shape[i] == -1:
                 shape[i] = 1
-                shape[i] = int(size/mullist(shape))
-        return self.ufront_model.reshape(input=input, shape=shape if type(shape)==list else list(shape.int64_data), name=node.name)
+                shape[i] = int(size/list_product(shape))
+        return self.ufront_model.reshape(input=input, shape=list(shape), name=node.name)
     
     def handleCast(self, node, node_to_output):
         # TODO: add cast
@@ -344,26 +357,10 @@ class ONNXModel(object):
         return input
 
     def unpack_rawdata(self, raw_data, data_type, shape):
-        if len(shape) == 0:
-            length = 1
-            shape = [1]
+        if len(shape) > 0:
+            length = list_product(shape)
         else:
-            length = mullist(shape)
-
-        #         i = 0
-        #         if data_type == DataType.Float:
-        #             value = struct.unpack('f', raw_data[i*4:(i+1)*4])
-        #         elif data_type == DataType.Int32:
-        #             value = struct.unpack('i', raw_data[i*4:(i+1)*4])
-        #         elif data_type == DataType.Int64:
-        #             value = struct.unpack('q', raw_data[i*8:(i+1)*8])
-        #         elif data_type == DataType.Double:
-        #             value = struct.unpack('d', raw_data[i*8:(i+1)*8])
-        #         elif data_type == DataType.Half:
-        #             value = struct.unpack('e', raw_data[i*2:(i+1)*2])
-        #         elif data_type == DataType.Bool:
-        #             value = struct.unpack('?', raw_data[i*2:(i+1)*2])
-        #         output = value[0]
+            length = 1
 
         if data_type == DataType.Float:
             fmt = "<%df" % (length)
@@ -377,21 +374,20 @@ class ONNXModel(object):
             fmt = "<%de" % (length)
         elif data_type == DataType.Bool:
             fmt = "<%d?" % (length)
-        import numpy as np
+        
         output = np.array(struct.unpack(fmt, raw_data))
 
-        if length > 1:
-            output = output.reshape(shape).tolist() # ndarray
-        else:
+        if len(shape) == 0 or (len(shape) == 1 and shape[0]==1):
             output = output[0] #scalar
-        # else:
+        else:
+            output = output.reshape(shape) # ndarray
 
         return output
     
     def handleConstant(self, node, node_to_output):
         attribute = {x.name: x for x in node.attribute}
         tensor = attribute["value"].t
-        data_type = onnx_to_ff_dt(tensor.data_type)
+        data_type = onnx_to_ufront_dtype(tensor.data_type)
         raw_data = tensor.raw_data
         
         if len(tensor.dims) > 1: #TODO set raw_data array to constant tensor
@@ -440,26 +436,54 @@ class ONNXModel(object):
         input = node_to_output[node.input[0]]
         return self.ufront_model.sigmoid(input = input, name=node.name)
     
+    def addTensor(self, np_tensor, requires_grad, name):
+        output = io.BytesIO()
+        np.savez_compressed(output, x=np_tensor)
+        raw_bytes = str(output.getvalue().hex())
+        
+        operator = self.ufront_model.tensor(np_tensor=np_tensor.astype(np.float32), dtype=numpy_to_ufront_dtype(np_tensor.dtype), requires_grad=requires_grad, initializer=raw_bytes, name=name)
+        return operator
+    
     def handleRandomUniformLike(self, node, node_to_output):
-        input = node_to_output[node.input[0]]
-        return self.ufront_model.uniform_like(input = input, name=node.name)
+        np_tensor = node_to_output[node.input[0]]
+        assert type(np_tensor) == np.ndarray, "The given input is not an ndarray!"
+        operator = self.addTensor(np_tensor, False, node.input[0])
+        self.operators.append(operator)
+
+        return self.ufront_model.uniform_like(input = operator.get_output(0), dtype=numpy_to_ufront_dtype(np_tensor.dtype), name=node.name)
 
     def handleLess(self, node, node_to_output):
         input1 = node_to_output[node.input[0]]
         input2 = node_to_output[node.input[1]]
+        if type(input2) != TensorF32:
+            assert type(input2) == np.ndarray, "The given input is not an ndarray!"
+            operator = self.addTensor(input2, False, node.input[1])
+            self.operators.append(operator)
+            input2 = operator.get_output(0)
+        elif type(input1) != TensorF32:
+            assert type(input1) == np.ndarray, "The given input is not an ndarray!"
+            operator = self.addTensor(input1, False, node.input[0])
+            self.operators.append(operator)
+            input1 = operator.get_output(0)
+
         return self.ufront_model.less(x = input1, y=input2, name=node.name)
     
     def handleCast(self, node, node_to_output):
         input = node_to_output[node.input[0]]
         attribute = {x.name: x for x in node.attribute}
         dtype = attribute["to"].i
-        dtype = onnx_to_ff_dt(dtype)
+        dtype = onnx_to_ufront_dtype(dtype)
         return self.ufront_model.cast(input = input, dtype=dtype, name=node.name)
     
     def handleDiv(self, node, node_to_output):
         input1 = node_to_output[node.input[0]]
         scalar = node_to_output[node.input[1]]
-        return self.ufront_model.divide(input = input1, scalar=scalar, name=node.name)
+        if type(scalar) in [float, int, np.float32, np.float64, np.int32, np.int64, np.half]:
+            return self.ufront_model.divide(input = input1, scalar=scalar, name=node.name)
+        else:
+            assert type(scalar) == np.ndarray, "The given input is not an ndarray!"
+            return self.ufront_model.divide(input = input1, operand=scalar.tolist(), name=node.name)
+
     
     def handleReduceMean(self, node, node_to_output):
         input = node_to_output[node.input[0]]
@@ -495,16 +519,16 @@ class ONNXModel(object):
         print("Processing initializer...")
         for item in initializer:
             print(item.dims, " ", item.data_type, " ", item.name, ": ", len(item.raw_data))
-            datatype = onnx_to_ff_dt(item.data_type)
+            datatype = onnx_to_ufront_dtype(item.data_type)
             if len(item.raw_data) > 0:
                 values = self.unpack_rawdata(item.raw_data, datatype, item.dims)
             else:
                 if datatype == DataType.Float:
-                    values = item.float_data
+                    values = np.array(item.float_data, dtype=np.float32)
                 elif datatype == DataType.Int32:
-                    values = item.int32_data
+                    values = np.array(item.int32_data, dtype=np.int32)
                 elif datatype == DataType.Int64:
-                    values = item.int64_data
+                    values = np.array(item.int64_data, dtype=np.int64)
                 else:
                     assert 0, "Not supported data type!"
 
@@ -657,7 +681,7 @@ class ONNXModelKeras(ONNXModel):
 
         for i in range(len(shape)):
             if shape[i] == -1:
-                shape[i] = mullist(input_tensor.shape) // mullist(valid_shape)
+                shape[i] = list_product(input_tensor.shape) // list_product(valid_shape)
                 break
 
         return self.ufront_model.reshape(input=input_tensor, shape=list(shape), name=node.name)

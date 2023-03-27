@@ -5,7 +5,7 @@ from tensorflow.keras.datasets import cifar10
 from ufront.keras.model import UFrontKeras
 from keras_def import SequentialCNN, ConcatenatedCNN, NestedCNN
 
-from tensorflow.keras.applications import ResNet50, ResNet50V2, EfficientNetB0, Xception, MobileNetV2, DenseNet121, InceptionV3, VGG16
+from tensorflow.keras.applications import ResNet50, ResNet50V2, EfficientNetB0, Xception, MobileNetV2, MobileNetV3Small, DenseNet121, InceptionV3, VGG16
 from tensorflow.keras import layers
 from tensorflow.keras.models import Model
 
@@ -23,15 +23,17 @@ if __name__ == "__main__":
     input = layers.Input(shape=(3, 224, 224))
 
     # base_model = ResNet50(weights=None, include_top=True, input_tensor=input)
-    base_model = ResNet50V2(weights=None, include_top=True, input_tensor=input)
+    # base_model = ResNet50V2(weights=None, include_top=True, input_tensor=input)
 
     # base_model = EfficientNetB0(weights=None, include_top=True, input_tensor=input) 
 
-    # base_model = Xception(weights=None, include_top=True, input_tensor=input)
+    base_model = Xception(weights=None, include_top=True, input_tensor=input)
     # base_model = MobileNetV2(weights=None, include_top=True, input_tensor=input)
+    # base_model = MobileNetV3Small(weights=None, include_top=True, input_tensor=input)
+
     # base_model = DenseNet121(weights=None, include_top=True, input_tensor=input)
     # base_model = InceptionV3(weights=None, include_top=True, input_tensor=input)
-    # base_model = VGG16(weights=None, include_top=True, input_tensor=input)
+    # base_model = VGG17(weights=None, include_top=True, input_tensor=input)
 
 
     model_name = base_model.name

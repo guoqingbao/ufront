@@ -16,14 +16,14 @@ if __name__ == "__main__":
 
     # torch_model = ComplexCNN()
     # torch_model = resnet18(pretrained=False)
-    # torch_model = resnet50(pretrained=False)
+    torch_model = resnet50(pretrained=False)
     # torch_model = squeezenet1_1(pretrained=False)
     # torch_model = regnet_x_32gf(pretrained=False)
     # torch_model = mobilenet_v3_small(pretrained=False)
     # torch_model = densenet121(pretrained=False)
-    # torch_model = models.vision_transformer.vit_b_16(weights=False)
+    # torch_model = models.vision_transformer.vit_b_16(weights=False) #TODO
     # torch_model = inception_v3(pretrained=False) #training=TrainingMode.EVAL important!
-    torch_model = shufflenet_v2_x1_5(pretrained=False) 
+    # torch_model = shufflenet_v2_x1_5(pretrained=False) 
     # torch_model = efficientnet_v2_s(pretrained=False) 
 
     # torch_model = convnext_small(pretrained=False) #not supported at the moment 
@@ -31,7 +31,8 @@ if __name__ == "__main__":
 
     f = io.BytesIO()
     model_name = torch_model.__class__.__name__ #"ComplexCNN"
-    torch.onnx.export(model=torch_model, args=(torch.from_numpy(input)), f=f, export_params=False, training=TrainingMode.TRAINING, opset_version=17)
+    torch.onnx.export(model=torch_model, args=(torch.from_numpy(input)), f=f, export_params=False, 
+                      training=TrainingMode.EVAL if model_name=="Inception3" else TrainingMode.TRAINING, opset_version=17)
     onnx_model = onnx.load_model_from_string(f.getvalue())
 
     # onnx_model, check = onnxsim.simplify(onnx_model) # simply onnx models, for example, merge sub operators in onnx for chunk, remove redundant operators

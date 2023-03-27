@@ -26,6 +26,8 @@ import io
 
 from ..ufront import (OpType, ActiMode, AggrMode, PoolType, TensorF32, DataType, ParamSyncType, Initializer)
 from ..ufront import Model, PyOperator, TensorF32, Optimizer, LossType, MetricsType #Rust frontend
+from ..utils import list_product, onnx_to_ufront_dtype, numpy_to_ufront_dtype, ufront_to_numpy_dtype
+
 try:
     import torch
     from torch.fx.immutable_collections import immutable_dict
@@ -188,40 +190,6 @@ class Node():
             return DataType.Bool
         else:
             assert 0, f"Unknown dtype: {torch_dtype}"
-
-    @staticmethod
-    def ff_to_numpy_dtype(ff_dtype):
-        if ff_dtype ==DataType.Float:
-            return np.float32
-        elif ff_dtype ==DataType.Double:
-            return np.float64
-        elif ff_dtype == DataType.Int32:
-            return np.int32
-        elif ff_dtype == DataType.Int64:
-            return np.int64
-        elif ff_dtype == DataType.Half:
-            return np.float16
-        elif ff_dtype == DataType.Bool:
-            return np.bool
-        else:
-            assert 0, f"Unknown dtype: {ff_dtype}"
-
-    @staticmethod
-    def numpy_to_ff_dtype(numpy_dtype):
-        if numpy_dtype in (np.float32, np.float, "float32", "float"):
-            return DataType.Float
-        elif numpy_dtype in (np.float64, np.double, "float64", "double"):
-            return DataType.Double
-        elif numpy_dtype in (np.int32, np.int, "int32", "int"):
-            return DataType.Int32
-        elif numpy_dtype in (np.int64, np.long, "int64", "long"):
-            return DataType.Int64
-        elif numpy_dtype in (np.float16, np.half, "float16", "half"):
-            return DataType.Half
-        elif numpy_dtype in (np.bool, "bool", "BOOL", "boolean", "Boolean"):
-            return DataType.Bool
-        else:
-            assert 0, f"Unknown dtype: {numpy_dtype}"
 
 
 class ModuleNode(Node):
@@ -1357,7 +1325,7 @@ class FunctionNode(Node):
             np1 = tensor1.get_tensor(ffmodel, ParamSyncType.PS)
             np1 = np.broadcast_to(np1, bc_shape)
             np1 = np.ascontiguousarray(np1)
-            dtype = Node.numpy_to_ff_dtype(np1.dtype)
+            dtype = numpy_to_ufront_dtype(np1.dtype)
             x = ffmodel.create_tensor(bc_shape, dtype, True, "broadcast_tensor_x_" + str(FunctionNode.tensor_idx))
             FunctionNode.tensor_idx += 1
             x.set_ndarray(np1)
@@ -1365,7 +1333,7 @@ class FunctionNode(Node):
             np2 = tensor2.get_tensor(ffmodel, ParamSyncType.PS)
             np2 = np.broadcast_to(np2, bc_shape)
             np2 = np.ascontiguousarray(np2)
-            dtype = Node.numpy_to_ff_dtype(np2.dtype)
+            dtype = numpy_to_ufront_dtype(np2.dtype)
             y = ffmodel.create_tensor(bc_shape, dtype, True, "broadcast_tensor_y_" + str(FunctionNode.tensor_idx))
             FunctionNode.tensor_idx += 1
             y.set_ndarray(np2)
@@ -1671,7 +1639,7 @@ class GetItemNode(FunctionNode):
             slices = self.innodes[1]
             if hasattr(slices, "name"):
                 slice_tensor = node_to_output[slices.name]
-                np_slices = slice_tensor.ndarray.astype(Node.ff_to_numpy_dtype(slice_tensor.dtype))
+                np_slices = slice_tensor.ndarray.astype(ufront_to_numpy_dtype(slice_tensor.dtype))
                 output_shape = np.zeros(shape=input_tensor.shape, dtype=np.float32)[np_slices].shape
             else:
                 assert type(slices) is tuple, f"Expected tuple slices but got {type(slices)}"
@@ -2725,7 +2693,7 @@ class AttributeNode(Node):
         # TODO support tensor dtypes of Int32, Int64
         # ff_dtype = DataType.Float
         np_tensor = np_tensor.astype(np.float32)
-        raw_array = np_tensor.astype(Node.ff_to_numpy_dtype(ff_dtype))
+        raw_array = np_tensor.astype(ufront_to_numpy_dtype(ff_dtype))
 
         output = io.BytesIO()
         np.savez_compressed(output, x=raw_array)
@@ -2962,7 +2930,7 @@ class UFrontTorch():
         assert(len(kwargs["args"]) > 0)
         for key, v in kwargs["args"].items():
             if type(v) == TensorF32:
-                dtype = Node.ff_to_numpy_dtype(v.dtype)
+                dtype = ufront_to_numpy_dtype(v.dtype)
                 kwargs["args"][key] = torch.from_numpy(v.ndarray.astype(dtype))
 
         ret = self.external_functions[kwargs['func']](**kwargs["args"])
@@ -2978,7 +2946,7 @@ class UFrontTorch():
         args = []
         for key, v in kwargs["args"].items():
             if type(v) == TensorF32:
-                dtype = Node.ff_to_numpy_dtype(v.dtype)
+                dtype = ufront_to_numpy_dtype(v.dtype)
                 kwargs["args"][key] = torch.from_numpy(v.ndarray.astype(dtype))
             args.append(kwargs["args"][key])
         
