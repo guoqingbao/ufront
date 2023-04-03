@@ -21,3 +21,5 @@ num_enum = "0.5.1"
 dict_derive = "0.4.0"
 itertools = "0.10.5"
 indexmap = "1.9.2"
+log = { version = "0.4"}
+env_logger = "0.10.0"

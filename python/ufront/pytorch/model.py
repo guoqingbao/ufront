@@ -1643,8 +1643,11 @@ class GetItemNode(FunctionNode):
                 output_shape = np.zeros(shape=input_tensor.shape, dtype=np.float32)[np_slices].shape
             else:
                 assert type(slices) is tuple, f"Expected tuple slices but got {type(slices)}"
-                slice_tensor = list(slices)
-                output_shape = np.zeros(shape=input_tensor.shape, dtype=np.float32)[slice_tensor].shape
+                # slice_tensor = list(slices)
+                start, step, stop = slices[0].start,  slices[0].step,  slices[0].stop
+                slice_tensor = "[[{}, {}, {}], {}]".format(start if start!= None else "\"None\"", step if step!= None else "\"None\"", stop if stop!= None else "\"None\"", slices[1])
+                
+                output_shape = np.zeros(shape=input_tensor.shape, dtype=np.float32)[slices].shape
             
             # print(np.max(slices), " ", np.min(slices), " : ", list(slices))
             if type(slice_tensor) == TensorF32:
@@ -2926,7 +2929,7 @@ class UFrontTorch():
         # the HuggingFace `symbolic_trace()`'s default of `(128, 128)` to
         # decouple the two implementations
     def normal_callback(self, **kwargs):
-        print(kwargs)
+        # print(kwargs)
         assert(len(kwargs["args"]) > 0)
         for key, v in kwargs["args"].items():
             if type(v) == TensorF32:
@@ -2935,13 +2938,13 @@ class UFrontTorch():
 
         ret = self.external_functions[kwargs['func']](**kwargs["args"])
         if type(ret) == torch.Tensor:
-            print("Results after calling the external function: ", ret.shape)
+            # print("Results after calling the external function: ", ret.shape)
             return TensorF32(ret.numpy(), kwargs['func']) # convert to Rust f32 tensor
         else:
             return ret
         
     def torch_callback(self, **kwargs):
-        print(kwargs)
+        # print(kwargs)
         assert(len(kwargs["args"]) > 0)
         args = []
         for key, v in kwargs["args"].items():
@@ -2952,7 +2955,7 @@ class UFrontTorch():
         
         ret = self.external_functions[kwargs['func']](*args)
         if type(ret) == torch.Tensor:
-            print("Results after calling the external function: ", ret.shape)
+            # print("Results after calling the external function: ", ret.shape)
             nparray = ret.numpy()
             # if kwargs['func'] == "swapaxes":
             nparray = np.zeros(nparray.shape, dtype=np.float32)
@@ -2961,7 +2964,7 @@ class UFrontTorch():
             return ret
 
     def math_callback(self, **kwargs):
-        print(kwargs)
+        # print(kwargs)
         assert(len(kwargs["args"]) > 0)
         args = []
         for key, v in kwargs["args"].items():
@@ -2996,7 +2999,7 @@ class UFrontTorch():
             # print(name)
         graph = []
         for fx_node in traced.graph.nodes:
-            print(fx_node.op, " : ", fx_node.name)
+            # print(fx_node.op, " : ", fx_node.name)
             if fx_node.op == "call_module":
                 module_name = fx_node.target
                 module = name_to_module[module_name]
@@ -3010,10 +3013,10 @@ class UFrontTorch():
                 if node is None:
                     # if fx_node.name.find("einsum") >=0 or fx_node.name.find("swapaxes") >=0: 
                     if hasattr(fx_node.target, "__module__") and (fx_node.target.__module__ == "torch.functional" or fx_node.target.__module__=="torch"):
-                        print(fx_node.target.__module__)
+                        # print(fx_node.target.__module__)
                         node = TorchCallNode(fx_node, self.torch_callback)
                     elif hasattr(fx_node.target, "__module__") and fx_node.target.__module__ == "math":
-                        print(fx_node.target.__module__)
+                        # print(fx_node.target.__module__)
                         node = MathCallNode(fx_node, self.math_callback)
                     elif fx_node.target == 'masked_fill':
                         node = MaskedFillNode(fx_node)
@@ -3166,8 +3169,8 @@ class UFrontTorch():
                 node.to_ff(self.ufront_model, node_to_output, output_tensors)
                 node_output = None
             else:
-                if type(node) in [GetItemNode, GetAttrNode, AttributeNode, EqNode, AssertNode, ScalarAddNode, ScalarFloorDivNode, ScalarMulNode, ScalarSubNode, ScalarTrueDivNode]:
-                    print(type(node), ": ", node.name)
+                # if type(node) in [GetItemNode, GetAttrNode, AttributeNode, EqNode, AssertNode, ScalarAddNode, ScalarFloorDivNode, ScalarMulNode, ScalarSubNode, ScalarTrueDivNode]:
+                #     print(type(node), ": ", node.name)
 
                 operator = node.to_ff(self.ufront_model, node_to_output)
                 if type(operator) == PyOperator:
@@ -3217,7 +3220,7 @@ class UFrontTorch():
             else:
                 # node_output =  node_class.string_to_ff(string, umodel, node_to_output)
                 if node_class == GetItemNode:
-                    print("GetItemNode")
+                    # print("GetItemNode")
                     node_output = node_class.string_to_ff(string, ufront_model, node_to_output)
                 else:
                     operator = node_class.string_to_ff(string, ufront_model, node_to_output)

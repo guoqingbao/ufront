@@ -20,7 +20,7 @@ use crate::tensor::TensorF32;
 use crate::types::DataType;
 use crate::types::OpType;
 use indexmap::IndexMap;
-
+use log::{info, warn, error};
 use crate::optimizer::Optimizer;
 
 use std::collections::HashMap;
@@ -112,7 +112,8 @@ pub struct Model {
 impl Model {
     #[new]
     pub fn new() -> Model {
-        println!("Model::new");
+        env_logger::init();
+        info!("Model::new");
         let params = HashMap::from([
             ("type".to_string(), "sgd".to_string()),
             ("lr".to_string(), "0.01".to_string()),
@@ -152,11 +153,11 @@ impl Model {
 
     #[pyo3(signature = (**kwds))]
     pub fn compile(&mut self, kwds: Option<&PyDict>) {
-        println!("Model::compile");
+        info!("Model::compile");
 
         match kwds {
             Some(args) => {
-                println!("\r\n{args:?}");
+                info!("\r\n{args:?}");
             }
             _ => {
                 panic!("No arguments for compile!");
@@ -168,22 +169,22 @@ impl Model {
     }
 
     pub fn forward(&self) {
-        println!("Model::forward");
+        info!("Model::forward");
         self.graph.forward();
     }
 
     pub fn backward(&self) {
-        println!("Model::backward");
+        info!("Model::backward");
         self.graph.backward();
     }
 
     pub fn update(&self) {
-        println!("Model::update");
+        info!("Model::update");
         self.graph.update();
     }
 
     pub fn zero_gradients(&self) {
-        println!("Model::zero_gradients");
+        info!("Model::zero_gradients");
         self.graph.zero_gradients();
     }
 
@@ -220,18 +221,18 @@ impl Model {
             self.op_names.push(name);
         }
 
-        print!("Op: {}, ", pyop.op_type.as_str());
+        let mut logstr = format!("Op: {}, ", pyop.op_type.as_str());
         let mut idxmap = IndexMap::<String, String>::new();
         for (key, value) in &pyop.params {
             if key=="initializer" {
-                print!("{key}:\"__elided__\", ");
+                logstr += format!("{key}:\"__elided__\", ").as_str();
             }
             else {
-                print!("{key}:{value}, ");
+                logstr += format!("{key}:{value}, ").as_str();
             }
             idxmap.insert(key.to_string(), value.to_string());
         }
-        println!();
+        info!("{}", logstr);
 
         let operator = Box::new(Operator::new(pyop.op_type, idxmap));
 
@@ -262,7 +263,7 @@ impl Model {
             .retain(|x| &**x as *const Operator as u64 != pyop.raw_ptr);
         // }
 
-        println!(
+        info!(
             "Op: {}, ptr: {} removed from computation graph!",
             pyop.op_type.as_str(),
             pyop.raw_ptr
@@ -344,7 +345,7 @@ impl Model {
 
         let header = format! {"func.func @forward({argstr}) -> {output_shapes} "};
 
-        // println!("{:?}", self.args);
+        // info!("{:?}", self.args);
         let mut op_ir = "".to_string();
         for op in &self.graph.operators {
             op_ir += "\t";
@@ -428,7 +429,7 @@ impl Model {
                             Ok(vlist) => {
                                 for v in vlist {
                                     if op.add_input(&v).is_ok() {
-                                        println!(
+                                        info!(
                                             "A list of input tensors added for operator {op_type:?}!"
                                         );
                                     }
@@ -596,7 +597,7 @@ impl Model {
                     shape: shape.clone(),
                     data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(shape.iter().product(), Some(vec![0f32; shape.iter().product()]))),
                 });
-                println!("Tensor initialized with {shape:?} dimension within Rust");
+                info!("Tensor initialized with {shape:?} dimension within Rust");
                 Python::with_gil(|py| {
                     Py::new(
                         py,
@@ -628,7 +629,7 @@ impl Model {
     #[pyo3(signature = (**kwds))]
     pub fn call(&mut self, py: Python, kwds: Option<&PyDict>) -> Py<PyOperator> {
         // self.handle_operator(OpType::CALL, kwds)
-        println!("{:?}\r\n", kwds);
+        info!("{:?}\r\n", kwds);
         let op_type = OpType::CALL;
         let mut op = PyOperator {
             op_type,
@@ -653,7 +654,7 @@ impl Model {
 
                 match (callback, func_args) {
                     (Ok(_callback), Ok(_func_args)) => {
-                        println!("Function args  {:?}", _func_args);
+                        info!("Function args  {:?}", _func_args);
 
                         for key in _func_args.keys() {
                             let x = _func_args
@@ -663,13 +664,13 @@ impl Model {
                             match x {
                                 Ok(_x) => {
                                     if op.add_input(&_x).is_ok() {
-                                        println!(
+                                        info!(
                                             "A list of input tensors added for operator {op_type:?}!"
                                         );
                                     }
                                 }
                                 _ => {
-                                    println!("{:?} is not tensor argument!", key);
+                                    info!("{:?} is not tensor argument!", key);
                                 }
                             }
                         }
@@ -677,23 +678,23 @@ impl Model {
                         match _callback.call(py, (), kwds) {
                             Ok(ret) => {
                                 // if para.contains("return").is_ok() {
-                                println!("Model::add_layer calculate output for {:?} by calling the external function {}", 
+                                info!("Model::add_layer calculate output for {:?} by calling the external function {}", 
                                             op_type, para.get_item("func").unwrap().to_string());
                                 let tensor = ret.extract::<PyRef<TensorF32>>(py);
 
                                 match tensor {
                                     Ok(v) => {
                                         op.add_output(&v);
-                                        println!("Output tensor with shape {:?} created within Rust for operator {:?}!", v.get_shape(py), op_type);
+                                        info!("Output tensor with shape {:?} created within Rust for operator {:?}!", v.get_shape(py), op_type);
                                     }
                                     // _ => panic!("Invalid tensor outputs!"),
                                     _ => {
-                                        println!("The return value from function call {} is not tensor output!", para.get_item("func").unwrap().to_string());
+                                        info!("The return value from function call {} is not tensor output!", para.get_item("func").unwrap().to_string());
                                     }
                                 }
                             }
                             Err(e) => {
-                                println!("No return values of the callback! {:?}", e);
+                                error!("No return values of the callback! {:?}", e);
                             }
                         }
                     }
@@ -727,7 +728,7 @@ impl Model {
         match kwds {
             Some(args) => {
                 if op_type != OpType::TENSOR && op_type != OpType::PARAMETER {
-                    println!("\r\n{args:?}");
+                    info!("\r\n{args:?}");
                 }
                 else {
                     let mut mp = HashMap::<String, String>::new();
@@ -738,7 +739,7 @@ impl Model {
                             mp.insert(key.to_string(), args.get_item(key).unwrap().to_string());
                         }
                     }
-                    println!("\r\n{mp:?}");
+                    info!("\r\n{mp:?}");
                 }
                 self.add_layer(op_type, kwds)
             }

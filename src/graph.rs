@@ -1,5 +1,6 @@
 use crate::operator::Operator;
 use pyo3::types::PyDict;
+use log::info;
 pub trait GraphTrait {
     fn compile(&self, kwds: Option<&PyDict>);
     fn forward(&self);
@@ -14,18 +15,18 @@ pub struct Graph {
 
 impl GraphTrait for Graph {
     fn compile(&self, kwds: Option<&PyDict>) {
-        println!("Graph::compile");
+        info!("Graph::compile");
     }
     fn forward(&self) {
-        println!("Graph::forward");
+        info!("Graph::forward");
     }
     fn backward(&self) {
-        println!("Graph::backward");
+        info!("Graph::backward");
     }
     fn update(&self) {
-        println!("Graph::update");
+        info!("Graph::update");
     }
     fn zero_gradients(&self) {
-        println!("Graph::zero_gradients");
+        info!("Graph::zero_gradients");
     }
 }

@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 use pyo3::pyclass;
 use std::collections::HashMap;
-
+use log::{info, warn, error};
 #[pyclass]
 #[derive(Debug, Clone)]
 pub struct Optimizer {
@@ -18,7 +18,7 @@ impl Optimizer {
         // optim_type: OptimizerType,
         params: HashMap<String, String>,
     ) -> PyResult<PyClassInitializer<Self>> {
-        println!("Optimizer::new");
+        info!("Optimizer::new");
         let op = Optimizer {
             // optim_type: optim_type,
             params,

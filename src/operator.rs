@@ -18,7 +18,7 @@ use std::num;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 static IDX: AtomicUsize = AtomicUsize::new(0);
-
+use log::{info, warn, error};
 pub trait Texualization {
     fn dump(&self) -> String;
 }
@@ -66,7 +66,7 @@ impl Texualization for Operator {
 
 impl Operator {
     pub fn new(op: OpType, params: IndexMap<String, String>) -> Operator {
-        println!("Operator::new------------------------------------------------------------------");
+        info!("Operator::new------------------------------------------------------------------");
         // let mut params_ : HashMap<String, String> = HashMap::new();
         // params_.extend(params.into_iter());
         // Python::with_gil(|py| {
@@ -89,18 +89,18 @@ impl Operator {
     pub fn num_of_inputs(&self) -> usize {
         //
         let num = self.inputs.len();
-        println!("Operator::num_of_inputs {num}");
+        info!("Operator::num_of_inputs {num}");
         num
     }
 
     pub fn num_of_outputs(&self) -> usize {
         let num = self.outputs.len();
-        println!("Operator::num_of_outputs {num}");
+        info!("Operator::num_of_outputs {num}");
         num
     }
 
     // pub fn get_input_ndarray<'py>(&self, idx : usize, py: Python<'py>) -> &'py PyArrayDyn<f32>{
-    //     println!("Operator::get_input_ndarray {}", idx);
+    //     info!("Operator::get_input_ndarray {}", idx);
     //     if idx < self.num_of_inputs() {
 
     //         match &self.inputs[idx].tensor {
@@ -125,7 +125,7 @@ impl Operator {
     // }
 
     pub fn get_input(&self, idx: usize) -> Result<&TensorF32, ()> {
-        println!("Operator::get_input idx {idx}");
+        info!("Operator::get_input idx {idx}");
         if idx < self.num_of_inputs() {
             return Ok(&self.inputs[idx]);
         }
@@ -133,7 +133,7 @@ impl Operator {
     }
 
     pub fn get_output(&self, idx: usize) -> Result<&TensorF32, ()> {
-        println!("Operator::get_output idx {idx}");
+        info!("Operator::get_output idx {idx}");
         if idx < self.num_of_outputs() {
             return Ok(&self.outputs[idx]);
         }
@@ -175,7 +175,7 @@ impl Operator {
     }
 
     pub fn calculate_output(&mut self) {
-        println!("Operator::calculate_output for {:?}", self.op_type);
+        info!("Operator::calculate_output for {:?}", self.op_type);
         assert!(!self.inputs.is_empty());
         match self.op_type {
             OpType::CONV2D => {
@@ -207,7 +207,7 @@ impl Operator {
 
                     match &self.inputs[0].tensor {
                         Some(v) => {
-                            println!("Input tensor shape {:?}", v.shape);
+                            info!("Input tensor shape {:?}", v.shape);
                             // let w = (v.shape[2] - kernel_w + 2 * padding_w) / stride_w + 1;
                             // let h = (v.shape[3] - kernel_h + 2 * padding_h) / stride_h + 1;
                             //formula [(W + 2*P - D*(K-1) - 1)/S]+1 , conv2d 2d
@@ -222,7 +222,7 @@ impl Operator {
 
                             let output_shape = if self.channel_first {vec![v.shape[0], output_channel, h, w]} else {vec![v.shape[0], h, w, output_channel]};
                             let sz: usize = output_shape.iter().product();
-                            println!("Output tensor with shape {:?} created within Rust for operator {:?}!", output_shape, self.op_type);
+                            info!("Output tensor with shape {:?} created within Rust for operator {:?}!", output_shape, self.op_type);
                             let tensor = Tensor::<f32> {
                                 shape: output_shape,
                                 // data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
@@ -252,7 +252,7 @@ impl Operator {
                             } else {
                                 output_shape = if self.channel_first {vec![v.shape[0], v.shape[1], output_size[0], output_size[1]]} else {vec![v.shape[0], output_size[0], output_size[1], v.shape[3]]};
                             }
-                            println!(
+                            info!(
                                 "Output tensor with shape {:?} created within Rust for operator {:?}!",
                                 output_shape, self.op_type
                             );
@@ -316,7 +316,7 @@ impl Operator {
                                 }
 
                                 let output_shape = if self.channel_first {vec![v.shape[0], v.shape[1], h, w]} else {vec![v.shape[0], h, w, v.shape[3]]};
-                                println!(
+                                info!(
                                     "Output tensor with shape {:?} created within Rust for operator {:?}!",
                                     output_shape, self.op_type
                                 );
@@ -374,7 +374,7 @@ impl Operator {
                 // } else {
                 match &self.inputs[0].tensor {
                     Some(v) => {
-                        println!(
+                        info!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
                             v.shape, self.op_type
                         );
@@ -406,7 +406,7 @@ impl Operator {
                             let mut vshape = if v1shape.len() > v2shape.len() {v1shape.clone()} else {v2shape.clone()};
                             vshape = vshape[0..v1shape.len().abs_diff(v2shape.len())].to_vec();
                             vshape.extend(if v1shape.len() > v2shape.len() {v2shape.clone()} else {v1shape.clone()});
-                            // println!("vshape {:?}", vshape);
+                            // info!("vshape {:?}", vshape);
 
                             if v1shape.len() > v2shape.len() {
                                 v2shape = vshape;
@@ -424,7 +424,7 @@ impl Operator {
                             output_shape.push(if v1shape[i] > v2shape[i] {v1shape[i]} else {v2shape[i]}); 
                         }
 
-                        println!(
+                        info!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
                             output_shape, self.op_type
                         );
@@ -463,7 +463,7 @@ impl Operator {
                     }
                 }
 
-                println!(
+                info!(
                     "Output tensor with shape {:?} created within Rust for operator {:?}!",
                     output_shape, self.op_type
                 );
@@ -529,7 +529,7 @@ impl Operator {
 
                                 };
                                 self.add_output(tensor, Some(self.inputs[0].dtype));
-                                println!("Output tensor with shape {:?} created within Rust for operator {:?}!", output_shape, self.op_type);
+                                info!("Output tensor with shape {:?} created within Rust for operator {:?}!", output_shape, self.op_type);
                             }
 
                         } else {
@@ -578,7 +578,7 @@ impl Operator {
                             data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(sz, None)),
                         };
                         self.add_output(tensor, Some(self.inputs[0].dtype));
-                        println!(
+                        info!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
                             output_shape,
                             self.op_type
@@ -604,7 +604,7 @@ impl Operator {
                             // data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
                         };
                         self.add_output(tensor, Some(self.inputs[0].dtype));
-                        println!(
+                        info!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
                             output_shape,
                             self.op_type
@@ -636,7 +636,7 @@ impl Operator {
                             data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(sz, None)),
                         };
                         self.add_output(tensor, Some(self.inputs[0].dtype));
-                        println!(
+                        info!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
                             output_shape,
                             self.op_type
@@ -671,7 +671,7 @@ impl Operator {
                             data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(sz, None)),
                         };
                         self.add_output(tensor, Some(self.inputs[0].dtype));
-                        println!(
+                        info!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
                             output_shape,
                             self.op_type
@@ -702,7 +702,7 @@ impl Operator {
                             data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(sz, None)),
                         };
                         self.add_output(tensor, Some(self.inputs[0].dtype));
-                        println!(
+                        info!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
                             output_shape,
                             self.op_type
@@ -729,7 +729,7 @@ impl Operator {
                             data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(sz, None)),
                         };
                         self.add_output(tensor, Some(self.inputs[0].dtype));
-                        println!(
+                        info!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
                             output_shape,
                             self.op_type
@@ -756,7 +756,7 @@ impl Operator {
                             // data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(sz, Some(v.data_buffer.to_vec()))),
                         };
                         self.add_output(tensor, Some(self.inputs[0].dtype));
-                        println!(
+                        info!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
                             output_shape,
                             self.op_type
@@ -807,7 +807,7 @@ impl Operator {
                             data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(sz, None)),
                         };
                         self.add_output(tensor, Some(self.inputs[0].dtype));
-                        println!(
+                        info!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
                             output_shape,
                             self.op_type
@@ -852,7 +852,7 @@ impl Operator {
 
                         output_shape.push(m2shape[1]);
 
-                        println!(
+                        info!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
                             output_shape, self.op_type
                         );
@@ -897,7 +897,7 @@ impl Operator {
                             data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(sz, None)),
                         };
                         self.add_output(tensor, Some(self.inputs[0].dtype));
-                        println!(
+                        info!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
                             output_shape,
                             self.op_type
@@ -1170,7 +1170,7 @@ impl PyOperator {
         op_type: OpType,
         params: HashMap<String, String>,
     ) -> PyResult<PyClassInitializer<Self>> {
-        println!("PyOperator::new");
+        info!("PyOperator::new");
         let op = PyOperator {
             op_type,
             params,
@@ -1197,7 +1197,7 @@ impl PyOperator {
     }
 
     pub fn get_input_ndarray<'py>(&self, idx: usize, py: Python<'py>) -> &'py PyArrayDyn<f32> {
-        println!("Operator::get_input_ndarray idx {idx}");
+        info!("Operator::get_input_ndarray idx {idx}");
         if self.raw_ptr > 0 && idx < self.num_of_inputs() {
             let operator = self.raw_ptr as *const Operator;
             unsafe {
@@ -1222,7 +1222,7 @@ impl PyOperator {
     }
 
     pub fn get_output_ndarray<'py>(&self, idx: usize, py: Python<'py>) -> &'py PyArrayDyn<f32> {
-        println!("Operator::get_output_ndarray {idx}");
+        info!("Operator::get_output_ndarray {idx}");
         if self.raw_ptr > 0 && idx < self.num_of_outputs() {
             let operator = self.raw_ptr as *const Operator;
             unsafe {
@@ -1261,10 +1261,10 @@ impl PyOperator {
                         (*operator).add_input(tensor, name, DataType::Float);
                     }
                 } else {
-                    println!("Input not added to the graph!");
+                    info!("Input not added to the graph!");
                 }
 
-                println!(
+                info!(
                     "Tensor initialized with {:?} dimension within Rust",
                     x.shape().to_vec()
                 );
@@ -1274,7 +1274,7 @@ impl PyOperator {
     }
 
     pub fn add_input(&mut self, x: &TensorF32) -> PyResult<()> {
-        println!("Operator::add_input");
+        info!("Operator::add_input");
         if self.raw_ptr > 0 {
             unsafe {
                 let operator = std::mem::transmute::<u64, *mut Operator>(self.raw_ptr);
@@ -1309,7 +1309,7 @@ impl PyOperator {
     }
 
     pub fn add_output(&mut self, x: &TensorF32) {
-        println!("Operator::add_output");
+        info!("Operator::add_output");
         if self.raw_ptr > 0 {
             unsafe {
                 let operator = std::mem::transmute::<u64, *mut Operator>(self.raw_ptr);

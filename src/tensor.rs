@@ -10,7 +10,7 @@ use numpy::{IntoPyArray, PyArrayDyn, PyReadonlyArrayDyn};
 // use pyo3::exceptions::PyOSError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
-// use pyo3::wrap_pyfunction;
+use log::{info, warn, error};
 
 pub trait TensorTrait {
     fn get_dims(&self) -> usize;
@@ -50,7 +50,7 @@ pub struct TensorF32 {
 impl TensorF32 {
     #[new]
     pub fn new(x: PyReadonlyArrayDyn<f32>, name: String) -> PyResult<PyClassInitializer<Self>> {
-        println!("PyTensor::new");
+        info!("PyTensor::new");
         let mut tensor = TensorF32 {
             tensor: None,
             name,
@@ -69,7 +69,7 @@ impl TensorF32 {
                     shape: x.shape().to_vec(),
                     data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(v.len(), Some(v.to_vec()))),
                 });
-                println!(
+                info!(
                     "Tensor initialized with {:?} dimension within Rust",
                     x.shape().to_vec()
                 );
