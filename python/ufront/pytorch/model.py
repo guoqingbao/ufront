@@ -112,12 +112,12 @@ class Node():
             return filtered_node_list
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         """Returns a FlexFlow Tensor corresponding to the output of the node by
         extracting the necessary information from ``string``."""
         raise NotImplementedError
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         """Returns a FlexFlow Tensor corresponding to the output of the node by
         extracting the necessary information from ``self``."""
         assert 0, f"`to_ff()` is not implemented for {self.name}"
@@ -268,7 +268,7 @@ class LinearNode(ModuleNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
@@ -276,7 +276,7 @@ class LinearNode(ModuleNode):
         out_dim = int(items[4])
         activation = ActiMode.as_enum(int(items[5]))
         use_bias = bool(int(items[6]))
-        return ffmodel.dense(
+        return umodel.dense(
             input=input_tensor,
             out_dim=out_dim,
             activation=activation,
@@ -284,9 +284,9 @@ class LinearNode(ModuleNode):
             name=name,
         )
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return ffmodel.dense(
+        return umodel.dense(
             input=input_tensor,
             out_dim=self.module.out_features,
             activation=self.acti_mode,
@@ -323,7 +323,7 @@ class Conv2dNode(ModuleNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
@@ -338,7 +338,7 @@ class Conv2dNode(ModuleNode):
         activation = ActiMode.as_enum(int(items[11]))
         groups = int(items[12])
         use_bias = bool(int(items[13]))
-        return ffmodel.conv2d(
+        return umodel.conv2d(
             input=input_tensor, out_channels=out_channels,
             kernel=[kernel_h, kernel_w],
             stride=[stride_h, stride_w],
@@ -347,9 +347,9 @@ class Conv2dNode(ModuleNode):
             use_bias=use_bias, name=name,
         )
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return ffmodel.conv2d(
+        return umodel.conv2d(
             input=input_tensor,
             out_channels=self.module.out_channels,
             kernel=[self.module.kernel_size[0], self.module.kernel_size[1]],
@@ -395,7 +395,7 @@ class Pool2dNode(ModuleNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
@@ -405,7 +405,7 @@ class Pool2dNode(ModuleNode):
         padding = int(items[6])
         pool_type = PoolType.as_enum(int(items[7]))
         activation = ActiMode.as_enum(int(items[8]))
-        return ffmodel.pool2d(
+        return umodel.pool2d(
             input=input_tensor,
             kernel=[kernel, kernel],
             stride=[stride, stride],
@@ -414,9 +414,9 @@ class Pool2dNode(ModuleNode):
             name=name,
         )
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return ffmodel.pool2d(
+        return umodel.pool2d(
             input=input_tensor,
             kernel=[self.module.kernel_size, self.module.kernel_size],
             stride=[self.module.stride, self.module.stride],
@@ -453,14 +453,14 @@ class AdaptivePool2dNode(ModuleNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
-        return Pool2dNode.string_to_ff(string, ffmodel, node_to_output)
+    def string_to_ff(string, umodel, node_to_output):
+        return Pool2dNode.string_to_ff(string, umodel, node_to_output)
 
-    def to_ff(self, ffmodel, node_to_output):
-        # return Pool2dNode.to_ff(self, ffmodel, node_to_output)
+    def to_ff(self, umodel, node_to_output):
+        # return Pool2dNode.to_ff(self, umodel, node_to_output)
         input_tensor = node_to_output[self.innodes[0].name]
         output_size = self.module.output_size if type(self.module.output_size) != int else [self.module.output_size, self.module.output_size]
-        return ffmodel.pool2d(
+        return umodel.pool2d(
             input=input_tensor,
             output_size=list(output_size),
             pool_type=self.pool_type,
@@ -489,7 +489,7 @@ class BatchNorm2dNode(ModuleNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
@@ -499,14 +499,14 @@ class BatchNorm2dNode(ModuleNode):
         affine = bool(items[6])
         track_running_stats = bool(items[7])
 
-        return ffmodel.batch_norm(input=input_tensor, 
+        return umodel.batch_norm(input=input_tensor, 
                                 eps=eps, momentum=momentum, affine=affine,
                                 track_running_stats=track_running_stats,
                                 name=name)
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return ffmodel.batch_norm(
+        return umodel.batch_norm(
             input=input_tensor,
             eps=float(self.module.eps), momentum=self.module.momentum, affine=self.module.affine,
             track_running_stats=self.module.track_running_stats,
@@ -528,15 +528,15 @@ class SoftmaxMNode(ModuleNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
-        return ffmodel.softmax(input=input_tensor, name=name)
+        return umodel.softmax(input=input_tensor, name=name)
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return ffmodel.softmax(
+        return umodel.softmax(
             input=input_tensor, name=self.name,
         )
 
@@ -556,19 +556,19 @@ class DropoutMNode(ModuleNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
         rate = float(data.items[4])
-        return ffmodel.dropout(
+        return umodel.dropout(
             input=input_tensor, rate=rate, seed=0, name=name,
         )
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         rate = self.module.p
-        return ffmodel.dropout(
+        return umodel.dropout(
             input=input_tensor, rate=rate, seed=0, name=self.name,
         )
 
@@ -604,17 +604,17 @@ class FlattenNode(ModuleNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
         start_dim = int(data.items[4])
         end_dim = int(data.items[5])
-        return ffmodel.flat(input=input_tensor, start_dim=start_dim, end_dim=end_dim, name=name)
+        return umodel.flat(input=input_tensor, start_dim=start_dim, end_dim=end_dim, name=name)
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return ffmodel.flat(input=input_tensor, start_dim=self.module.start_dim, end_dim=self.module.end_dim, name=self.name)
+        return umodel.flat(input=input_tensor, start_dim=self.module.start_dim, end_dim=self.module.end_dim, name=self.name)
 
 
 class ReLUMNode(ModuleNode):
@@ -633,15 +633,15 @@ class ReLUMNode(ModuleNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
-        return ffmodel.relu(input=input_tensor, name=name)
+        return umodel.relu(input=input_tensor, name=name)
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return ffmodel.relu(input=input_tensor, name=self.name, inplace=self.inplace)
+        return umodel.relu(input=input_tensor, name=self.name, inplace=self.inplace)
 
 
 class IdentityNode(ModuleNode):
@@ -658,15 +658,15 @@ class IdentityNode(ModuleNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
-        return ffmodel.identity(input=input_tensor, name=name)
+        return umodel.identity(input=input_tensor, name=name)
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return ffmodel.identity(
+        return umodel.identity(
             input=input_tensor,
             name=self.name,
         )
@@ -686,15 +686,15 @@ class GeluMNode(ModuleNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
-        return ffmodel.gelu(input=input_tensor, name=name)
+        return umodel.gelu(input=input_tensor, name=name)
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return ffmodel.gelu(input=input_tensor, name=self.name)
+        return umodel.gelu(input=input_tensor, name=self.name)
 
 
 class LayerNormNode(ModuleNode):
@@ -725,7 +725,7 @@ class LayerNormNode(ModuleNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
@@ -734,12 +734,12 @@ class LayerNormNode(ModuleNode):
         eps = float(items[5])
         elementwise_affine = bool(items[6])
 
-        return ffmodel.layer_norm(input=input_tensor, normalized_shape=list(normalized_shape), 
+        return umodel.layer_norm(input=input_tensor, normalized_shape=list(normalized_shape), 
                                   eps=float(eps), elementwise_affine=elementwise_affine, name=name)
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return ffmodel.layer_norm(input=input_tensor, normalized_shape=list(self.module.normalized_shape), 
+        return umodel.layer_norm(input=input_tensor, normalized_shape=list(self.module.normalized_shape), 
                                   eps=float(self.module.eps), elementwise_affine=self.module.elementwise_affine, name=self.name)
 
 
@@ -782,13 +782,13 @@ class T5LayerNormNode(Node):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
         # Normalize over the last dimension
         axes = [len(input_tensor.dims) - 1]
-        return ffmodel.layer_norm(
+        return umodel.layer_norm(
             input=input_tensor,
             axes=axes,
             elementwise_affine=True,
@@ -796,11 +796,11 @@ class T5LayerNormNode(Node):
             name=name,
         )
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         # Normalize over the last dimension
         axes = [len(input_tensor.dims) - 1]
-        return ffmodel.layer_norm(
+        return umodel.layer_norm(
             input=input_tensor,
             axes=axes,
             elementwise_affine=True,
@@ -823,15 +823,15 @@ class SigmoidNode(ModuleNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
-        return ffmodel.sigmoid(input=input_tensor, name=name)
+        return umodel.sigmoid(input=input_tensor, name=name)
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return ffmodel.sigmoid(
+        return umodel.sigmoid(
             input=input_tensor,
             name=self.name,
         )
@@ -851,15 +851,15 @@ class TanhMNode(ModuleNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
-        return ffmodel.tanh(input=input_tensor, name=name)
+        return umodel.tanh(input=input_tensor, name=name)
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return ffmodel.tanh(input=input_tensor, name=self.name)
+        return umodel.tanh(input=input_tensor, name=self.name)
 
 
 class ELUNode(ModuleNode):
@@ -876,15 +876,15 @@ class ELUNode(ModuleNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
-        return ffmodel.elu(input=input_tensor, name=name)
+        return umodel.elu(input=input_tensor, name=name)
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return ffmodel.elu(input=input_tensor, name=self.name)
+        return umodel.elu(input=input_tensor, name=self.name)
 
 class HardswishNode(ModuleNode):
     def __init__(self, node, module):
@@ -900,15 +900,15 @@ class HardswishNode(ModuleNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
-        return ffmodel.hardswish(input=input_tensor, name=name)
+        return umodel.hardswish(input=input_tensor, name=name)
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return ffmodel.hardswish(input=input_tensor, name=self.name)
+        return umodel.hardswish(input=input_tensor, name=self.name)
 
 class HardsigmoidNode(ModuleNode):
     def __init__(self, node, module):
@@ -924,15 +924,15 @@ class HardsigmoidNode(ModuleNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
-        return ffmodel.hardsigmoid(input=input_tensor, name=name)
+        return umodel.hardsigmoid(input=input_tensor, name=name)
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return ffmodel.hardsigmoid(input=input_tensor, name=self.name)
+        return umodel.hardsigmoid(input=input_tensor, name=self.name)
 
 class SiLUNode(ModuleNode):
     def __init__(self, node, module):
@@ -948,15 +948,15 @@ class SiLUNode(ModuleNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
-        return ffmodel.silu(input=input_tensor, name=name)
+        return umodel.silu(input=input_tensor, name=name)
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return ffmodel.silu(input=input_tensor, name=self.name)
+        return umodel.silu(input=input_tensor, name=self.name)
         
 class EmbeddingNode(ModuleNode):
     def __init__(self, node, module):
@@ -974,7 +974,7 @@ class EmbeddingNode(ModuleNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
@@ -982,7 +982,7 @@ class EmbeddingNode(ModuleNode):
         num_embeddings = int(items[4])
         embedding_dim = int(items[5])
         init = Initializer(params={"type":"norm", "seed":"42", "mean":"0", "stddev":"1"})
-        return ffmodel.embedding(
+        return umodel.embedding(
             input=input_tensor,
             num_embeddings=num_embeddings,
             embedding_dim=embedding_dim,
@@ -991,13 +991,13 @@ class EmbeddingNode(ModuleNode):
             name=name,
         )
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         num_embeddings = self.module.num_embeddings
         embedding_dim = self.module.embedding_dim
         assert type(num_embeddings) is int
         assert type(embedding_dim) is int
-        return ffmodel.embedding(
+        return umodel.embedding(
             input=input_tensor,
             num_embeddings=num_embeddings,
             embedding_dim=embedding_dim,
@@ -1032,7 +1032,7 @@ class MultiheadAttentionNode(ModuleNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         q = node_to_output[data.innodes[0]]
@@ -1044,7 +1044,7 @@ class MultiheadAttentionNode(ModuleNode):
         num_heads = int(items[5])
         dropout = int(items[6])
         batch_first = int(items[7])
-        return ffmodel.multihead_attention(
+        return umodel.multihead_attention(
             q=q,
             k=k,
             v=v,
@@ -1055,7 +1055,7 @@ class MultiheadAttentionNode(ModuleNode):
             name=name,
         )
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         q = node_to_output[self.innodes[0].name]
         k = node_to_output[self.innodes[1].name]
         v = node_to_output[self.innodes[2].name]
@@ -1065,7 +1065,7 @@ class MultiheadAttentionNode(ModuleNode):
         dropout = self.module.dropout
         batch_first = self.module.batch_first
 
-        return ffmodel.multihead_attention(
+        return umodel.multihead_attention(
             q=q,
             k=k,
             v=v,
@@ -1312,7 +1312,7 @@ class FunctionNode(Node):
         return bc_shape
 
     @staticmethod
-    def broadcast_tensors(tensor1, tensor2, ffmodel):
+    def broadcast_tensors(tensor1, tensor2, umodel):
         shape1 = tensor1.dims
         shape2 = tensor2.dims
         bc_shape = FunctionNode.get_broadcast_shape(shape1, shape2)
@@ -1322,19 +1322,19 @@ class FunctionNode(Node):
             assert 0, "Operands cannot be broadcast together: " \
                 f"{shape1} {shape2}"
         if list(shape1) != bc_shape:
-            np1 = tensor1.get_tensor(ffmodel, ParamSyncType.PS)
+            np1 = tensor1.get_tensor(umodel, ParamSyncType.PS)
             np1 = np.broadcast_to(np1, bc_shape)
             np1 = np.ascontiguousarray(np1)
             dtype = numpy_to_ufront_dtype(np1.dtype)
-            x = ffmodel.create_tensor(bc_shape, dtype, True, "broadcast_tensor_x_" + str(FunctionNode.tensor_idx))
+            x = umodel.create_tensor(bc_shape, dtype, True, "broadcast_tensor_x_" + str(FunctionNode.tensor_idx))
             FunctionNode.tensor_idx += 1
             x.set_ndarray(np1)
         if list(shape2) != bc_shape:
-            np2 = tensor2.get_tensor(ffmodel, ParamSyncType.PS)
+            np2 = tensor2.get_tensor(umodel, ParamSyncType.PS)
             np2 = np.broadcast_to(np2, bc_shape)
             np2 = np.ascontiguousarray(np2)
             dtype = numpy_to_ufront_dtype(np2.dtype)
-            y = ffmodel.create_tensor(bc_shape, dtype, True, "broadcast_tensor_y_" + str(FunctionNode.tensor_idx))
+            y = umodel.create_tensor(bc_shape, dtype, True, "broadcast_tensor_y_" + str(FunctionNode.tensor_idx))
             FunctionNode.tensor_idx += 1
             y.set_ndarray(np2)
         return x, y
@@ -1362,19 +1362,19 @@ class ScalarAddNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
         scalar = float(data.items[4])
-        return ffmodel.sadd(
+        return umodel.sadd(
             input=input_tensor, scalar=scalar, name=name,
         )
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor, scalar = \
             FunctionNode.parse_scalar_op(self, node_to_output)
-        return ffmodel.sadd(
+        return umodel.sadd(
             input=input_tensor, scalar=scalar, name=self.name,
         )
 
@@ -1393,19 +1393,19 @@ class AddNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor1 = node_to_output[data.innodes[0]]
         input_tensor2 = node_to_output[data.innodes[1]]
-        return ffmodel.add(
+        return umodel.add(
             x=input_tensor1, y=input_tensor2, name=name,
         )
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor1 = node_to_output[self.innodes[0].name]
         input_tensor2 = node_to_output[self.innodes[1].name]
-        res = ffmodel.add(x=input_tensor1, y=input_tensor2, name=self.name)
+        res = umodel.add(x=input_tensor1, y=input_tensor2, name=self.name)
         return res
 
 
@@ -1431,19 +1431,19 @@ class ScalarSubNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
         scalar = float(data.items[4])
-        return ffmodel.ssub(
+        return umodel.ssub(
             input=input_tensor, scalar=scalar, name=name,
         )
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor, scalar = \
             FunctionNode.parse_scalar_op(self, node_to_output)
-        return ffmodel.ssub(
+        return umodel.ssub(
             input=input_tensor, scalar=scalar, name=self.name,
         )
 
@@ -1465,22 +1465,22 @@ class ScalarTrueDivNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
         scalar = float(data.items[4])
-        return ffmodel.struediv(
+        return umodel.struediv(
             input=input_tensor, scalar=scalar, name=name,
         )
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         scalar = self.innodes[1]
         if hasattr(scalar, "name"):
             scalar = node_to_output[scalar.name]
         assert type(scalar) is float
-        return ffmodel.struediv(
+        return umodel.struediv(
             input=input_tensor, scalar=scalar, name=self.name,
         )
 
@@ -1506,24 +1506,24 @@ class ConcatNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensors = []
         for i in range(len(data.innodes)):
             input_tensors.append(node_to_output[data.innodes[i]])
         axis = int(data.items[4])
-        return ffmodel.concat(
+        return umodel.concat(
             tensors=input_tensors, axis=axis, name=name,
         )
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensors = []
         for input_node in self.innodes[0]:
             input_tensors.append(node_to_output[input_node.name])
         axis = 1 if len(self.innodes) == 1 else self.innodes[1]
         assert type(axis) is int
-        return ffmodel.concat(
+        return umodel.concat(
             tensors=input_tensors, axis=axis, name=self.name,
         )
 
@@ -1548,29 +1548,29 @@ class SplitChunkNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
         # sizes = len(data.outnodes)
         sizes = data.items[4]
         axis = int(data.items[5])
-        return ffmodel.split(
+        return umodel.split(
             input=input_tensor, sizes=sizes, axis=axis, name=name,
         )
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         sizes = self.innodes[1] #len(self.outnodes)
         axis = self.dim
         assert type(axis) is int
         #TODO split support sizes of int or list
         if self.op_type==OpType.SPLIT:
-            return ffmodel.split(
+            return umodel.split(
                 input=input_tensor, sizes=sizes, axis=axis, name=self.name,
             ) 
         else:
-            return ffmodel.chunk(
+            return umodel.chunk(
                 input=input_tensor, sizes=sizes, axis=axis, name=self.name,
             )
 
@@ -1589,12 +1589,12 @@ class ReLUFNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
-        return ReLUMNode.string_to_ff(string, ffmodel, node_to_output)
+    def string_to_ff(string, umodel, node_to_output):
+        return ReLUMNode.string_to_ff(string, umodel, node_to_output)
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return ffmodel.relu(input=input_tensor, name=self.name)
+        return umodel.relu(input=input_tensor, name=self.name)
 
 
 class GetItemNode(FunctionNode):
@@ -1618,7 +1618,7 @@ class GetItemNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         input_tensor = node_to_output[data.innodes[0]]
         try:
@@ -1631,9 +1631,9 @@ class GetItemNode(FunctionNode):
             slice_strings = data.items[4:]
             slices = GetItemNode.strings_to_slices(slice_strings)
             output_shape = np.zeros(shape=input_tensor.shape, dtype=np.float32)[slices].shape
-            return ffmodel.slice_tensor(x=input_tensor, y=slices, output_shape=list(output_shape),  name=data.items[0])
+            return umodel.slice_tensor(x=input_tensor, y=slices, output_shape=list(output_shape),  name=data.items[0])
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         if type(input_tensor) is TensorF32:
             slices = self.innodes[1]
@@ -1643,14 +1643,14 @@ class GetItemNode(FunctionNode):
                 output_shape = np.zeros(shape=input_tensor.shape, dtype=np.float32)[np_slices].shape
             else:
                 assert type(slices) is tuple, f"Expected tuple slices but got {type(slices)}"
-                slice_tensor = slices
+                slice_tensor = list(slices)
                 output_shape = np.zeros(shape=input_tensor.shape, dtype=np.float32)[slice_tensor].shape
             
             # print(np.max(slices), " ", np.min(slices), " : ", list(slices))
             if type(slice_tensor) == TensorF32:
-                return ffmodel.slice_tensor(x=input_tensor, y=slice_tensor, output_shape=list(output_shape), name=self.name)
+                return umodel.slice_tensor(x=input_tensor, y=slice_tensor, output_shape=list(output_shape), name=self.name)
             else:
-                return ffmodel.slice_tensor(input=input_tensor, slices=slices, output_shape=list(output_shape), name=self.name)
+                return umodel.slice_tensor(input=input_tensor, slices=slice_tensor, output_shape=list(output_shape), name=self.name)
 
         assert type(input_tensor) is list or \
             type(input_tensor) is tuple, \
@@ -1660,7 +1660,7 @@ class GetItemNode(FunctionNode):
         return input_tensor[index]
 
     @staticmethod
-    def slice_tensor(ffmodel, tensor, slices, name):
+    def slice_tensor(umodel, tensor, slices, name):
         """Returns a reshaped tensor based on the given slices."""
         def is_colon(slice_elem):
             """Returns if the slice is equivalent to `:`."""
@@ -1684,7 +1684,7 @@ class GetItemNode(FunctionNode):
             else:
                 assert 0, f"Unsupported slice element: {slice_elem}"
         new_shape.reverse()
-        return ffmodel.reshape(
+        return umodel.reshape(
             input=tensor, shape=list(new_shape), name=name,
         )
 
@@ -1743,19 +1743,19 @@ class BatchMatMulNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor1 = node_to_output[data.innodes[0]]
         input_tensor2 = node_to_output[data.innodes[1]]
-        return ffmodel.batch_matmul(
+        return umodel.batch_matmul(
             x=input_tensor1, y=input_tensor2, name=name,
         )
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor1 = node_to_output[self.innodes[0].name]
         input_tensor2 = node_to_output[self.innodes[1].name]
-        return ffmodel.batch_matmul(
+        return umodel.batch_matmul(
             x=input_tensor1, y=input_tensor2, name=self.name,
         )
 
@@ -1782,20 +1782,20 @@ class ScalarMulNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
         scalar = float(data.items[4])
-        return ffmodel.smultiply(
+        return umodel.smultiply(
             input=input_tensor, scalar=scalar, name=name,
         )
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor, scalar = \
             FunctionNode.parse_scalar_op(self, node_to_output)
         if type(input_tensor) == TensorF32:
-            return ffmodel.smultiply(
+            return umodel.smultiply(
                 input=input_tensor, scalar=scalar, name=self.name,
             )
         else:
@@ -1816,24 +1816,24 @@ class MulNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor1 = node_to_output[data.innodes[0]]
         input_tensor2 = node_to_output[data.innodes[1]]
 
         if type(input_tensor1) == TensorF32 and type(input_tensor2) == TensorF32:
-            return ffmodel.multiply(
+            return umodel.multiply(
                 x=input_tensor1, y=input_tensor2, name=name
             )
         else:
             return input_tensor1 * input_tensor2
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor1 = node_to_output[self.innodes[0].name]
         input_tensor2 = node_to_output[self.innodes[1].name]
         if type(input_tensor1) == TensorF32 and type(input_tensor2) == TensorF32:
-            return ffmodel.multiply(
+            return umodel.multiply(
                 x=input_tensor1, y=input_tensor2, name=self.name
             )
         else:
@@ -1861,7 +1861,7 @@ class GetAttrNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         input_tensor = node_to_output[data.innodes[0]]
         attr = data.items[4]
@@ -1872,7 +1872,7 @@ class GetAttrNode(FunctionNode):
         else:
             return getattr(input_tensor, attr)
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         attr = self.innodes[1]
         if attr == "shape" or attr == "size":
@@ -1900,25 +1900,25 @@ class TransposeNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
         dim0, dim1 = int(data.items[4]), int(data.items[5])
         perms = list(range(len(input_tensor.dims)))
         perms[dim0], perms[dim1] = perms[dim1], perms[dim0]
-        return ffmodel.transpose(
+        return umodel.transpose(
             input=input_tensor, perms=perms, name=name,
         )
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         dim0 = self.innodes[1]
         dim1 = self.innodes[2]
         assert type(dim0) is int and type(dim1) is int
         perms = list(range(input_tensor.dims if type(input_tensor.dims)==int else len(input_tensor.dims) ))
         perms[dim0], perms[dim1] = perms[dim1], perms[dim0]
-        return ffmodel.transpose(
+        return umodel.transpose(
             input=input_tensor, perms=perms, name=self.name,
         )
 
@@ -1949,7 +1949,7 @@ class ExpandNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
@@ -1964,11 +1964,11 @@ class ExpandNode(FunctionNode):
             elif type(shapes[i]) == int:
                 output_shape.append(shapes[i])
 
-        return ffmodel.expand(
+        return umodel.expand(
             input=input_tensor, sizes=output_shape, name=name,
         )
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         output_shape = []
         shapes = self.innodes[1:]
@@ -1980,7 +1980,7 @@ class ExpandNode(FunctionNode):
             elif type(shapes[i]) == int:
                 output_shape.append(shapes[i])
 
-        return ffmodel.expand(
+        return umodel.expand(
             input=input_tensor, sizes=output_shape, name=self.name,
         )
 
@@ -2004,7 +2004,7 @@ class ScalarFloorDivNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         input_tensor = node_to_output[data.innodes[0]]
         scalar = float(data.items[4])
@@ -2013,7 +2013,7 @@ class ScalarFloorDivNode(FunctionNode):
         assert 0, "FlexFlow does not support tensor scalar floor " \
             "division"
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         scalar = self.innodes[1]
         # assert type(scalar) is float
@@ -2051,7 +2051,7 @@ class ReshapeNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
@@ -2064,9 +2064,9 @@ class ReshapeNode(FunctionNode):
             shape = node_to_output[data.innodes[1]].dims
         for dim in shape:
             assert type(dim) is int
-        return ffmodel.reshape(input=input_tensor, shape=list(shape), name=name)
+        return umodel.reshape(input=input_tensor, shape=list(shape), name=name)
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         reshape_as = len(self.innodes) == 2 and \
             type(self.innodes[1]) is not int and \
@@ -2082,7 +2082,7 @@ class ReshapeNode(FunctionNode):
             shape = node_to_output[other.name].dims
         for dim in shape:
             assert type(dim) is int
-        return ffmodel.reshape(input=input_tensor, shape=list(shape), name=self.name)
+        return umodel.reshape(input=input_tensor, shape=list(shape), name=self.name)
 
 
 class PermuteNode(FunctionNode):
@@ -2104,20 +2104,20 @@ class PermuteNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
         perms = [int(dim) for dim in data.items[4:]]
-        return ffmodel.transpose(input=input_tensor, perms=perms, name=name)
+        return umodel.transpose(input=input_tensor, perms=perms, name=name)
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         perm_as_list = isinstance(self.innodes[1], list)
         perms = self.innodes[1] if perm_as_list else self.innodes[1:]
         for dim in perms:
             assert type(dim) is int
-        return ffmodel.transpose(input=input_tensor, perms=list(perms), name=self.name)
+        return umodel.transpose(input=input_tensor, perms=list(perms), name=self.name)
 
 
 class SoftmaxFNode(FunctionNode):
@@ -2134,12 +2134,12 @@ class SoftmaxFNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
-        return SoftmaxMNode.string_to_ff(string, ffmodel, node_to_output)
+    def string_to_ff(string, umodel, node_to_output):
+        return SoftmaxMNode.string_to_ff(string, umodel, node_to_output)
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return ffmodel.softmax(input=input_tensor, name=self.name)
+        return umodel.softmax(input=input_tensor, name=self.name)
 
 
 class ViewNode(FunctionNode):
@@ -2160,7 +2160,7 @@ class ViewNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
@@ -2169,9 +2169,9 @@ class ViewNode(FunctionNode):
             view_shape[dim] = int(dim_size)
         shape = FunctionNode.get_view_shape(input_tensor, view_shape)
         # Treat as a special case of `reshape()`
-        return ffmodel.reshape(input=input_tensor, shape=list(shape), name=name)
+        return umodel.reshape(input=input_tensor, shape=list(shape), name=name)
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         view_shape = list(self.innodes[1:])
         for i in range(len(view_shape)):
@@ -2180,7 +2180,7 @@ class ViewNode(FunctionNode):
 
         shape = FunctionNode.get_view_shape(input_tensor, view_shape)
         # Treat as a special case of `reshape()`
-        return ffmodel.reshape(
+        return umodel.reshape(
             input=input_tensor, shape=list(shape), name=self.name
         )
 
@@ -2209,12 +2209,12 @@ class ToNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         input_tensor = node_to_output[data.innodes[0]]
         return input_tensor
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         return input_tensor
 
@@ -2235,17 +2235,17 @@ class PowNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
         exponent = float(data.items[4])
-        return ffmodel.pow(input=input_tensor, exponent=exponent, name=name)
+        return umodel.pow(input=input_tensor, exponent=exponent, name=name)
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         exponent = self.innodes[1]
-        return ffmodel.pow(
+        return umodel.pow(
             input=input_tensor, exponent=exponent, name=self.name,
         )
 
@@ -2269,7 +2269,7 @@ class MeanNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
@@ -2285,11 +2285,11 @@ class MeanNode(FunctionNode):
             keepdims = bool(items[5])
         else:
             keepdims = False
-        return ffmodel.mean(
+        return umodel.mean(
             input=input_tensor, dims=dims, keepdims=keepdims, name=name,
         )
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         if "keepdim" in self.kwargs:
             keepdims = self.kwargs["keepdim"]
@@ -2305,7 +2305,7 @@ class MeanNode(FunctionNode):
                 dims[i] = len(input_tensor.dims) - 1
             assert dims[i] >= 0 and dims[i] < input_tensor.dims if type(input_tensor.dims)==int else len(input_tensor.dims)
 
-        return ffmodel.mean(
+        return umodel.mean(
             input=input_tensor, dims=dims, keepdims=keepdims, name=self.name,
         )
 
@@ -2325,15 +2325,15 @@ class RsqrtNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
-        return ffmodel.rsqrt(input=input_tensor, name=name)
+        return umodel.rsqrt(input=input_tensor, name=name)
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return ffmodel.rsqrt(input=input_tensor, name=self.name)
+        return umodel.rsqrt(input=input_tensor, name=self.name)
 
 
 class UnsqueezeNode(FunctionNode):
@@ -2352,21 +2352,21 @@ class UnsqueezeNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor = node_to_output[data.innodes[0]]
         dim = int(data.items[4])
         shape = FunctionNode.get_unsqueeze_shape(input_tensor, dim)
         # Treat as a special case of `reshape()`
-        return ffmodel.reshape(input=input_tensor, shape=shape, name=name)
+        return umodel.reshape(input=input_tensor, shape=shape, name=name)
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         dim = self.innodes[1]
         shape = FunctionNode.get_unsqueeze_shape(input_tensor, dim)
         # Treat as a special case of `reshape()`
-        return ffmodel.reshape(
+        return umodel.reshape(
             input=input_tensor, shape=list(shape), name=self.name,
         )
 
@@ -2385,12 +2385,12 @@ class FloatNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         input_tensor = node_to_output[data.innodes[0]]
         return input_tensor
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         return input_tensor
 
@@ -2409,12 +2409,12 @@ class TypeAsNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         input_tensor = node_to_output[data.innodes[0]]
         return input_tensor
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         return input_tensor
 
@@ -2434,13 +2434,13 @@ class DropoutFNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
-        return DropoutMNode.string_to_ff(string, ffmodel, node_to_output)
+    def string_to_ff(string, umodel, node_to_output):
+        return DropoutMNode.string_to_ff(string, umodel, node_to_output)
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         rate = self.kwargs["p"]
-        return ffmodel.dropout(
+        return umodel.dropout(
             input=input_tensor, rate=rate, seed=0, name=self.name,
         )
 
@@ -2459,12 +2459,12 @@ class ContiguousNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         input_tensor = node_to_output[data.innodes[0]]
         return input_tensor
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         return input_tensor
 
@@ -2483,12 +2483,12 @@ class TanhFNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
-        return TanhMNode.string_to_ff(string, ffmodel, node_to_output)
+    def string_to_ff(string, umodel, node_to_output):
+        return TanhMNode.string_to_ff(string, umodel, node_to_output)
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return ffmodel.tanh(input=input_tensor, name=self.name)
+        return umodel.tanh(input=input_tensor, name=self.name)
 
 class MaskedFillNode(FunctionNode):
     def __init__(self, node):
@@ -2504,15 +2504,15 @@ class MaskedFillNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
-        # return TanhMNode.string_to_ff(string, ffmodel, node_to_output)
+    def string_to_ff(string, umodel, node_to_output):
+        # return TanhMNode.string_to_ff(string, umodel, node_to_output)
         assert 0, "Not implemented!"
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         mask_tensor = node_to_output[self.innodes[1].name]
         value = self.innodes[2]
-        return ffmodel.masked_fill(input=input_tensor, mask=mask_tensor, value=value, name=self.name)
+        return umodel.masked_fill(input=input_tensor, mask=mask_tensor, value=value, name=self.name)
     
 class RepeatNode(FunctionNode):
     def __init__(self, node):
@@ -2528,14 +2528,14 @@ class RepeatNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
-        # return TanhMNode.string_to_ff(string, ffmodel, node_to_output)
+    def string_to_ff(string, umodel, node_to_output):
+        # return TanhMNode.string_to_ff(string, umodel, node_to_output)
         assert 0, "Not implemented!"
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         sizes = self.innodes[1:]
-        return ffmodel.repeat(input=input_tensor, sizes=list(sizes), name=self.name)
+        return umodel.repeat(input=input_tensor, sizes=list(sizes), name=self.name)
     
 
 class AssertNode(FunctionNode):
@@ -2552,7 +2552,7 @@ class AssertNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         if hasattr(data.innodes[0], 'name'):
@@ -2561,7 +2561,7 @@ class AssertNode(FunctionNode):
             v = data.innodes[0]
         assert v, data.innodes[1]
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         if hasattr(self.innodes[0], 'name'):
             v = node_to_output[self.innodes[0].name]
         else:
@@ -2583,14 +2583,14 @@ class EqNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
         input_tensor1 = node_to_output[data.innodes[0]]
         input_tensor2 = node_to_output[data.innodes[1]]
         return input_tensor1 == input_tensor2
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         if hasattr(self.innodes[0], 'name'):
             input_tensor1 = node_to_output[self.innodes[0].name]
         else:
@@ -2606,14 +2606,14 @@ class EqNode(FunctionNode):
         elif type(input_tensor1) == TensorF32:
             # ret = input_tensor1.ndarray == input_tensor2
             # return TensorF32(ret.astype(np.float32), self.name)
-            return ffmodel.eq(input=input_tensor1, comparator=input_tensor2, name=self.name)
+            return umodel.eq(input=input_tensor1, comparator=input_tensor2, name=self.name)
         elif type(input_tensor2) == TensorF32:
             # ret = input_tensor1 == input_tensor2.ndarray
             # return TensorF32(ret.astype(np.float32), self.name)
-            return ffmodel.eq(input=input_tensor2, comparator=input_tensor1, name=self.name)
+            return umodel.eq(input=input_tensor2, comparator=input_tensor1, name=self.name)
         else:
             return input_tensor1 == input_tensor2
-        # res = ffmodel.eq(x=input_tensor1, y=input_tensor2, name=self.name)
+        # res = umodel.eq(x=input_tensor1, y=input_tensor2, name=self.name)
         # return res
 
 class GeluFNode(FunctionNode):
@@ -2630,12 +2630,12 @@ class GeluFNode(FunctionNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
-        return GeluMNode.string_to_ff(string, ffmodel, node_to_output)
+    def string_to_ff(string, umodel, node_to_output):
+        return GeluMNode.string_to_ff(string, umodel, node_to_output)
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return ffmodel.gelu(input=input_tensor, name=self.name)
+        return umodel.gelu(input=input_tensor, name=self.name)
 
 
 class AttributeNode(Node):
@@ -2662,7 +2662,7 @@ class AttributeNode(Node):
         self._ir_string = IR_DELIMITER.join(s)
 
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         # NOTE: The string IR does not support attributes since they need the
         # tensor values themselves, which are not easily representable as a
         # string
@@ -2671,10 +2671,10 @@ class AttributeNode(Node):
             "since attributes require access to the PyTorch model"
         )
 
-    def to_ff(self, ffmodel, node_to_output):
-        return self.attr_to_ff_tensor(ffmodel)
+    def to_ff(self, umodel, node_to_output):
+        return self.attr_to_ff_tensor(umodel)
 
-    def attr_to_ff_tensor(self, ffmodel):
+    def attr_to_ff_tensor(self, umodel):
         torch_tensor = self.attr
         ff_dtype = Node.torch_to_ff_dtype(torch_tensor.dtype)
 
@@ -2700,9 +2700,9 @@ class AttributeNode(Node):
         raw_bytes = str(output.getvalue().hex())
         
         if type(self.attr) == torch.nn.Parameter:
-            return ffmodel.parameter(np_tensor=np_tensor, dtype=ff_dtype, requires_grad=requires_grad, initializer=raw_bytes, name=self.attr_name)
+            return umodel.parameter(np_tensor=np_tensor, dtype=ff_dtype, requires_grad=requires_grad, initializer=raw_bytes, name=self.attr_name)
         else:
-            return ffmodel.tensor(np_tensor=np_tensor, dtype=ff_dtype, requires_grad=requires_grad, initializer=raw_bytes, name=self.attr_name)
+            return umodel.tensor(np_tensor=np_tensor, dtype=ff_dtype, requires_grad=requires_grad, initializer=raw_bytes, name=self.attr_name)
     
                     
 class CallNode(FunctionNode):
@@ -2731,7 +2731,7 @@ class CallNode(FunctionNode):
 
     #TODO fix decode for call node
     @staticmethod
-    def string_to_ff(string, ffmodel, node_to_output):
+    def string_to_ff(string, umodel, node_to_output):
         data = Node.StringData(string)
         name = data.name
 
@@ -2741,11 +2741,11 @@ class CallNode(FunctionNode):
         
         input_tensor1 = node_to_output[data.innodes[0]]
         input_tensor2 = node_to_output[data.innodes[1]]
-        return ffmodel.call(
+        return umodel.call(
             input=input_tensor1, B=input_tensor2, name=name,
         )
 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         idx = 0
         args = OrderedDict()
         argtypes = OrderedDict()
@@ -2758,7 +2758,7 @@ class CallNode(FunctionNode):
 
             idx += 1
 
-        return ffmodel.call(
+        return umodel.call(
             func=self.funcname, args=args, argtypes = self.target_argnames, callback=self.callback, name=self.name
         )
 
@@ -2769,7 +2769,7 @@ class TorchCallNode(CallNode):
         self.args = node.args
         self.funcname = node.target.__name__
                 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         args = OrderedDict()
         argtypes = OrderedDict()
         idx = 1
@@ -2783,7 +2783,7 @@ class TorchCallNode(CallNode):
                 args["arg"+str(idx)] = arg
             idx += 1
 
-        return ffmodel.call(
+        return umodel.call(
             func=self.funcname, args=args, argtypes = argtypes, callback=self.callback, name=self.name
         )
 
@@ -2794,7 +2794,7 @@ class MathCallNode(CallNode):
         self.args = node.args
         self.funcname = node.target.__name__
                 
-    def to_ff(self, ffmodel, node_to_output):
+    def to_ff(self, umodel, node_to_output):
         args = OrderedDict()
         argtypes = OrderedDict()
         idx = 1
@@ -2810,7 +2810,7 @@ class MathCallNode(CallNode):
         func = getattr(math, self.funcname)
         assert func!=None, "Unable to obtain function " + self.funcname + " from math!" 
         return func(*list(args.values()))
-        # return ffmodel.call(
+        # return umodel.call(
         #     func=self.funcname, args=args, argtypes = argtypes, callback=self.callback, name=self.name
         # )
     
@@ -2879,7 +2879,7 @@ class OutputNode(Node):
             # Destructively modify `output_tensors`
             output_tensors[:] += [node_to_output[other]]
 
-    def to_ff(self, ffmodel, node_to_output, output_tensors):
+    def to_ff(self, umodel, node_to_output, output_tensors):
         for other in self.innodes:
             # Destructively modify `output_tensors`
             if type(other) is immutable_dict:
@@ -2894,7 +2894,7 @@ class OutputNode(Node):
                     # traced from PyTorch, which includes the softmax in its
                     # `CrossEntropyLoss()` implementation
                     logits = node_to_output[other["logits"].name]
-                    softmax_logits = ffmodel.softmax(
+                    softmax_logits = umodel.softmax(
                         input=logits, name=self.name,
                     )
                     output_tensors[:] += [softmax_logits]
@@ -3131,7 +3131,7 @@ class UFrontTorch():
     def apply(self, inputs, verbose=False):
         """
         Traces the PyTorch model wrapped by this ``PyTorchModel`` instance,
-        and adds operators to ``ffmodel`` coresponding to the computational
+        and adds operators to ``umodel`` coresponding to the computational
         graph nodes from the trace.
 
         Args:
@@ -3215,7 +3215,7 @@ class UFrontTorch():
                 node_class.string_to_ff(string, node_to_output, output_tensors)
                 node_output = None
             else:
-                # node_output =  node_class.string_to_ff(string, ffmodel, node_to_output)
+                # node_output =  node_class.string_to_ff(string, umodel, node_to_output)
                 if node_class == GetItemNode:
                     print("GetItemNode")
                     node_output = node_class.string_to_ff(string, ufront_model, node_to_output)

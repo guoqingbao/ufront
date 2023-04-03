@@ -16,7 +16,7 @@ if __name__ == "__main__":
 
     # torch_model = ComplexCNN()
     # torch_model = resnet18(pretrained=False)
-    torch_model = resnet50(pretrained=False)
+    # torch_model = resnet50(pretrained=False)
     # torch_model = squeezenet1_1(pretrained=False)
     # torch_model = regnet_x_32gf(pretrained=False)
     # torch_model = mobilenet_v3_small(pretrained=False)
@@ -24,7 +24,7 @@ if __name__ == "__main__":
     # torch_model = models.vision_transformer.vit_b_16(weights=False) #TODO
     # torch_model = inception_v3(pretrained=False) #training=TrainingMode.EVAL important!
     # torch_model = shufflenet_v2_x1_5(pretrained=False) 
-    # torch_model = efficientnet_v2_s(pretrained=False) 
+    torch_model = efficientnet_v2_s(pretrained=False) 
 
     # torch_model = convnext_small(pretrained=False) #not supported at the moment 
     # torch_model = models.swin_transformer.swin_t(weights=None) #not supported at the moment 

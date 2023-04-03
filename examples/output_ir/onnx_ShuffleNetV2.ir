@@ -239,7 +239,7 @@ func.func @forward(%input.1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  {
 	%238="ufront.conv2d"(%237){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x704x7x7xf32>) -> tensor<1x1024x7x7xf32>
 	%239="ufront.batchnorm"(%238){affine=true, eps=0.00001, momentum=0.8999999761581421, track_running_stats=true}:(tensor<1x1024x7x7xf32>) -> tensor<1x1024x7x7xf32>
 	%240="ufront.relu"(%239):(tensor<1x1024x7x7xf32>) -> tensor<1x1024x7x7xf32>
-	%241="ufront.mean"(%240){dims=[2, 3], keepdims=True}:(tensor<1x1024x7x7xf32>) -> tensor<1x1024xf32>
+	%241="ufront.mean"(%240){dims=[2, 3], keepdims=true}:(tensor<1x1024x7x7xf32>) -> tensor<1x1024xf32>
 	%242="ufront.linear"(%241):(tensor<1x1024xf32>) -> tensor<1x1000xf32>
 	%243="ufront.softmax"(%242):(tensor<1x1000xf32>) -> tensor<1x1000xf32>
 	return %243: tensor<1x1000xf32>

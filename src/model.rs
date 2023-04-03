@@ -10,6 +10,7 @@ use tuple_conv::RepeatedTuple;
 // use pyo3_log;
 // use crate::error::RustError;
 use crate::databuffer::DataBuffer;
+use crate::databuffer::Buffer;
 use crate::graph::Graph;
 use crate::graph::GraphTrait;
 use crate::operator::Operator;
@@ -222,7 +223,12 @@ impl Model {
         print!("Op: {}, ", pyop.op_type.as_str());
         let mut idxmap = IndexMap::<String, String>::new();
         for (key, value) in &pyop.params {
-            print!("{key}:{value}, ");
+            if key=="initializer" {
+                print!("{key}:\"__elided__\", ");
+            }
+            else {
+                print!("{key}:{value}, ");
+            }
             idxmap.insert(key.to_string(), value.to_string());
         }
         println!();
@@ -413,7 +419,7 @@ impl Model {
                 self.add_operator(&mut op);
 
                 if op_type == OpType::CONCAT {
-                    if para.contains("tensors").is_ok() {
+                    if para.contains("tensors").unwrap() {
                         let ret = para
                             .get_item("tensors")
                             .unwrap()
@@ -436,10 +442,10 @@ impl Model {
                     } else {
                         panic! {"Missing important arguments (tensors?)"};
                     }
-                } else if op_type == OpType::ADD || op_type == OpType::MULTIPLY || 
+                } else if op_type == OpType::ADD || op_type == OpType::MULTIPLY || op_type == OpType::SUBTRACT ||
                         op_type == OpType::BATCH_MATMUL || op_type == OpType::LESS ||
-                        ((op_type == OpType::SLICE) && para.contains("input").is_err() )    {
-                    if para.contains("x").is_ok() && para.contains("y").is_ok() {
+                        ((op_type == OpType::SLICE) && !para.contains("input").unwrap() )    {
+                    if para.contains("x").unwrap() && para.contains("y").unwrap() {
                         let x = para.get_item("x").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
                         let y = para.get_item("y").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
                         match (x, y) {
@@ -456,9 +462,9 @@ impl Model {
                         panic! {"Missing important arguments (x, or y?)"};
                     }
                 } else if op_type == OpType::MULTIHEAD_ATTENTION {
-                    if para.contains("q").is_ok()
-                        && para.contains("k").is_ok()
-                        && para.contains("v").is_ok()
+                    if para.contains("q").unwrap()
+                        && para.contains("k").unwrap()
+                        && para.contains("v").unwrap()
                     {
                         let q = para.get_item("q").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
                         let k = para.get_item("k").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
@@ -481,7 +487,7 @@ impl Model {
                         panic! {"Missing important arguments (q, k, or v?)"};
                     }
                 } else if op_type == OpType::PARAMETER || op_type == OpType::TENSOR {
-                    if para.contains("np_tensor").is_ok() && para.contains("dtype").is_ok() {
+                    if para.contains("np_tensor").unwrap() && para.contains("dtype").unwrap() {
                         let np_tensor = para
                             .get_item("np_tensor")
                             .unwrap()
@@ -521,9 +527,9 @@ impl Model {
                         panic! {"Missing important arguments (q, k, or v?)"};
                     }
                 } else if op_type == OpType::MASKEDFILL {
-                    if para.contains("input").is_ok()
-                        && para.contains("mask").is_ok()
-                        && para.contains("value").is_ok()
+                    if para.contains("input").unwrap()
+                        && para.contains("mask").unwrap()
+                        && para.contains("value").unwrap()
                     {
                         let input = para.get_item("input").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
                         let mask = para.get_item("mask").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
@@ -543,7 +549,7 @@ impl Model {
                     } else {
                         panic! {"Missing important arguments (q, k, or v?)"};
                     }
-                } else if para.contains("input").is_ok() {
+                } else if para.contains("input").unwrap() {
                     let ret = para
                         .get_item("input")
                         .unwrap()
@@ -588,7 +594,7 @@ impl Model {
                 let shape = shape.to_vec();
                 let tensor = Some(Tensor::<f32> {
                     shape: shape.clone(),
-                    data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; shape.iter().product()]),
+                    data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(shape.iter().product(), Some(vec![0f32; shape.iter().product()]))),
                 });
                 println!("Tensor initialized with {shape:?} dimension within Rust");
                 Python::with_gil(|py| {
@@ -720,7 +726,20 @@ impl Model {
     fn handle_operator(&mut self, op_type: OpType, kwds: Option<&PyDict>) -> Py<PyOperator> {
         match kwds {
             Some(args) => {
-                println!("\r\n{args:?}");
+                if op_type != OpType::TENSOR && op_type != OpType::PARAMETER {
+                    println!("\r\n{args:?}");
+                }
+                else {
+                    let mut mp = HashMap::<String, String>::new();
+                    for key in args.keys() {
+                        if key.to_string() == "initializer" {
+                            mp.insert(key.to_string(), "__elided__".to_string());
+                        } else {
+                            mp.insert(key.to_string(), args.get_item(key).unwrap().to_string());
+                        }
+                    }
+                    println!("\r\n{mp:?}");
+                }
                 self.add_layer(op_type, kwds)
             }
             _ => {

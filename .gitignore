@@ -75,3 +75,4 @@ docs/_build/
 *.onnx
 *.gz
 *.compiler
+.onnx/

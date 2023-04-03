@@ -1,8 +1,10 @@
 use crate::databuffer::DataBuffer;
+use crate::databuffer::Buffer;
 use crate::types::DataType;
 use ndarray;
 use ndarray::ArrayView;
 use ndarray::ArrayViewD;
+use num::Signed;
 use numpy::ndarray::{ArrayD, Zip};
 use numpy::{IntoPyArray, PyArrayDyn, PyReadonlyArrayDyn};
 // use pyo3::exceptions::PyOSError;
@@ -18,12 +20,12 @@ pub trait TensorTrait {
     fn get_owner(&self);
 }
 
-pub struct Tensor<T> {
+pub struct Tensor<T: Clone + Signed> {
     pub shape: Vec<usize>,
     pub data_buffer: DataBuffer<T>,
 }
 
-impl<T> TensorTrait for Tensor<T> {
+impl<T: Clone + Signed> TensorTrait for Tensor<T> {
     fn get_dims(&self) -> usize {
         0
     }
@@ -65,7 +67,7 @@ impl TensorF32 {
             Some(v) => {
                 self.tensor = Some(Tensor::<f32> {
                     shape: x.shape().to_vec(),
-                    data_buffer: DataBuffer::CPUDataBuffer(v.to_vec()),
+                    data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(v.len(), Some(v.to_vec()))),
                 });
                 println!(
                     "Tensor initialized with {:?} dimension within Rust",

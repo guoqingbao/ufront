@@ -1,6 +1,7 @@
 # import torch.nn as nn
 import numpy as np
 import torch
+import torch.nn as nn
 from torchvision.models import resnet18, resnet50, squeezenet1_1, regnet_x_32gf, maxvit_t, shufflenet_v2_x1_5, inception_v3, mobilenet_v3_small, efficientnet_v2_s, densenet121, convnext_small
 import torchvision.models as models
 
@@ -28,7 +29,7 @@ if __name__ == "__main__":
     # net = regnet_x_32gf(pretrained=False)
     # net = resnet18(pretrained=False)
 
-    net = resnet50(pretrained=False)
+    # net = resnet50(pretrained=False)
     # net = shufflenet_v2_x1_5(pretrained=False)
     # net = mobilenet_v3_small(pretrained=False)
     # net = densenet121(pretrained=False)
@@ -36,7 +37,7 @@ if __name__ == "__main__":
     # net = efficientnet_v2_s(pretrained=False)
     # net = inception_v3(pretrained=False) #net.train(False) important!
 
-    # net = models.vision_transformer.vit_b_16(weights=False)
+    net = models.vision_transformer.vit_b_16(weights=False)
     # net = models.swin_transformer.swin_t(weights=None)
     net.train(False) #False for inception_v3
     # b = net(input)
@@ -55,6 +56,7 @@ if __name__ == "__main__":
 
     #This will trigger Rust frontend for actual model conversion and graph building
     #operators can also be managed by python side (each operator here corresponding to an operator in the Rust computation graph)
+    # output_tensors = model(inputs = [input])
     output_tensors = model(inputs = [input])
 
     #The output of the model (forward pass have not been triggered at the moment!)
@@ -77,12 +79,11 @@ if __name__ == "__main__":
     model.compile(optimizer={"type":"sgd", "lr":"0.01", "momentum":"0", "nesterov":"False", "weight_decay":"0"},
                          loss='sparse_categorical_crossentropy', metrics=['accuracy', 'sparse_categorical_crossentropy'])
     
-    print("\r\n\r\nIR for ", model.model.__class__.__name__)
 
     # for operator in operators:
     #   print(operator.ir) #show ir for each operator
     modelir= model.dump_ir()
-    print(modelir)
+    # print(modelir)
 
     import pathlib
     path = str(pathlib.Path(__file__).parent.resolve()) + "/output_ir/torch_" + model.model.__class__.__name__ + ".ir"
@@ -91,6 +92,8 @@ if __name__ == "__main__":
     f = open(path, "w")
     f.write(modelir)
     f.close()
+
+    print("\r\n\r\nIR for ", model.model.__class__.__name__, " generated: ", path)
 
     #This will be supported later
     #model.forward()
