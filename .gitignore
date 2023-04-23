@@ -76,3 +76,4 @@ docs/_build/
 *.gz
 *.compiler
 .onnx/
+test.py

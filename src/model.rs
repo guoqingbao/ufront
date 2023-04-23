@@ -26,6 +26,9 @@ use crate::optimizer::Optimizer;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::rc::Rc;
+use std::sync::Once;
+
+static START: Once = Once::new();
 
 pub trait FunctionTrait {
     fn input(&self);
@@ -106,13 +109,18 @@ pub struct Model {
     argshapes: IndexMap<String, String>,
     ssa_ids: HashMap<String, i32>,
     op_names: Vec<String>,
+    op_idx : i32,
 }
 
 #[pymethods]
 impl Model {
     #[new]
     pub fn new() -> Model {
-        env_logger::init();
+        unsafe {
+            START.call_once(|| {
+                env_logger::init();
+            });
+        }
         info!("Model::new");
         let params = HashMap::from([
             ("type".to_string(), "sgd".to_string()),
@@ -131,6 +139,7 @@ impl Model {
             argshapes: IndexMap::new(),
             ssa_ids: HashMap::new(),
             op_names: Vec::new(),
+            op_idx: 0,
         }
     }
 
@@ -248,7 +257,7 @@ impl Model {
         // });
 
         //
-
+        self.op_idx += 1;
         // return Err(PyOSError::new_err("Failed to create operator!".to_string()));
     }
 
@@ -300,6 +309,7 @@ impl Model {
     }
 
     pub fn dump_ir(&self) -> String {
+        info!("{:?}", self.argshapes);
         let mut argstr = "".to_string();
         for arg in self.argshapes.keys() {
             argstr += "%";
@@ -308,7 +318,7 @@ impl Model {
             argstr += self.argshapes[arg].as_str();
             argstr += ", ";
         }
-
+        
         argstr = argstr.trim().to_string();
         if &argstr[argstr.len() - 1..] == "," {
             argstr.pop();
@@ -443,7 +453,7 @@ impl Model {
                     } else {
                         panic! {"Missing important arguments (tensors?)"};
                     }
-                } else if op_type == OpType::ADD || op_type == OpType::MULTIPLY || op_type == OpType::SUBTRACT ||
+                } else if op_type == OpType::ADD || op_type == OpType::MULTIPLY || op_type == OpType::SUBTRACT || op_type == OpType::MATMUL ||
                         op_type == OpType::BATCH_MATMUL || op_type == OpType::LESS ||
                         ((op_type == OpType::SLICE) && !para.contains("input").unwrap() )    {
                     if para.contains("x").unwrap() && para.contains("y").unwrap() {
@@ -550,14 +560,14 @@ impl Model {
                     } else {
                         panic! {"Missing important arguments (q, k, or v?)"};
                     }
-                } else if para.contains("input").unwrap() {
+                } else if para.contains("input").unwrap()  {
                     let ret = para
                         .get_item("input")
                         .unwrap()
                         .extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
                     match ret {
                         Ok(v) => {
-                            if v.name.find("input") == Some(0) {
+                            if v.name.find("input") == Some(0) || v.name.find("x") == Some(0) {
                                 self.args.insert(v.name.clone(), argstr.clone());
                                 self.argshapes.insert(v.name.clone(), v.get_ir());
                             }
@@ -757,6 +767,11 @@ impl Model {
     #[pyo3(signature = (**kwds))]
     pub fn batch_matmul(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::BATCH_MATMUL, kwds)
+    }
+
+    #[pyo3(signature = (**kwds))]
+    pub fn matmul(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
+        self.handle_operator(OpType::MATMUL, kwds)
     }
 
     #[pyo3(signature = (**kwds))]

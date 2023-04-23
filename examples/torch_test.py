@@ -37,16 +37,18 @@ if __name__ == "__main__":
     # net = efficientnet_v2_s(pretrained=False)
     # net = inception_v3(pretrained=False) #net.train(False) important!
 
-    net = models.vision_transformer.vit_b_16(weights=False)
+    net = models.vision_transformer.vit_b_16(weights=False, dropout=0.1)
     # net = models.swin_transformer.swin_t(weights=None)
     net.train(False) #False for inception_v3
     # b = net(input)
 
     # resnet.train(mode=False)
-    model = UFrontTorch(net, batch_size=batch_size) # convert torch model to ufront model
+    # model = UFrontTorch(net, batch_size=batch_size) # convert torch model to ufront model
 
-       
-    # model = UFrontTorch(ComplexCNN(), batch_size=batch_size) # convert torch model to ufront model
+    # input = torch.ones((batch_size, 3, 32, 32), dtype=torch.float32)   
+    # net = SimpleCNN()
+    # net(input, input)
+    model = UFrontTorch(net, batch_size=batch_size) # convert torch model to ufront model
 
     #save model to file (compatible with flexflow)
     # model.torch_to_file('cnn.ff')
@@ -100,4 +102,3 @@ if __name__ == "__main__":
     
     #This will be supported later
     #model.backward()
-    

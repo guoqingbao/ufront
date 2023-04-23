@@ -1,66 +1,66 @@
 func.func @forward(%input1: tensor<1x3x224x224xf32>) -> tensor<1x1000xf32>  { 
-	%1="ufront.conv2d"(%input1){groups=1, kernel=[3, 3], pad=[0, 0], stride=[2, 2]}:(tensor<1x3x224x224xf32>) -> tensor<1x64x111x111xf32>
-	%2="ufront.relu"(%1):(tensor<1x64x111x111xf32>) -> tensor<1x64x111x111xf32>
-	%3="ufront.pool2d"(%2){kernel=[3, 3], pad=[0, 0], pool_type="POOL_MAX", stride=[2, 2]}:(tensor<1x64x111x111xf32>) -> tensor<1x64x55x55xf32>
-	%4="ufront.conv2d"(%3){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x64x55x55xf32>) -> tensor<1x16x55x55xf32>
+	%1="ufront.conv2d"(%input1){dilation=[1, 1], groups=1, kernel=[3, 3], pad=[1, 1], stride=[2, 2]}:(tensor<1x3x224x224xf32>) -> tensor<1x64x112x112xf32>
+	%2="ufront.relu"(%1):(tensor<1x64x112x112xf32>) -> tensor<1x64x112x112xf32>
+	%3="ufront.pool2d"(%2){kernel=[3, 3], pad=[0, 0], pool_type="POOL_MAX", stride=[2, 2]}:(tensor<1x64x112x112xf32>) -> tensor<1x64x55x55xf32>
+	%4="ufront.conv2d"(%3){dilation=[1, 1], groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x64x55x55xf32>) -> tensor<1x16x55x55xf32>
 	%5="ufront.relu"(%4):(tensor<1x16x55x55xf32>) -> tensor<1x16x55x55xf32>
-	%6="ufront.conv2d"(%5){groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<1x16x55x55xf32>) -> tensor<1x64x55x55xf32>
+	%6="ufront.conv2d"(%5){dilation=[1, 1], groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<1x16x55x55xf32>) -> tensor<1x64x55x55xf32>
 	%7="ufront.relu"(%6):(tensor<1x64x55x55xf32>) -> tensor<1x64x55x55xf32>
-	%8="ufront.conv2d"(%5){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x16x55x55xf32>) -> tensor<1x64x55x55xf32>
+	%8="ufront.conv2d"(%5){dilation=[1, 1], groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x16x55x55xf32>) -> tensor<1x64x55x55xf32>
 	%9="ufront.relu"(%8):(tensor<1x64x55x55xf32>) -> tensor<1x64x55x55xf32>
 	%10="ufront.concat"(%9, %7){axis=1}:(tensor<1x64x55x55xf32>, tensor<1x64x55x55xf32>) -> tensor<1x128x55x55xf32>
-	%11="ufront.conv2d"(%10){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x128x55x55xf32>) -> tensor<1x16x55x55xf32>
+	%11="ufront.conv2d"(%10){dilation=[1, 1], groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x128x55x55xf32>) -> tensor<1x16x55x55xf32>
 	%12="ufront.relu"(%11):(tensor<1x16x55x55xf32>) -> tensor<1x16x55x55xf32>
-	%13="ufront.conv2d"(%12){groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<1x16x55x55xf32>) -> tensor<1x64x55x55xf32>
+	%13="ufront.conv2d"(%12){dilation=[1, 1], groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<1x16x55x55xf32>) -> tensor<1x64x55x55xf32>
 	%14="ufront.relu"(%13):(tensor<1x64x55x55xf32>) -> tensor<1x64x55x55xf32>
-	%15="ufront.conv2d"(%12){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x16x55x55xf32>) -> tensor<1x64x55x55xf32>
+	%15="ufront.conv2d"(%12){dilation=[1, 1], groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x16x55x55xf32>) -> tensor<1x64x55x55xf32>
 	%16="ufront.relu"(%15):(tensor<1x64x55x55xf32>) -> tensor<1x64x55x55xf32>
 	%17="ufront.concat"(%16, %14){axis=1}:(tensor<1x64x55x55xf32>, tensor<1x64x55x55xf32>) -> tensor<1x128x55x55xf32>
 	%18="ufront.pool2d"(%17){kernel=[3, 3], pad=[0, 0], pool_type="POOL_MAX", stride=[2, 2]}:(tensor<1x128x55x55xf32>) -> tensor<1x128x27x27xf32>
-	%19="ufront.conv2d"(%18){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x128x27x27xf32>) -> tensor<1x32x27x27xf32>
+	%19="ufront.conv2d"(%18){dilation=[1, 1], groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x128x27x27xf32>) -> tensor<1x32x27x27xf32>
 	%20="ufront.relu"(%19):(tensor<1x32x27x27xf32>) -> tensor<1x32x27x27xf32>
-	%21="ufront.conv2d"(%20){groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<1x32x27x27xf32>) -> tensor<1x128x27x27xf32>
+	%21="ufront.conv2d"(%20){dilation=[1, 1], groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<1x32x27x27xf32>) -> tensor<1x128x27x27xf32>
 	%22="ufront.relu"(%21):(tensor<1x128x27x27xf32>) -> tensor<1x128x27x27xf32>
-	%23="ufront.conv2d"(%20){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x32x27x27xf32>) -> tensor<1x128x27x27xf32>
+	%23="ufront.conv2d"(%20){dilation=[1, 1], groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x32x27x27xf32>) -> tensor<1x128x27x27xf32>
 	%24="ufront.relu"(%23):(tensor<1x128x27x27xf32>) -> tensor<1x128x27x27xf32>
 	%25="ufront.concat"(%24, %22){axis=1}:(tensor<1x128x27x27xf32>, tensor<1x128x27x27xf32>) -> tensor<1x256x27x27xf32>
-	%26="ufront.conv2d"(%25){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x256x27x27xf32>) -> tensor<1x32x27x27xf32>
+	%26="ufront.conv2d"(%25){dilation=[1, 1], groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x256x27x27xf32>) -> tensor<1x32x27x27xf32>
 	%27="ufront.relu"(%26):(tensor<1x32x27x27xf32>) -> tensor<1x32x27x27xf32>
-	%28="ufront.conv2d"(%27){groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<1x32x27x27xf32>) -> tensor<1x128x27x27xf32>
+	%28="ufront.conv2d"(%27){dilation=[1, 1], groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<1x32x27x27xf32>) -> tensor<1x128x27x27xf32>
 	%29="ufront.relu"(%28):(tensor<1x128x27x27xf32>) -> tensor<1x128x27x27xf32>
-	%30="ufront.conv2d"(%27){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x32x27x27xf32>) -> tensor<1x128x27x27xf32>
+	%30="ufront.conv2d"(%27){dilation=[1, 1], groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x32x27x27xf32>) -> tensor<1x128x27x27xf32>
 	%31="ufront.relu"(%30):(tensor<1x128x27x27xf32>) -> tensor<1x128x27x27xf32>
 	%32="ufront.concat"(%31, %29){axis=1}:(tensor<1x128x27x27xf32>, tensor<1x128x27x27xf32>) -> tensor<1x256x27x27xf32>
 	%33="ufront.pool2d"(%32){kernel=[3, 3], pad=[0, 0], pool_type="POOL_MAX", stride=[2, 2]}:(tensor<1x256x27x27xf32>) -> tensor<1x256x13x13xf32>
-	%34="ufront.conv2d"(%33){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x256x13x13xf32>) -> tensor<1x48x13x13xf32>
+	%34="ufront.conv2d"(%33){dilation=[1, 1], groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x256x13x13xf32>) -> tensor<1x48x13x13xf32>
 	%35="ufront.relu"(%34):(tensor<1x48x13x13xf32>) -> tensor<1x48x13x13xf32>
-	%36="ufront.conv2d"(%35){groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<1x48x13x13xf32>) -> tensor<1x192x13x13xf32>
+	%36="ufront.conv2d"(%35){dilation=[1, 1], groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<1x48x13x13xf32>) -> tensor<1x192x13x13xf32>
 	%37="ufront.relu"(%36):(tensor<1x192x13x13xf32>) -> tensor<1x192x13x13xf32>
-	%38="ufront.conv2d"(%35){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x48x13x13xf32>) -> tensor<1x192x13x13xf32>
+	%38="ufront.conv2d"(%35){dilation=[1, 1], groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x48x13x13xf32>) -> tensor<1x192x13x13xf32>
 	%39="ufront.relu"(%38):(tensor<1x192x13x13xf32>) -> tensor<1x192x13x13xf32>
 	%40="ufront.concat"(%39, %37){axis=1}:(tensor<1x192x13x13xf32>, tensor<1x192x13x13xf32>) -> tensor<1x384x13x13xf32>
-	%41="ufront.conv2d"(%40){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x384x13x13xf32>) -> tensor<1x48x13x13xf32>
+	%41="ufront.conv2d"(%40){dilation=[1, 1], groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x384x13x13xf32>) -> tensor<1x48x13x13xf32>
 	%42="ufront.relu"(%41):(tensor<1x48x13x13xf32>) -> tensor<1x48x13x13xf32>
-	%43="ufront.conv2d"(%42){groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<1x48x13x13xf32>) -> tensor<1x192x13x13xf32>
+	%43="ufront.conv2d"(%42){dilation=[1, 1], groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<1x48x13x13xf32>) -> tensor<1x192x13x13xf32>
 	%44="ufront.relu"(%43):(tensor<1x192x13x13xf32>) -> tensor<1x192x13x13xf32>
-	%45="ufront.conv2d"(%42){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x48x13x13xf32>) -> tensor<1x192x13x13xf32>
+	%45="ufront.conv2d"(%42){dilation=[1, 1], groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x48x13x13xf32>) -> tensor<1x192x13x13xf32>
 	%46="ufront.relu"(%45):(tensor<1x192x13x13xf32>) -> tensor<1x192x13x13xf32>
 	%47="ufront.concat"(%46, %44){axis=1}:(tensor<1x192x13x13xf32>, tensor<1x192x13x13xf32>) -> tensor<1x384x13x13xf32>
-	%48="ufront.conv2d"(%47){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x384x13x13xf32>) -> tensor<1x64x13x13xf32>
+	%48="ufront.conv2d"(%47){dilation=[1, 1], groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x384x13x13xf32>) -> tensor<1x64x13x13xf32>
 	%49="ufront.relu"(%48):(tensor<1x64x13x13xf32>) -> tensor<1x64x13x13xf32>
-	%50="ufront.conv2d"(%49){groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<1x64x13x13xf32>) -> tensor<1x256x13x13xf32>
+	%50="ufront.conv2d"(%49){dilation=[1, 1], groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<1x64x13x13xf32>) -> tensor<1x256x13x13xf32>
 	%51="ufront.relu"(%50):(tensor<1x256x13x13xf32>) -> tensor<1x256x13x13xf32>
-	%52="ufront.conv2d"(%49){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x64x13x13xf32>) -> tensor<1x256x13x13xf32>
+	%52="ufront.conv2d"(%49){dilation=[1, 1], groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x64x13x13xf32>) -> tensor<1x256x13x13xf32>
 	%53="ufront.relu"(%52):(tensor<1x256x13x13xf32>) -> tensor<1x256x13x13xf32>
 	%54="ufront.concat"(%53, %51){axis=1}:(tensor<1x256x13x13xf32>, tensor<1x256x13x13xf32>) -> tensor<1x512x13x13xf32>
-	%55="ufront.conv2d"(%54){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x512x13x13xf32>) -> tensor<1x64x13x13xf32>
+	%55="ufront.conv2d"(%54){dilation=[1, 1], groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x512x13x13xf32>) -> tensor<1x64x13x13xf32>
 	%56="ufront.relu"(%55):(tensor<1x64x13x13xf32>) -> tensor<1x64x13x13xf32>
-	%57="ufront.conv2d"(%56){groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<1x64x13x13xf32>) -> tensor<1x256x13x13xf32>
+	%57="ufront.conv2d"(%56){dilation=[1, 1], groups=1, kernel=[3, 3], pad=[1, 1], stride=[1, 1]}:(tensor<1x64x13x13xf32>) -> tensor<1x256x13x13xf32>
 	%58="ufront.relu"(%57):(tensor<1x256x13x13xf32>) -> tensor<1x256x13x13xf32>
-	%59="ufront.conv2d"(%56){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x64x13x13xf32>) -> tensor<1x256x13x13xf32>
+	%59="ufront.conv2d"(%56){dilation=[1, 1], groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x64x13x13xf32>) -> tensor<1x256x13x13xf32>
 	%60="ufront.relu"(%59):(tensor<1x256x13x13xf32>) -> tensor<1x256x13x13xf32>
 	%61="ufront.concat"(%60, %58){axis=1}:(tensor<1x256x13x13xf32>, tensor<1x256x13x13xf32>) -> tensor<1x512x13x13xf32>
-	%62="ufront.conv2d"(%61){groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x512x13x13xf32>) -> tensor<1x1000x13x13xf32>
+	%62="ufront.conv2d"(%61){dilation=[1, 1], groups=1, kernel=[1, 1], pad=[0, 0], stride=[1, 1]}:(tensor<1x512x13x13xf32>) -> tensor<1x1000x13x13xf32>
 	%63="ufront.pool2d"(%62){output_size=[1, 1], pad=[0, 0], pool_type="POOL_ADAPTIVE", stride=[1, 1]}:(tensor<1x1000x13x13xf32>) -> tensor<1x1000x1x1xf32>
 	%64="ufront.flat"(%63){end_dim=-1, start_dim=1}:(tensor<1x1000x1x1xf32>) -> tensor<1x1000xf32>
 	%65="ufront.softmax"(%64):(tensor<1x1000xf32>) -> tensor<1x1000xf32>

@@ -74,3 +74,28 @@ class ComplexCNN(nn.Module):
     y = self.relu(y)
     yo = self.linear2(y)
     return (yo, y)
+  
+class SimpleCNN(nn.Module):
+  def __init__(self):
+    super().__init__()
+    self.conv1 = nn.Conv2d(3, 32, 3, 1)
+    self.conv2 = nn.Conv2d(64, 64, 3, 1)
+    self.pool1 = nn.MaxPool2d(4, 4)
+    self.batch_norm = nn.BatchNorm2d(64)
+    self.flat1 = nn.Flatten()
+    self.linear1 = nn.Linear(3136, 512)
+    self.linear2 = nn.Linear(512, 10)
+    self.relu = nn.ReLU()
+
+  def forward(self, input1, input2):
+    y1 = self.relu(self.conv1(input1))
+    y2 = self.relu(self.conv1(input2))
+    y = torch.cat((y1, y2), 1)
+    (y1, y2) = torch.split(y, [32, 32], dim=1) # split into [32, 32] in axis 1
+    y = torch.cat((y1, y2), 1)
+    y = self.relu(self.conv2(y))
+    y = self.pool1(y)
+    y = self.batch_norm(y)
+    y = self.flat1(y)
+    y = self.relu(self.linear1(y))
+    return self.linear2(y)

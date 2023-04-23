@@ -151,6 +151,7 @@ pub enum OpType {
     LESS,
     CAST,
     TENSOR,
+    MATMUL,
 }
 
 #[pymethods]
@@ -224,6 +225,8 @@ impl OpType {
             OpType::LESS => "less",
             OpType::CAST => "cast",
             OpType::TENSOR => "tensor",
+            OpType::MATMUL => "matmul",
+
             // _ => panic!("Not supported operator!"),
         }
     }
@@ -297,6 +300,7 @@ impl OpType {
             "less" => OpType::LESS,
             "cast" => OpType::CAST,
             "tensor" => OpType::TENSOR,
+            "matmul" => OpType::MATMUL,
             _ => {
                 panic!("Not supported type!");
             }

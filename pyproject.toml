@@ -10,7 +10,7 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
-dependencies = ["onnx"]
+dependencies = ["onnx", "tf2onnx"]
 
 [tool.maturin]
 python-source = "python"

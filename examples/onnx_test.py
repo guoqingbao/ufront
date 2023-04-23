@@ -11,7 +11,7 @@ import onnxsim
 
 if __name__ == "__main__":
     batch_size = 1
-    input = np.zeros((batch_size, 3, 224, 224), dtype=np.float32)
+    input = np.ones((batch_size, 3, 224, 224), dtype=np.float32)
     
 
     # torch_model = ComplexCNN()
@@ -21,11 +21,11 @@ if __name__ == "__main__":
     # torch_model = regnet_x_32gf(pretrained=False)
     # torch_model = mobilenet_v3_small(pretrained=False)
     # torch_model = densenet121(pretrained=False)
-    # torch_model = models.vision_transformer.vit_b_16(weights=False) #TODO
+    torch_model = models.vision_transformer.vit_b_16(weights=False)
     # torch_model = inception_v3(pretrained=False) #training=TrainingMode.EVAL important!
     # torch_model = shufflenet_v2_x1_5(pretrained=False) 
-    torch_model = efficientnet_v2_s(pretrained=False) 
-
+    # torch_model = efficientnet_v2_s(pretrained=False) 
+    # out = torch_model(torch.Tensor(input))
     # torch_model = convnext_small(pretrained=False) #not supported at the moment 
     # torch_model = models.swin_transformer.swin_t(weights=None) #not supported at the moment 
 
@@ -35,11 +35,8 @@ if __name__ == "__main__":
                       training=TrainingMode.EVAL if model_name=="Inception3" else TrainingMode.TRAINING, opset_version=17)
     onnx_model = onnx.load_model_from_string(f.getvalue())
 
-    # onnx_model, check = onnxsim.simplify(onnx_model) # simply onnx models, for example, merge sub operators in onnx for chunk, remove redundant operators
-    # onnx.save_model(onnx_model, f=model_name+"_sim.onnx")
-    # assert check, "Simplified ONNX model could not be validated"
-
-    model = UFrontONNX(onnx_model=onnx_model, batch_size=batch_size)
+    transformer = True if model_name in ["MaxVit", "SwinTransformer", "VisionTransformer", "MultiHeadAttention"] else False
+    model = UFrontONNX(onnx_model=onnx_model, batch_size=batch_size, simplify=True, transformer=transformer)
 
     #This will trigger Rust frontend for model conversion and graph building
     #operators can also be managed by python side (each operator here corresponding to an operator in the Rust computation graph)
@@ -52,15 +49,15 @@ if __name__ == "__main__":
     
 
     #The Rust frontend will build computation graph and initialize temporary inputs and outputs for each operator
-    total_memory = 0
-    for operator in model.operators:
-      sz = operator.memory_usage()
-      total_memory += sz
-      print("{0} > name: {1}, raw_ptr: {2:#06x}, No. of outputs: {3}, memory used:{4:.5f}MB".format(operator.op_type, operator.params['name'], 
-      operator.raw_ptr, operator.num_of_outputs(),  sz/1024/1024))
+    # total_memory = 0
+    # for operator in model.operators:
+    #   sz = operator.memory_usage()
+    #   total_memory += sz
+    #   print("{0} > name: {1}, raw_ptr: {2:#06x}, No. of outputs: {3}, memory used:{4:.5f}MB".format(operator.op_type, operator.params['name'], 
+    #   operator.raw_ptr, operator.num_of_outputs(),  sz/1024/1024))
     
     #Total memory cached for inputs/outputs of all operators (in Rust)
-    print("\r\nTotal memory cached for operators {:.2f}MB".format(total_memory/1024/1024))
+    # print("\r\nTotal memory cached for operators {:.2f}MB".format(total_memory/1024/1024))
 
     #This will trigger model compilation, i.e., convert Rust computation graph to a unified high-level IR and lower it to TOSA IR
     model.compile(optimizer={"type":"sgd", "lr":"0.01", "momentum":"0", "nesterov":"False", "weight_decay":"0"},
@@ -71,12 +68,16 @@ if __name__ == "__main__":
     #   print(operator.ir) #show ir for each operator
 
     print("\r\n\r\nIR for ", model_name)
-
+    # for operator in model.operators:
+    #   print(operator.ir)
+      
     # for operator in operators:
     #   print(operator.ir) #show ir for each operator
     modelir= model.dump_ir()
     print(modelir)
 
+    # print(modelir)
+    # model_name = "ResNet18"
     import pathlib
     path = str(pathlib.Path(__file__).parent.resolve()) + "/output_ir/onnx_" + model_name + ".ir"
     f = open(path, "w")

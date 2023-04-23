@@ -713,7 +713,7 @@ class ResnetBuilder(object):
         return ResnetBuilder.build(input_shape, num_outputs, bottleneck, [3, 8, 36, 3], name)
     
 
-from tensorflow.keras.layers import Dense, Conv2D, AveragePooling2D, Flatten, MaxPool2D, Input, BatchNormalization, Activation, add
+from tensorflow.keras.layers import Dense, Conv2D, GlobalAveragePooling2D, Flatten, MaxPool2D, Input, BatchNormalization, Activation, add
 from tensorflow.keras.models import Model
 from tensorflow.keras.regularizers import l2
 
@@ -765,14 +765,9 @@ def ResidualBlock(x, filters, kernel_size, weight_decay, downsample=True):
 def ResNet18(classes, input_shape, weight_decay=1e-4):
     input = Input(shape=input_shape)
     x = input
-    x = ZeroPadding2D(
-      padding=((3, 3), (3, 3)), name='conv1_pad')(x)
-    x = Conv2D(64, 7, strides=2, name='conv1_conv')(x)
 
-    # x = conv2d_bn_relu(x, filters=64, kernel_size=7, weight_decay=weight_decay, strides=2)
-    x = ZeroPadding2D(padding=((1, 1), (1, 1)), name='pool1_pad')(x)
+    x = Conv2D(64, 7, strides=2, padding='same', name='conv1_conv')(x)
     x = MaxPool2D(pool_size=(3, 3), strides=(2, 2),  padding='same')(x)
-    # x = conv2d_bn_relu(x, filters=64, kernel_size=(3, 3), weight_decay=weight_decay, strides=(1, 1))
 
     # # conv 2
     x = ResidualBlock(x, filters=64, kernel_size=(3, 3), weight_decay=weight_decay, downsample=False)
@@ -786,13 +781,8 @@ def ResNet18(classes, input_shape, weight_decay=1e-4):
     # # conv 5
     x = ResidualBlock(x, filters=512, kernel_size=(3, 3), weight_decay=weight_decay, downsample=True)
     x = ResidualBlock(x, filters=512, kernel_size=(3, 3), weight_decay=weight_decay, downsample=False)
-    # x = ZeroPadding2D(padding=((1, 1), (1, 1)), name='pool1_pad1')(x)
 
-    block_shape = K.int_shape(x)
-
-    x = AveragePooling2D(pool_size=(7, 7), strides=(1, 1))(x)
-    # block_shape = K.int_shape(x)
-    # x = K.reshape(x=x, shape=(1, 512))
+    x = GlobalAveragePooling2D()(x)
     x = Flatten()(x)
     x = Dense(classes, activation='softmax')(x)
     model = Model(input, x, name='ResNet18')

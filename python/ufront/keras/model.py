@@ -115,8 +115,9 @@ class Tensor(object):
     assert self.dtype == self._ffhandle.dtype
 
 class BaseModel(object):
-  def __init__(self, inputs, onnx_model, batch_size):
+  def __init__(self, inputs, onnx_model, batch_size, transformer):
     self.ufront_model = Model()
+    self.transformer=transformer
     self._onnx_model = onnx_model
     self._input_tensors = []
     for key in inputs:
@@ -139,6 +140,8 @@ class BaseModel(object):
     global tracing_id
     self.__tracing_id = tracing_id
     tracing_id += 1
+    self._create_input_tensors()
+    self._create_layers()
     
   def compile(self,
               optimizer,
@@ -184,9 +187,7 @@ class BaseModel(object):
         self._metrics.append(MetricsType.MEAN_ABSOLUTE_ERROR)
       else:
         assert 0, 'Unsupported metric'
-        
-    self._create_input_tensors()
-    self._create_flexflow_layers()
+      
     
     if isinstance(optimizer, tf_keras_optimizer.Optimizer) == True:
       if isinstance(optimizer, tf_keras_optimizer.SGD) == True:
@@ -281,16 +282,16 @@ class BaseModel(object):
       self._input_tensors[idx].create_ff_tensor(self.ufront_model, "input"+str(idx+1))
       idx += 1
       
-  def _create_flexflow_layers(self):
-    self._my_onnx_model = ONNXModelKeras(self._onnx_model, self.ufront_model)
-    # import onnx 
-    # onnx.save_model(self._my_onnx_model.model, f="keras_ResNet50_sim.onnx")
-    
+  def _create_layers(self):
+    self._my_onnx_model = ONNXModelKeras(self._onnx_model, self.ufront_model, self.transformer)
     input_dict = {}
     for input_tensor in self._input_tensors:
       input_dict[input_tensor.name] = input_tensor.ffhandle
     self._output_tensor = self._my_onnx_model.apply(input_dict)
-      
+
+  def get_output_operator(self):
+    return self._my_onnx_model.get_output_operator()
+    
   def _verify_tensors(self, input_arrays, label_array):
     assert len(input_arrays) == len(self._input_tensors), "check len of input tensors"
     # TODO: move check shape into another function
@@ -391,20 +392,29 @@ class BaseModel(object):
     if callbacks != None:
       for callback in callbacks:
         callback.on_train_end()
-    
+   
 class UFrontKeras(tf_keras_Model):
   def __init__(self, inputs, outputs, 
-            batch_size, verbose=False, name=None):
+            batch_size, verbose=False, name=None, transformer=False):
     super(UFrontKeras, self).__init__(inputs=inputs, outputs=outputs, name=name)
     if (isinstance(inputs, dict) == True):
-      onnx_model = tf2onnx.convert.from_keras(self, opset=17)
-      self._base_model = BaseModel(inputs=inputs, onnx_model=onnx_model[0], batch_size=batch_size)
+      # import onnx
+      # onnx_model = onnx.load_model("Keras_VIT.onnx")
+      # self._base_model = BaseModel(inputs=inputs, onnx_model=onnx_model, batch_size=batch_size, transformer=transformer)
+      onnx_model = tf2onnx.convert.from_keras(self, opset=18 if transformer else 17)
+      self._base_model = BaseModel(inputs=inputs, onnx_model=onnx_model[0], batch_size=batch_size, transformer=transformer)
     else:
       assert 0, "Inputs must be in dict format, e.g., {1: input_tensor1}"
 
+  def umodel(self):
+    return self._base_model._my_onnx_model.umodel
+  
   def dump_ir(self):
     return self._base_model.ufront_model.dump_ir()
-
+  
+  def get_output_operator(self):
+    return self._base_model.get_output_operator()
+  
   def compile(self,
               optimizer,
               loss=None,
@@ -442,12 +452,12 @@ class UFrontKeras(tf_keras_Model):
       use_multiprocessing=use_multiprocessing)
       
 class KerasSequential(tf_keras_Model):
-  def __init__(self, inputs, outputs, batch_size, name=None):
+  def __init__(self, inputs, outputs, batch_size, name=None, transformer=False):
     super(KerasSequential, self).__init__(inputs=inputs, outputs=outputs, name=name)
     
     if (isinstance(inputs, dict) == True):
       onnx_model = tf2onnx.convert.from_keras(self)
-      self._base_model = BaseModel(inputs=inputs, onnx_model=onnx_model, batch_size=batch_size)
+      self._base_model = BaseModel(inputs=inputs, onnx_model=onnx_model, batch_size=batch_size, transformer=transformer)
 
   def compile(self,
               optimizer,

@@ -237,6 +237,36 @@ impl Operator {
                     }
                 } else {panic!("Missing important parameters!");}
             }
+            OpType::MATMUL => {
+                match (&self.inputs[0].tensor, &self.inputs[1].tensor) {
+                    (Some(v1), Some(v2)) => {
+                        let v1shape = v1.shape.clone();
+                        let v2shape = v2.shape.clone();
+
+                        if v1shape.len() != 2 || v2shape.len() != 2 || v1shape[1] != v2shape[0] {
+                            panic!("Invalid shape a={:?}, b={:?}!", v1shape, v2shape);
+                        }
+
+                        let output_shape = vec![v1shape[0], v2shape[1]];
+                        info!(
+                            "Output tensor with shape {:?} created within Rust for operator {:?}!",
+                            output_shape, self.op_type
+                        );
+                        let tensor = Tensor::<f32> {
+                            shape: output_shape.clone(),
+                            // data_buffer: DataBuffer::CPUDataBuffer(vec![
+                            //     0f32;
+                            //     output_shape.iter().product()
+                            // ]),
+                            data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(output_shape.iter().product(), None)),
+                        };
+                        self.add_output(tensor, Some(self.inputs[0].dtype));
+                    }
+                    _ => {
+                        panic!("Invalid inputs!");
+                    }
+                }
+            }
             OpType::POOL2D => {
                 if self.params.contains_key("pool_type") && self.params["pool_type"].trim() == "PoolType.POOL_ADAPTIVE" {
                     //formula [w,h]=output_size
@@ -678,7 +708,7 @@ impl Operator {
                         );
                     }
                     _ => {
-                        panic!("Invalid tensor for flat!");
+                        panic!("Invalid tensor for expand!");
                     }
                 }
             }
@@ -774,6 +804,13 @@ impl Operator {
                 }
                 match &mut self.inputs[0].tensor {
                     Some(v) => {
+                        let mut keepdims = false;
+                        if self.params.contains_key("keepdims") {
+                            if self.params["keepdims"].trim() == "True" {
+                                keepdims = true;
+                            }
+                        } 
+
                         let mut output_shape: Vec<usize> = vec![];
                         if self.params.contains_key("dims") {
                             if self.params["dims"].find("[").is_some() {
@@ -781,6 +818,8 @@ impl Operator {
                                 for dim in 0..v.shape.len() {
                                     if !dims.contains(&dim) {
                                         output_shape.push(v.shape[dim]);
+                                    } else if keepdims {
+                                        output_shape.push(1);
                                     }
                                 }
                             } else {
@@ -788,17 +827,12 @@ impl Operator {
                                 for dim in 0..v.shape.len() {
                                     if dim != dims {
                                         output_shape.push(v.shape[dim]);
+                                    } else if keepdims {
+                                        output_shape.push(1);
                                     }
                                 }
                             }
-                        } else if self.params.contains_key("keepdims") {
-                            if self.params["keepdims"].trim() == "True" {
-                                output_shape = v.shape.clone();
-                            }
-                            else {
-                                panic!("Missing important parameters!");
-                            }
-                        }
+                        } 
 
                         let sz: usize = output_shape.iter().product();
                         let tensor = Tensor::<f32> {
