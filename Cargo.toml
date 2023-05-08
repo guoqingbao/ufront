@@ -23,3 +23,4 @@ itertools = "0.10.5"
 indexmap = "1.9.2"
 log = { version = "0.4"}
 env_logger = "0.10.0"
+rawapi = { path = "./rawapi", version = "0.1.1"}

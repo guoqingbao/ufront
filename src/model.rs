@@ -1,3 +1,18 @@
+// Copyright 2023, Enflame Tech. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
 use core::panic;
 use numpy::PyReadonlyArrayDyn;
 use pyo3::prelude::*;
@@ -29,6 +44,9 @@ use std::rc::Rc;
 use std::sync::Once;
 
 static START: Once = Once::new();
+
+use rawapi;
+use std::ffi::CStr;
 
 pub trait FunctionTrait {
     fn input(&self);
@@ -306,6 +324,13 @@ impl Model {
 
     pub fn num_of_operators(&self) -> usize {
         self.graph.operators.len()
+    }
+
+    pub fn dump_tosa_ir(&self) -> String {
+        let ufront_ir = self.dump_ir();
+        let tosa_ir_cstr = unsafe { rawapi::ufront_to_tosa(ufront_ir.as_ptr() as *const i8) };
+        let cstr = unsafe { CStr::from_ptr(tosa_ir_cstr) };
+        String::from_utf8_lossy(cstr.to_bytes()).to_string()
     }
 
     pub fn dump_ir(&self) -> String {

@@ -87,6 +87,8 @@ if __name__ == "__main__":
     modelir= model.dump_ir()
     # print(modelir)
 
+    tosair= model.dump_tosa_ir()
+
     import pathlib
     path = str(pathlib.Path(__file__).parent.resolve()) + "/output_ir/torch_" + model.model.__class__.__name__ + ".ir"
     # path = str(pathlib.Path(__file__).parent.resolve()) + "/output_ir/torch_Resnet18.ir"

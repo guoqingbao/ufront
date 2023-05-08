@@ -1,0 +1,8 @@
+[package]
+name = "rawapi"
+version = "0.1.1"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Low level bindings to UFront2TOSA API"
+repository = "https://github.com/guoqingbao/UFront2TOSA"
+readme = "../README.md"

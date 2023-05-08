@@ -457,6 +457,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "rawapi"
+version = "0.1.1"
+
+[[package]]
 name = "rawpointer"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -602,6 +606,7 @@ dependencies = [
  "num_enum",
  "numpy",
  "pyo3",
+ "rawapi",
  "tuple-conv",
 ]
 

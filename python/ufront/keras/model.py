@@ -1,4 +1,4 @@
-# Copyright 2023 CMU, Facebook, LANL, MIT, NVIDIA, and Stanford (alphabetical)
+# Copyright 2023 CMU, Facebook, LANL, MIT, NVIDIA, and Stanford (alphabetical), Enflame Tech
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -412,6 +412,10 @@ class UFrontKeras(tf_keras_Model):
   def dump_ir(self):
     return self._base_model.ufront_model.dump_ir()
   
+  def dump_tosa_ir(self):
+    return self._base_model.ufront_model.dump_tosa_ir()
+  
+
   def get_output_operator(self):
     return self._base_model.get_output_operator()
   

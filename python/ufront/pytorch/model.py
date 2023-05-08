@@ -1,4 +1,4 @@
-# Copyright 2020 Stanford University, Los Alamos National Laboratory
+# Copyright 2020 Stanford University, Los Alamos National Laboratory, Enflame Tech
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -3070,6 +3070,10 @@ class UFrontTorch():
 
     def dump_ir(self):
         return self.ufront_model.dump_ir()
+    
+    def dump_tosa_ir(self):
+        return self.ufront_model.dump_tosa_ir()
+    
 
     def compile(self,
               optimizer,

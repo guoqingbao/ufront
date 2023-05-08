@@ -1,4 +1,4 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All rights reserved.
+# Copyright (c) Facebook, Inc. and its affiliates, Enflame Tech. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -489,29 +489,29 @@ class ONNXModel(object):
         #     dim = input2.shape[1]
         #     return self.umodel.dense(input = input1, out_dim=dim, use_bias=False, name=node.name)
 
-        # input1 = node_to_output[node.input[0]]
-        # if node.input[1] in node_to_output:
-        #     input2 = node_to_output[node.input[1]]
-        # elif node.input[1] in self.inputs:
-        #     input2 = self.inputs[node.input[1]]
-        # else:
-        #     assert 0, "Unable to obtain input2!"
+        input1 = node_to_output[node.input[0]]
+        if node.input[1] in node_to_output:
+            input2 = node_to_output[node.input[1]]
+        elif node.input[1] in self.inputs:
+            input2 = self.inputs[node.input[1]]
+        else:
+            assert 0, "Unable to obtain input2!"
             
-        # if type(input2) != TensorF32:
-        #     assert type(input2) == np.ndarray, "The given input is not an ndarray!"
-        #     operator = self.addTensor(input2, False, node.input[1])
-        #     self.operators.append(operator)
-        #     input2 = operator.get_output(0)
-        # elif type(input1) != TensorF32:
-        #     assert type(input1) == np.ndarray, "The given input is not an ndarray!"
-        #     operator = self.addTensor(input1, False, node.input[0])
-        #     self.operators.append(operator)
-        #     input1 = operator.get_output(0)
+        if type(input2) != TensorF32:
+            assert type(input2) == np.ndarray, "The given input is not an ndarray!"
+            operator = self.addTensor(input2, False, node.input[1])
+            self.operators.append(operator)
+            input2 = operator.get_output(0)
+        elif type(input1) != TensorF32:
+            assert type(input1) == np.ndarray, "The given input is not an ndarray!"
+            operator = self.addTensor(input1, False, node.input[0])
+            self.operators.append(operator)
+            input1 = operator.get_output(0)
 
-        # if len(input1.shape) < 3 and len(input2.shape) < 3:
-        #     return self.umodel.matmul(x = input1, y=input2, name=node.name)
-        # else:
-        #     return self.umodel.batch_matmul(x = input1, y=input2, name=node.name)
+        if len(input1.shape) < 3 and len(input2.shape) < 3:
+            return self.umodel.matmul(x = input1, y=input2, name=node.name)
+        else:
+            return self.umodel.batch_matmul(x = input1, y=input2, name=node.name)
         
     def handleTranspose(self, node, node_to_output):
         input = node_to_output[node.input[0]]
@@ -1012,6 +1012,10 @@ class UFrontONNX(ONNXModel):
 
     def dump_ir(self):
         return self.umodel.dump_ir()
+    
+    def dump_tosa_ir(self):
+        return self.umodel.dump_tosa_ir()
+    
 
     def compile(self,
               optimizer,
