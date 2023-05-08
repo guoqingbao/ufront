@@ -17,12 +17,12 @@ build/
 develop-eggs/
 dist/
 eggs/
-lib/
+# lib/
 lib64/
 parts/
 sdist/
 var/
-include/
+# include/
 man/
 venv/
 *.egg-info/
