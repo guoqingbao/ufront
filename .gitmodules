@@ -1,0 +1,3 @@
+[submodule "UFront2TOSA"]
+	path = cpp/UFront2TOSA/
+	url = https://github.com/guoqingbao/UFront2TOSA
