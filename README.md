@@ -3,6 +3,51 @@ Unified Computing Frontend for Deep Learning
 
 _(This project is under development)_
 
+## How to build?
+
+#### Install tools for building main project
+```sh
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh #Rust
+
+pip install maturin==0.15.1
+
+pip install maturin[patchelf] #for packaging dependencies
+```
+
+#### Install tools for building subproject
+```sh
+echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-16 main" >> /etc/apt/sources.list && \
+    echo "deb-src http://apt.llvm.org/jammy/ llvm-toolchain-jammy-16 main" >> /etc/apt/sources.list && \
+    wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add
+
+apt update && apt install -y clang-16 lldb-16 lld-16 libmlir-16-dev mlir-16-tools #LLVM/MLIR
+```
+
+### Build the subproject first
+```sh
+cd cpp/UFront2TOSA && mkdir build && cd build
+
+cmake .. -G Ninja -DMLIR_DIR=/usr/lib/llvm-16/lib/cmake/mlir && \
+    ninja && \
+```
+
+### Build the main project for development
+```sh
+maturin develop #Debug mode
+```
+### Run the examples
+```sh
+cd examples
+python torch_test.py
+```
+
+### Build the release package (wheel file)
+```sh
+maturin build --release -i python3.8 #for python3.8
+maturin build --release -i python3.8 #for python3.9
+maturin build --release -i python3.10 #for python3.10
+```
+
 
 ## Project discription
 1. The objective of this project is to create a **unified frontend** for deep learning computing.
@@ -103,7 +148,8 @@ if __name__ == "__main__":
     # for operator in operators:
     #   print(operator.ir) #show ir for each operator
 
-    print(model.dump_ir()) # TOSA IR
+    print(model.dump_ir()) # UFront IR
+    #print(model.dump_tosa_ir()) # TOSA IR
 
     #This will be supported later
     #model.forward()
@@ -183,7 +229,9 @@ if __name__ == "__main__":
     # for operator in operators:
     #   print(operator.ir) #show ir for each operator
 
-    print(model.dump_ir())
+    print(model.dump_ir()) # UFront IR
+
+    #model.dump_tosa_ir() #TOSA IR
 
     #This will be supported later
     #model.forward()
@@ -273,8 +321,8 @@ if __name__ == "__main__":
 
     # for operator in operators:
     #   print(operator.ir) #show ir for each operator
-    print(model.dump_ir())
-
+    print(model.dump_ir()) #UFront IR
+    #print(model.dump_tosa_ir()) #TOSA IR
     #This will be supported later
     #model.forward()
     
@@ -350,8 +398,9 @@ if __name__ == "__main__":
 
    model.compile(loss=LossType.CATEGORICAL_CROSSENTROPY, metrics=[MetricsType.ACCURACY, MetricsType.SPARSE_CATEGORICAL_CROSSENTROPY])
    
-   print(model.dump_ir())
-   
+   print(model.dump_ir()) #UFront IR
+   #print(model.dump_tosa_ir()) #TOSA IR
+
    #This will be supported later
    #model.forward()
     
