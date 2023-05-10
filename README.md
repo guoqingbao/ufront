@@ -1,7 +1,9 @@
 # ufront
 Unified Computing Frontend for Deep Learning 
 
-_(This project is under development)_
+## How it works?
+Convert Pytorch, Tensorflow, Keras, ONNX models to UFront IR and then lower them into standard MLIR dialect (TOSA IR)
+
 
 ## How to build?
 
@@ -9,18 +11,23 @@ _(This project is under development)_
 ```sh
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh #Rust
 
-pip install maturin==0.15.1
+pip install maturin==0.15.1 #Rust cross-language build tool
 
 pip install maturin[patchelf] #for packaging dependencies
 ```
 
-#### Install tools for building subproject
+#### Install dependencies for subproject
 ```sh
-echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-16 main" >> /etc/apt/sources.list && \
-    echo "deb-src http://apt.llvm.org/jammy/ llvm-toolchain-jammy-16 main" >> /etc/apt/sources.list && \
+apt update && apt install -y wget cmake ninja-build gnupg #C++ build tools
+
+apt install libomp-16-dev #openmp
+
+#LLVM-16 for Ubuntu 20.04, you may change this for Ubuntu 22.04 or 18.04 (see https://apt.llvm.org/)
+echo "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-16 main" >> /etc/apt/sources.list && \
+    echo "deb-src http://apt.llvm.org/focal/ llvm-toolchain-focal-16 main" >> /etc/apt/sources.list && \
     wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add
 
-apt update && apt install -y clang-16 lldb-16 lld-16 libmlir-16-dev mlir-16-tools #LLVM/MLIR
+apt update && apt install -y clang-16 lldb-16 lld-16 libmlir-16-dev mlir-16-tools #LLVM/MLIR version 16
 ```
 
 ### Build the subproject first
@@ -35,6 +42,7 @@ cmake .. -G Ninja -DMLIR_DIR=/usr/lib/llvm-16/lib/cmake/mlir && \
 ```sh
 maturin develop #Debug mode
 ```
+
 ### Run the examples
 ```sh
 cd examples

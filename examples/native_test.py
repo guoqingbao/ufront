@@ -35,7 +35,7 @@ x = model.conv2d(input=x.get_output(0), out_channels=64, kernel=[3, 3], stride=[
 x = model.relu(input=x.get_output(0))
 x = model.pool2d(input=x.get_output(0), kernel=[2, 2], stride=[2, 2], pad=[0, 0], pool_type=PoolType.POOL_MAX)
 
-x = model.flat(input=x.get_output(0))
+x = model.flat(input=x.get_output(0), start_dim=1, end_dim=-1)
 x = model.dense(input=x.get_output(0), out_dim=512)
 
 x = model.relu(input=x.get_output(0))

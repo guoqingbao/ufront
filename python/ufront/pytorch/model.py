@@ -2904,7 +2904,7 @@ class OutputNode(Node):
             else:
                 output_tensors[:] += [node_to_output[other.name]]
 
-TorchFunctions = {'einsum':torch.einsum, 'swapaxes':torch.swapaxes}
+# TorchFunctions = {'einsum':torch.einsum, 'swapaxes':torch.swapaxes}
 
 class UFrontTorch():
     def __init__(
