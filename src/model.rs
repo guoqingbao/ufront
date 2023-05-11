@@ -47,6 +47,8 @@ static START: Once = Once::new();
 
 use rawapi;
 use std::ffi::CStr;
+use std::ffi::CString;
+use std::ffi::c_char;
 
 pub trait FunctionTrait {
     fn input(&self);
@@ -328,9 +330,12 @@ impl Model {
 
     pub fn dump_tosa_ir(&self) -> String {
         let ufront_ir = self.dump_ir();
-        let tosa_ir_cstr = unsafe { rawapi::ufront_to_tosa(ufront_ir.as_ptr() as *const i8) };
-        let cstr = unsafe { CStr::from_ptr(tosa_ir_cstr) };
-        String::from_utf8_lossy(cstr.to_bytes()).to_string()
+        let rust_cstring = CString::new(ufront_ir).unwrap();
+        let rust_cstring = rust_cstring.as_bytes_with_nul().as_ptr() as *const c_char;
+
+        let tosa_ir_cstr = unsafe { rawapi::ufront_to_tosa(rust_cstring) };
+        let cstr = unsafe { CStr::from_ptr(tosa_ir_cstr).to_str().unwrap() };
+        String::from(cstr)
     }
 
     pub fn dump_ir(&self) -> String {
