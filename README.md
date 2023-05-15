@@ -7,6 +7,16 @@ Convert Pytorch, Tensorflow, Keras, ONNX models to UFront IR and then lower them
 
 ## How to build?
 
+### Option 1: Docker image (**recommended**)
+```sh
+git clone git@github.com:guoqingbao/ufront.git
+cd ufront
+git submodule update --init --recursive
+docker build -t ufront:latest .
+docker run --name <your container name> ufront:latest /bin/bash
+```
+
+### Option 2: Manual build
 #### Install tools for building main project
 ```sh
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh #Rust
@@ -19,7 +29,7 @@ pip install maturin[patchelf] #for packaging dependencies
 #### Install dependencies for subproject
 ```sh
 apt update && apt install -y wget cmake ninja-build gnupg #C++ build tools
-
+apt install zlib1g zlib1g-dev #zlib
 apt install libomp-16-dev #openmp
 
 #LLVM-16 for Ubuntu 20.04, you may change this for Ubuntu 22.04 or 18.04 (see https://apt.llvm.org/)
@@ -30,7 +40,7 @@ echo "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-16 main" >> /etc/apt/s
 apt update && apt install -y clang-16 lldb-16 lld-16 libmlir-16-dev mlir-16-tools #LLVM/MLIR version 16
 ```
 
-### Build the subproject first
+#### Build the subproject first
 ```sh
 cd cpp/UFront2TOSA && mkdir build && cd build
 
@@ -38,21 +48,22 @@ cmake .. -G Ninja -DMLIR_DIR=/usr/lib/llvm-16/lib/cmake/mlir && \
     ninja && \
 ```
 
-### Build the main project for development
+#### Build the main project for development
 ```sh
 maturin develop #Debug mode
 ```
 
-### Run the examples
+#### Run the examples
 ```sh
 cd examples
-python torch_test.py
+python native_test.py
+python torch_e2e_demo.py #make sure torch-cpu installed
 ```
 
-### Build the release package (wheel file)
+#### Build the release package (wheel file)
 ```sh
 maturin build --release -i python3.8 #for python3.8
-maturin build --release -i python3.8 #for python3.9
+maturin build --release -i python3.9 #for python3.9
 maturin build --release -i python3.10 #for python3.10
 ```
 

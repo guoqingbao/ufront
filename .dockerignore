@@ -1,0 +1,25 @@
+**/target
+
+# Byte-compiled / optimized / DLL files
+*/__pycache__
+*/.pytest_cache/
+# *.py[cod]
+
+# C extensions
+*.so
+**/env
+**/bin
+**/build
+
+
+
+**/.cache
+
+**/.vscode
+
+*.ff
+*.onnx
+*.gz
+*.compiler
+**/.onnx
+test.py
