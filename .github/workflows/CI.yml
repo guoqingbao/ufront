@@ -1,0 +1,139 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  linux:
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Install SSH Key
+      uses: shimataro/ssh-key-action@v2
+      with:
+        key: ${{ secrets.SSH_PRIVATE_KEY }} 
+        known_hosts: 'github.com'
+
+    - name: add llvm deb repository
+      uses: myci-actions/add-deb-repo@11
+      with:
+        repo: deb http://apt.llvm.org/focal/ llvm-toolchain-focal-16 main
+        repo-name: llvm
+        keys-asc: https://apt.llvm.org/llvm-snapshot.gpg.key
+
+    - name: add llvm-src deb repository
+      uses: myci-actions/add-deb-repo@11
+      with:
+        repo: deb-src http://apt.llvm.org/focal/ llvm-toolchain-focal-16 main
+        repo-name: llvm-src
+        keys-asc: https://apt.llvm.org/llvm-snapshot.gpg.key
+
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y wget cmake ninja-build gnupg 
+        sudo apt install -y clang-16 lldb-16 lld-16 libmlir-16-dev mlir-16-tools
+        sudo apt install curl libomp-16-dev zlib1g zlib1g-dev -y
+        sudo curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+        sudo apt install python3-distutils -y
+        sudo python3 get-pip.py
+        sudo pip install maturin[patchelf] 
+
+    - uses: actions/checkout@v3
+    - name: Checkout submodules
+      run: git submodule update --init --recursive
+    - name: Build dependencies
+      run: |
+         mkdir ${{github.workspace}}/cpp/UFront2TOSA/build
+         cd ${{github.workspace}}/cpp/UFront2TOSA/build
+         cmake ${{github.workspace}}/cpp/UFront2TOSA -G Ninja -DMLIR_DIR=/usr/lib/llvm-16/lib/cmake/mlir
+         ninja
+         cd ${{github.workspace}}
+    - name: Build project
+      run: |
+         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+         pip install maturin==0.15.1 
+         maturin build --release --sdist -o dist --find-interpreter
+    # - uses: PyO3/maturin-action@v1
+    #   with:
+    #     docker-options: /bin/bash -c "apt update && apt install -y clang-16 libmlir-16-dev mlir-16-tools"
+    #     manylinux: auto
+    #     command: build
+    #     args: --release --sdist -o dist --find-interpreter
+    - name: Upload wheels
+      uses: actions/upload-artifact@v3
+      with:
+        name: wheels
+        path: dist
+
+  # windows:
+  #   runs-on: windows-latest
+  #   steps:
+  #   - name: Install SSH Key
+  #     uses: shimataro/ssh-key-action@v2
+  #     with:
+  #       key: ${{ secrets.SSH_PRIVATE_KEY }} 
+  #       known_hosts: 'github.com'
+
+  #   - name: Install dependencies
+  #     run: |
+  #       choco uninstall -y llvm
+  #       choco install -y curl ninja zlib-devel
+  #       choco install -y cmake --installargs '"ADD_CMAKE_TO_PATH=System"'
+  #       choco install -y llvm --version 16.0.3
+  #       python3 -m pip install maturin 
+
+  #   - uses: actions/checkout@v3
+  #   - name: Checkout submodules
+  #     run: git submodule update --init --recursive
+  #   - name: Build dependencies
+  #     run: |
+  #        mkdir ${{github.workspace}}/cpp/UFront2TOSA/build
+  #        cd ${{github.workspace}}/cpp/UFront2TOSA/build
+  #        cmake ${{github.workspace}}/cpp/UFront2TOSA -G Ninja -DMLIR_DIR=/usr/lib/llvm-16/lib/cmake/mlir -DUSEOMP=OFF
+  #        ninja
+  #        cd ${{github.workspace}}
+  #   - name: Build project
+  #     run: |
+  #        choco install rust
+  #        maturin build --release --sdist -o dist --find-interpreter
+  #   - name: Upload wheels
+  #     uses: actions/upload-artifact@v3
+  #     with:
+  #       name: wheels
+  #       path: dist
+
+  # macos:
+  #   runs-on: macos-latest
+  #   steps:
+  #   - uses: actions/checkout@v3
+  #   - uses: PyO3/maturin-action@v1
+  #     with:
+  #       command: build
+  #       args: --release -o dist --universal2 --find-interpreter
+  #   - name: Upload wheels
+  #     uses: actions/upload-artifact@v3
+  #     with:
+  #       name: wheels
+  #       path: dist
+
+  # release:
+  #   name: Release
+  #   runs-on: ubuntu-latest
+  #   if: "startsWith(github.ref, 'refs/tags/')"
+  #   needs: [ macos, windows, linux ]
+  #   steps:
+  #     - uses: actions/download-artifact@v3
+  #       with:
+  #         name: wheels
+  #     - name: Publish to PyPI
+  #       uses: PyO3/maturin-action@v1
+  #       env:
+  #         MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+  #       with:
+  #         command: upload
+  #         args: --skip-existing *
