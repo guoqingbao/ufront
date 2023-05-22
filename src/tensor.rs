@@ -153,4 +153,14 @@ impl TensorF32 {
     pub fn get_name(&self) -> String {
         self.name.clone()
     }
+
+    pub fn raw_size(&self) -> usize {
+        match &self.tensor {
+            Some(v) => {
+                return v.shape.iter().copied().reduce(|a, b| a*b).unwrap() * 4;
+            }
+            _ => panic!("Not initialized tensor!"),
+        }
+        return 0;
+    }
 }

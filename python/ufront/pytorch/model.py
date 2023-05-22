@@ -25,7 +25,7 @@ import math
 import io
 
 from ..ufront import (OpType, ActiMode, AggrMode, PoolType, TensorF32, DataType, ParamSyncType, Initializer)
-from ..ufront import Model, PyOperator, TensorF32, Optimizer, LossType, MetricsType #Rust frontend
+from ..ufront import Model, PyOperator, TensorF32, Optimizer, LossType, MetricsType, WeightType #Rust frontend
 from ..utils import list_product, onnx_to_ufront_dtype, numpy_to_ufront_dtype, ufront_to_numpy_dtype
 
 try:
@@ -286,13 +286,29 @@ class LinearNode(ModuleNode):
 
     def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return umodel.dense(
+        if umodel.weight_type == WeightType.INTERNAL:
+            return umodel.dense(
             input=input_tensor,
+            # weight=operator.get_output(0),
             out_dim=self.module.out_features,
             activation=self.acti_mode,
             use_bias=(self.module.bias is not None),
             name=self.name,
-        )
+            )
+        else:
+            requires_grad = self.module.weight.requires_grad
+            weight = self.module.weight.detach().numpy() if requires_grad \
+                else self.module.weight.numpy()
+            operator = umodel.parameter(np_tensor=weight.astype(np.float32), dtype=numpy_to_ufront_dtype(weight.dtype), requires_grad=requires_grad, name=self.name + "_weight")
+
+            return umodel.dense(
+                input=input_tensor,
+                weight=operator.get_output(0),
+                out_dim=self.module.out_features,
+                activation=self.acti_mode,
+                use_bias=(self.module.bias is not None),
+                name=self.name,
+            )
 
 
 class Conv2dNode(ModuleNode):
@@ -349,17 +365,38 @@ class Conv2dNode(ModuleNode):
 
     def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return umodel.conv2d(
-            input=input_tensor,
-            out_channels=self.module.out_channels,
-            kernel=[self.module.kernel_size[0], self.module.kernel_size[1]],
-            stride=[self.module.stride[0], self.module.stride[1]],
-            pad=[self.module.padding[0], self.module.padding[1]],
-            activation=self.acti_mode,
-            groups=self.module.groups,
-            use_bias=(self.module.bias is not None),
-            name=self.name,
-        )
+        if umodel.weight_type == WeightType.INTERNAL:
+            return umodel.conv2d(
+                input=input_tensor,
+                # weight=operator.get_output(0),
+                out_channels=self.module.out_channels,
+                kernel=[self.module.kernel_size[0], self.module.kernel_size[1]],
+                stride=[self.module.stride[0], self.module.stride[1]],
+                pad=[self.module.padding[0], self.module.padding[1]],
+                activation=self.acti_mode,
+                groups=self.module.groups,
+                use_bias=(self.module.bias is not None),
+                name=self.name,
+            )     
+        else:      
+            requires_grad = self.module.weight.requires_grad
+            weight = self.module.weight.detach().numpy() if requires_grad \
+                else self.module.weight.numpy()
+            
+            operator = umodel.parameter(np_tensor=weight.astype(np.float32), dtype=numpy_to_ufront_dtype(weight.dtype), requires_grad=requires_grad, name=self.name + "_weight")
+
+            return umodel.conv2d(
+                input=input_tensor,
+                weight=operator.get_output(0),
+                out_channels=self.module.out_channels,
+                kernel=[self.module.kernel_size[0], self.module.kernel_size[1]],
+                stride=[self.module.stride[0], self.module.stride[1]],
+                pad=[self.module.padding[0], self.module.padding[1]],
+                activation=self.acti_mode,
+                groups=self.module.groups,
+                use_bias=(self.module.bias is not None),
+                name=self.name,
+            )
 
 class objectview(object):
     def __init__(self, d):
@@ -1064,17 +1101,67 @@ class MultiheadAttentionNode(ModuleNode):
         num_heads = self.module.num_heads
         dropout = self.module.dropout
         batch_first = self.module.batch_first
+        if umodel.weight_type == WeightType.INTERNAL:
+            return umodel.multihead_attention(
+                q=q,
+                k=k,
+                v=v,
+                embed_dim=embed_dim,
+                num_heads=num_heads,
+                dropout=dropout,
+                batch_first=batch_first,
+                name=self.name,
+            )
+        else:
+            assert self.module.out_proj.weight != None, "out_proj.weight cannot be None!"
 
-        return umodel.multihead_attention(
-            q=q,
-            k=k,
-            v=v,
-            embed_dim=embed_dim,
-            num_heads=num_heads,
-            dropout=dropout,
-            batch_first=batch_first,
-            name=self.name,
-        )
+            requires_grad_o = self.module.out_proj.weight.requires_grad
+            weight_o = self.module.out_proj.weight.detach().numpy() if requires_grad_o \
+                    else self.module.out_proj.weight.numpy()
+            
+            if self.module.in_proj_weight != None:
+                requires_grad = self.module.in_proj_weight.requires_grad
+                weight_in = self.module.in_proj_weight.detach().numpy() if requires_grad \
+                    else self.module.in_proj_weight.numpy()
+                
+                length = int(weight_in.shape[0] / 3)
+                weight_q = weight_in[0:length,:]
+                weight_k = weight_in[length:2*length,:]
+                weight_v = weight_in[2*length:3*length,:]
+                requires_grad_q = requires_grad_k = requires_grad_v = requires_grad
+            else:
+                requires_grad_q = self.module.q_proj_weight.requires_grad
+                weight_q = self.module.q_proj_weight.detach().numpy() if requires_grad_q \
+                    else self.module.q_proj_weight.numpy()
+
+                requires_grad_k = self.module.k_proj_weight.requires_grad
+                weight_k = self.module.k_proj_weight.detach().numpy() if requires_grad_k \
+                    else self.module.k_proj_weight.numpy()
+
+                requires_grad_v = self.module.v_proj_weight.requires_grad
+                weight_v = self.module.v_proj_weight.detach().numpy() if requires_grad_v \
+                    else self.module.v_proj_weight.numpy()
+                            
+            operator_q = umodel.parameter(np_tensor=weight_q.astype(np.float32), dtype=numpy_to_ufront_dtype(weight_q.dtype), requires_grad=requires_grad_q, name=self.name + "_weight_q")
+            operator_k = umodel.parameter(np_tensor=weight_k.astype(np.float32), dtype=numpy_to_ufront_dtype(weight_k.dtype), requires_grad=requires_grad_k, name=self.name + "_weight_k")
+            operator_v = umodel.parameter(np_tensor=weight_v.astype(np.float32), dtype=numpy_to_ufront_dtype(weight_v.dtype), requires_grad=requires_grad_v, name=self.name + "_weight_v")
+
+            operator_o = umodel.parameter(np_tensor=weight_o.astype(np.float32), dtype=numpy_to_ufront_dtype(weight_o.dtype), requires_grad=requires_grad_o, name=self.name + "_weight_o")
+
+            return umodel.multihead_attention(
+                q=q,
+                k=k,
+                v=v,
+                weight_q=operator_q.get_output(0),
+                weight_k=operator_k.get_output(0),
+                weight_v=operator_v.get_output(0),
+                weight_o=operator_o.get_output(0),
+                embed_dim=embed_dim,
+                num_heads=num_heads,
+                dropout=dropout,
+                batch_first=batch_first,
+                name=self.name,
+            )
 
 
 
@@ -2679,11 +2766,14 @@ class AttributeNode(Node):
 
     def attr_to_ff_tensor(self, umodel):
         torch_tensor = self.attr
-        ff_dtype = Node.torch_to_ff_dtype(torch_tensor.dtype)
+        # ff_dtype = Node.torch_to_ff_dtype(torch_tensor.dtype)
 
         requires_grad = torch_tensor.requires_grad
         np_tensor = torch_tensor.detach().numpy() if requires_grad \
             else torch_tensor.numpy()
+
+        return umodel.parameter(np_tensor=np_tensor.astype(np.float32), dtype=numpy_to_ufront_dtype(np_tensor.dtype), requires_grad=requires_grad, name=self.attr_name)
+
 
         # TODO: Remove cast down to 32-bit once 64-bit dtype is supported
         if ff_dtype == DataType.Int64:
@@ -2911,6 +3001,7 @@ class UFrontTorch():
         self,
         model,
         batch_size,
+        pass_weights, #pass Pytorch weights to compiler, set to True for pretrained models.
         verbose = False,
         seq_length=None,
     ):
@@ -2918,11 +3009,13 @@ class UFrontTorch():
         self.model = model
         self.ufront_model = Model() # Ufront Rust model
         self.batch_size = batch_size
+        self.pass_weights = pass_weights
         self.seq_length = seq_length
         self.operators = []
         self._metrics = []
         self._loss = LossType.SPARSE_CATEGORICAL_CROSSENTROPY
         self._label_type = DataType.Int32
+        self.ufront_model.weight_type = WeightType.EXTERNAL if pass_weights else WeightType.INTERNAL
         self.ufront_model.optimizer = Optimizer(params={"type":"sgd", "lr":"0.01", "momentum":"0", "nesterov":"False", "weight_decay":"0"})
         self.external_functions = {}
         # NOTE: We default `seq_length` to `None` instead of matching

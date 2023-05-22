@@ -483,3 +483,13 @@ pub enum MetricsType {
     ROOT_MEAN_SQUARED_ERROR,
     MEAN_ABSOLUTE_ERROR,
 }
+
+#[pyclass]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, TryFromPrimitive)]
+#[repr(u32)]
+#[allow(non_camel_case_types)]
+pub enum WeightType {
+    EXTERNAL = 9001,
+    INTERNAL,
+}
+

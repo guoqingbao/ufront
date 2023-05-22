@@ -28,7 +28,7 @@ use model::Model;
 use operator::PyOperator;
 use optimizer::Optimizer;
 use tensor::TensorF32;
-use types::{ActiMode, AggrMode, DataType, LossType, MetricsType, OpType, ParamSyncType, PoolType};
+use types::{ActiMode, AggrMode, DataType, LossType, MetricsType, OpType, ParamSyncType, PoolType, WeightType};
 
 /// A Python module implemented in Rust.
 #[pymodule]
@@ -50,6 +50,7 @@ fn ufront(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<MetricsType>()?;
 
     m.add_class::<PyOperator>()?;
+    m.add_class::<WeightType>()?;
 
     Ok(())
 }

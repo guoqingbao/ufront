@@ -34,6 +34,7 @@ use crate::prelude::Tensor;
 use crate::tensor::TensorF32;
 use crate::types::DataType;
 use crate::types::OpType;
+use crate::types::WeightType;
 use indexmap::IndexMap;
 use log::{info, warn, error};
 use crate::optimizer::Optimizer;
@@ -130,17 +131,17 @@ pub struct Model {
     ssa_ids: HashMap<String, i32>,
     op_names: Vec<String>,
     op_idx : i32,
+    #[pyo3(get, set)]
+    pub weight_type: WeightType,
 }
 
 #[pymethods]
 impl Model {
     #[new]
     pub fn new() -> Model {
-        unsafe {
-            START.call_once(|| {
-                env_logger::init();
-            });
-        }
+        START.call_once(|| {
+            env_logger::init();
+        });
         info!("Model::new");
         let params = HashMap::from([
             ("type".to_string(), "sgd".to_string()),
@@ -160,6 +161,7 @@ impl Model {
             ssa_ids: HashMap::new(),
             op_names: Vec::new(),
             op_idx: 0,
+            weight_type: WeightType::INTERNAL,
         }
     }
 
@@ -507,9 +509,9 @@ impl Model {
                         && para.contains("k").unwrap()
                         && para.contains("v").unwrap()
                     {
-                        let q = para.get_item("q").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
-                        let k = para.get_item("k").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
-                        let v = para.get_item("v").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
+                        let q = para.get_item("q").unwrap().extract::<PyRef<TensorF32>>(); 
+                        let k = para.get_item("k").unwrap().extract::<PyRef<TensorF32>>(); 
+                        let v = para.get_item("v").unwrap().extract::<PyRef<TensorF32>>(); 
 
                         match (q, k, v) {
                             (Ok(q1), Ok(k1), Ok(v1)) => {
@@ -517,14 +519,41 @@ impl Model {
                                     && op.add_input(&k1).is_ok()
                                     && op.add_input(&v1).is_ok()
                                 {
-                                    op.calculate_output();
+                                    if para.contains("weight_q").unwrap()
+                                    && para.contains("weight_k").unwrap()
+                                    && para.contains("weight_v").unwrap()
+                                    && para.contains("weight_o").unwrap()
+                                    {
+                                        let weight_q = para.get_item("weight_q").unwrap().extract::<PyRef<TensorF32>>(); 
+                                        let weight_k = para.get_item("weight_k").unwrap().extract::<PyRef<TensorF32>>(); 
+                                        let weight_v = para.get_item("weight_v").unwrap().extract::<PyRef<TensorF32>>(); 
+                                        let weight_o = para.get_item("weight_o").unwrap().extract::<PyRef<TensorF32>>(); 
+                                        match (weight_q, weight_k, weight_v, weight_o) {
+                                            (Ok(wq), Ok(wk), Ok(wv), Ok(wo)) => {
+                                                if op.add_input(&wq).is_ok()
+                                                && op.add_input(&wk).is_ok()
+                                                && op.add_input(&wv).is_ok()
+                                                && op.add_input(&wo).is_ok()
+                                                {
+                                                    op.calculate_output();
+                                                }
+                                            }
+                                            _ => {
+                                                panic! {"Not the valid weight type!"};
+                                            }
+                                        }
+                                    }
+                                    else {
+                                        op.calculate_output();
+                                    }
                                 }
                             }
                             _ => {
                                 panic! {"Not a valid input type!"};
                             }
                         }
-                    } else {
+                    }
+                    else {
                         panic! {"Missing important arguments (q, k, or v?)"};
                     }
                 } else if op_type == OpType::PARAMETER || op_type == OpType::TENSOR {
@@ -591,24 +620,41 @@ impl Model {
                         panic! {"Missing important arguments (q, k, or v?)"};
                     }
                 } else if para.contains("input").unwrap()  {
-                    let ret = para
-                        .get_item("input")
-                        .unwrap()
-                        .extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
-                    match ret {
-                        Ok(v) => {
-                            if v.name.find("input") == Some(0) || v.name.find("x") == Some(0) {
-                                self.args.insert(v.name.clone(), argstr.clone());
-                                self.argshapes.insert(v.name.clone(), v.get_ir());
+                        let ret = para
+                            .get_item("input")
+                            .unwrap()
+                            .extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
+                        match ret {
+                            Ok(v) => {
+                                if v.name.find("input") == Some(0) || v.name.find("x") == Some(0) {
+                                    self.args.insert(v.name.clone(), argstr.clone());
+                                    self.argshapes.insert(v.name.clone(), v.get_ir());
+                                }
+                                if op.add_input(&v).is_ok() {
+                                    if para.contains("weight").unwrap()  {
+                                        let ret = para
+                                            .get_item("weight")
+                                            .unwrap()
+                                            .extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
+                                        match ret {
+                                            Ok(v) => {
+                                                if op.add_input(&v).is_ok() {
+                                                    op.calculate_output();
+                                                }
+                                            }
+                                            _ => {
+                                                panic! {"Not a valid input type!"};
+                                            }
+                                        }
+                                    } else {
+                                        op.calculate_output();
+                                    }
+                                }
                             }
-                            if op.add_input(&v).is_ok() {
-                                op.calculate_output();
+                            _ => {
+                                panic! {"Not a valid input type!"};
                             }
                         }
-                        _ => {
-                            panic! {"Not a valid input type!"};
-                        }
-                    }
                 }
 
                 Python::with_gil(|py| Py::new(py, op).unwrap())

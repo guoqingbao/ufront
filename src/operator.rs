@@ -19,6 +19,7 @@ use crate::tensor::TensorF32;
 use crate::types::DataType;
 use crate::types::OpType;
 use core::panic;
+use std::println;
 use ndarray::ArrayD;
 use numpy::{IntoPyArray, PyArrayDyn, PyReadonlyArrayDyn};
 // use pyo3::exceptions::PyOSError;
@@ -1038,6 +1039,19 @@ impl Operator {
             }
             if params.contains_key("initializer") {
                 params["initializer"] = params["initializer"].replace('\n', "");
+            } else {
+                match &self.inputs[0].tensor {
+                    Some(v) => match &v.data_buffer { 
+                        DataBuffer::CPUDataBuffer(data) => {
+                            params.insert("initializer".to_string(), format!("{:?}", data.as_ptr()));
+                            // let v = data.to_vec()[100];
+                            // let memaddr = format!("{:?}", data.as_ptr());
+                            // println!("Rust address {memaddr} 100th value {v}");
+                        }
+                        _ => panic!("Unable to init parameter, tensor conversion failed!"),
+                    },
+                    _ => panic!("Unable to init parameter, tensor not initialized!"),
+                }
             }
         } else if self.op_type == OpType::CALL {
             params.remove("argtypes");
@@ -1083,6 +1097,26 @@ impl Operator {
             if params.contains_key("keepdims") {
                 params["keepdims"] = params["keepdims"].to_lowercase();
             }
+        }
+
+        if self.op_type == OpType::CONV2D || self.op_type == OpType::LINEAR{
+            params.remove("weight");
+        }
+
+        if self.op_type == OpType::MULTIHEAD_ATTENTION{
+            params.remove("weight_q");
+            params.remove("weight_k");
+            params.remove("weight_v");
+            params.remove("weight_o");
+            
+            let mut segment_sizes = vec![0; 8];
+            for i in 0..self.inputs.len() {
+                segment_sizes[i] = 1;
+            }
+            let mut strsize = format!("{:?}", segment_sizes);
+            strsize = strsize.replace("[", "").replace("]", "");
+            params.insert("operand_segment_sizes".to_string(), format!("array<i32:{strsize}>"));
+            // println!("array<i64:{strsize}>")
         }
 
         params.remove("activation"); //fused activation not supported at the moment

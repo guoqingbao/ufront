@@ -20,7 +20,7 @@ if __name__ == "__main__":
     # input = torch.empty(1, 512, 128).normal_(std=0.02)
     # mask = MultiHeadAttention.gen_history_mask(input)
     # net = MultiHeadAttention(128, 16)
-    #out = net(input, input, input, mask)
+    # out = net(input, input, input, mask)
 
     # net = ComplexCNN()
     # net = maxvit_t(pretrained=False)
@@ -29,15 +29,15 @@ if __name__ == "__main__":
     # net = regnet_x_32gf(pretrained=False)
     # net = resnet18(pretrained=False)
 
-    # net = resnet50(pretrained=False)
+    net = resnet50(pretrained=False)
     # net = shufflenet_v2_x1_5(pretrained=False)
     # net = mobilenet_v3_small(pretrained=False)
     # net = densenet121(pretrained=False)
     # net = convnext_small(pretrained=False)
     # net = efficientnet_v2_s(pretrained=False)
-    # net = inception_v3(pretrained=False) #net.train(False) important!
+    # net = inception_v3(pretrained=False) 
 
-    net = models.vision_transformer.vit_b_16(weights=False, dropout=0.1)
+    # net = models.vision_transformer.vit_b_16(weights=False, dropout=0.1)
     # net = models.swin_transformer.swin_t(weights=None)
     net.train(False) #False for inception_v3
     # b = net(input)
@@ -48,18 +48,12 @@ if __name__ == "__main__":
     # input = torch.ones((batch_size, 3, 32, 32), dtype=torch.float32)   
     # net = SimpleCNN()
     # net(input, input)
-    model = UFrontTorch(net, batch_size=batch_size) # convert torch model to ufront model
-
-    #save model to file (compatible with flexflow)
-    # model.torch_to_file('cnn.ff')
-
-    #load model from file (compatible with flexflow)
-    # output_tensors = UFrontTorch.file_to_ff('cnn.ff', [input_tensor, input_tensor])
+    model = UFrontTorch(net, batch_size=batch_size, pass_weights=True) # convert torch model to ufront model
 
     #This will trigger Rust frontend for actual model conversion and graph building
     #operators can also be managed by python side (each operator here corresponding to an operator in the Rust computation graph)
-    # output_tensors = model(inputs = [input])
     output_tensors = model(inputs = [input])
+    # output_tensors = model(inputs = [input, input, input, mask])
 
     #The output of the model (forward pass have not been triggered at the moment!)
     if model.model.__class__.__name__ not in ["MaxVit", "SwinTransformer", "VisionTransformer", "MultiHeadAttention"]:

@@ -28,6 +28,10 @@ impl<T: Clone + Signed> Buffer<T> {
             self.raw_values.to_vec()
         }
     }
+
+    pub fn as_ptr(&self) -> *const T {
+        self.raw_values.as_ptr()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
