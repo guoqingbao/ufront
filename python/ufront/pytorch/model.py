@@ -3252,7 +3252,9 @@ class UFrontTorch():
         for input in inputs:
             if type(input) == torch.Tensor:
                 input = input.numpy()
-            input_tensor = TensorF32(input, "input" + str(idx)) # convert to Rust f32 tensor
+            input1 = np.ones(shape=input.shape, dtype=input.dtype)
+            input1[:] = input
+            input_tensor = TensorF32(input1, "input" + str(idx)) # convert to Rust f32 tensor
             input_tensors.append(input_tensor)
             idx += 1
 

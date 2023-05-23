@@ -57,7 +57,10 @@ jobs:
       run: |
          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
          pip install maturin==0.15.1 
-         maturin build --release --sdist -o dist --find-interpreter
+         maturin build --release --sdist -o dist -i python3.8
+         maturin build --release --sdist -o dist -i python3.9
+         maturin build --release --sdist -o dist -i python3.10
+
     # - uses: PyO3/maturin-action@v1
     #   with:
     #     docker-options: /bin/bash -c "apt update && apt install -y clang-16 libmlir-16-dev mlir-16-tools"
