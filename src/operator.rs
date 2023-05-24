@@ -1101,6 +1101,14 @@ impl Operator {
 
         if self.op_type == OpType::CONV2D || self.op_type == OpType::LINEAR{
             params.remove("weight");
+            params.remove("bias");
+            let mut segment_sizes = vec![0; 3];
+            for i in 0..self.inputs.len() {
+                segment_sizes[i] = 1;
+            }
+            let mut strsize = format!("{:?}", segment_sizes);
+            strsize = strsize.replace("[", "").replace("]", "");
+            params.insert("operand_segment_sizes".to_string(), format!("array<i32:{strsize}>"));
         }
 
         if self.op_type == OpType::MULTIHEAD_ATTENTION{
@@ -1117,6 +1125,21 @@ impl Operator {
             strsize = strsize.replace("[", "").replace("]", "");
             params.insert("operand_segment_sizes".to_string(), format!("array<i32:{strsize}>"));
             // println!("array<i64:{strsize}>")
+        }
+
+        if self.op_type == OpType::BATCH_NORM{
+            params.remove("weight");
+            params.remove("bias");
+            params.remove("mean");
+            params.remove("variance");
+            
+            let mut segment_sizes = vec![0; 5];
+            for i in 0..self.inputs.len() {
+                segment_sizes[i] = 1;
+            }
+            let mut strsize = format!("{:?}", segment_sizes);
+            strsize = strsize.replace("[", "").replace("]", "");
+            params.insert("operand_segment_sizes".to_string(), format!("array<i32:{strsize}>"));
         }
 
         params.remove("activation"); //fused activation not supported at the moment

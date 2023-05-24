@@ -300,15 +300,29 @@ class LinearNode(ModuleNode):
             weight = self.module.weight.detach().numpy() if requires_grad \
                 else self.module.weight.numpy()
             operator = umodel.parameter(np_tensor=weight.astype(np.float32), dtype=numpy_to_ufront_dtype(weight.dtype), requires_grad=requires_grad, name=self.name + "_weight")
-
-            return umodel.dense(
-                input=input_tensor,
-                weight=operator.get_output(0),
-                out_dim=self.module.out_features,
-                activation=self.acti_mode,
-                use_bias=(self.module.bias is not None),
-                name=self.name,
-            )
+            
+            if self.module.bias != None:
+                requires_grad = self.module.bias.requires_grad
+                bias = self.module.bias.detach().numpy() if requires_grad \
+                    else self.module.bias.numpy()
+                bias_op = umodel.parameter(np_tensor=bias.astype(np.float32), dtype=numpy_to_ufront_dtype(bias.dtype), requires_grad=requires_grad, name=self.name + "_bias")
+                return umodel.dense(
+                    input=input_tensor,
+                    weight=operator.get_output(0),
+                    bias=bias_op.get_output(0),
+                    out_dim=self.module.out_features,
+                    activation=self.acti_mode,
+                    name=self.name,
+                )
+            else:
+                return umodel.dense(
+                    input=input_tensor,
+                    weight=operator.get_output(0),
+                    out_dim=self.module.out_features,
+                    activation=self.acti_mode,
+                    use_bias=(self.module.bias is not None),
+                    name=self.name,
+                )
 
 
 class Conv2dNode(ModuleNode):
@@ -384,19 +398,38 @@ class Conv2dNode(ModuleNode):
                 else self.module.weight.numpy()
             
             operator = umodel.parameter(np_tensor=weight.astype(np.float32), dtype=numpy_to_ufront_dtype(weight.dtype), requires_grad=requires_grad, name=self.name + "_weight")
-
-            return umodel.conv2d(
-                input=input_tensor,
-                weight=operator.get_output(0),
-                out_channels=self.module.out_channels,
-                kernel=[self.module.kernel_size[0], self.module.kernel_size[1]],
-                stride=[self.module.stride[0], self.module.stride[1]],
-                pad=[self.module.padding[0], self.module.padding[1]],
-                activation=self.acti_mode,
-                groups=self.module.groups,
-                use_bias=(self.module.bias is not None),
-                name=self.name,
-            )
+            
+            if self.module.bias != None:
+                requires_grad = self.module.weight.requires_grad
+                bias = self.module.bias.detach().numpy() if requires_grad \
+                    else self.module.bias.numpy()
+                
+                bias_op = umodel.parameter(np_tensor=bias.astype(np.float32), dtype=numpy_to_ufront_dtype(bias.dtype), requires_grad=requires_grad, name=self.name + "_weight")
+                return umodel.conv2d(
+                    input=input_tensor,
+                    weight=operator.get_output(0),
+                    bias=bias_op.get_output(0),
+                    out_channels=self.module.out_channels,
+                    kernel=[self.module.kernel_size[0], self.module.kernel_size[1]],
+                    stride=[self.module.stride[0], self.module.stride[1]],
+                    pad=[self.module.padding[0], self.module.padding[1]],
+                    activation=self.acti_mode,
+                    groups=self.module.groups,
+                    name=self.name,
+                )
+            else:
+                return umodel.conv2d(
+                    input=input_tensor,
+                    weight=operator.get_output(0),
+                    out_channels=self.module.out_channels,
+                    kernel=[self.module.kernel_size[0], self.module.kernel_size[1]],
+                    stride=[self.module.stride[0], self.module.stride[1]],
+                    pad=[self.module.padding[0], self.module.padding[1]],
+                    activation=self.acti_mode,
+                    groups=self.module.groups,
+                    use_bias=(self.module.bias is not None),
+                    name=self.name,
+                )
 
 class objectview(object):
     def __init__(self, d):
@@ -543,12 +576,51 @@ class BatchNorm2dNode(ModuleNode):
 
     def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return umodel.batch_norm(
-            input=input_tensor,
-            eps=float(self.module.eps), momentum=self.module.momentum, affine=self.module.affine,
-            track_running_stats=self.module.track_running_stats,
-            name=self.name,
-        )
+        requires_grad = self.module.weight.requires_grad
+        weight = self.module.weight.detach().numpy() if requires_grad \
+            else self.module.weight.numpy()
+        weight = weight.reshape((1, weight.shape[0], 1, 1))
+        weight_op = umodel.parameter(np_tensor=weight.astype(np.float32), dtype=numpy_to_ufront_dtype(weight.dtype), requires_grad=requires_grad, name=self.name + "_weight")
+
+        requires_grad = self.module.bias.requires_grad
+        bias = self.module.bias.detach().numpy() if requires_grad \
+            else self.module.bias.numpy()
+        bias = bias.reshape((1, bias.shape[0], 1, 1))
+        
+        bias_op = umodel.parameter(np_tensor=bias.astype(np.float32), dtype=numpy_to_ufront_dtype(bias.dtype), requires_grad=requires_grad, name=self.name + "_weight")
+        if self.module.training:
+            return umodel.batch_norm(
+                input=input_tensor,
+                weight=weight_op.get_output(0),
+                bias=bias_op.get_output(0),
+                eps=float(self.module.eps), momentum=self.module.momentum, affine=self.module.affine,
+                track_running_stats=self.module.track_running_stats,
+                name=self.name,
+            )
+        else:
+            requires_grad = self.module.running_mean.requires_grad
+            running_mean = self.module.running_mean.detach().numpy() if requires_grad \
+                else self.module.running_mean.numpy()
+            running_mean = running_mean.reshape((1, running_mean.shape[0], 1, 1))
+            
+            running_mean_op = umodel.parameter(np_tensor=running_mean.astype(np.float32), dtype=numpy_to_ufront_dtype(running_mean.dtype), requires_grad=requires_grad, name=self.name + "_weight")
+            
+            requires_grad = self.module.running_var.requires_grad
+            running_var = self.module.running_var.detach().numpy() if requires_grad \
+                else self.module.running_var.numpy()
+            running_var = running_var.reshape((1, running_var.shape[0], 1, 1))
+            
+            running_var_op = umodel.parameter(np_tensor=running_var.astype(np.float32), dtype=numpy_to_ufront_dtype(running_var.dtype), requires_grad=requires_grad, name=self.name + "_weight")
+            return umodel.batch_norm(
+                input=input_tensor,
+                weight=weight_op.get_output(0),
+                bias=bias_op.get_output(0),
+                mean=running_mean_op.get_output(0),
+                variance=running_var_op.get_output(0),
+                eps=float(self.module.eps), momentum=self.module.momentum, affine=self.module.affine,
+                track_running_stats=self.module.track_running_stats,
+                name=self.name,
+            )
 
 
 class SoftmaxMNode(ModuleNode):

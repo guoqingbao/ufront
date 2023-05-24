@@ -619,11 +619,51 @@ impl Model {
                     } else {
                         panic! {"Missing important arguments (q, k, or v?)"};
                     }
+                } else if op_type == OpType::BATCH_NORM && para.contains("input").unwrap() {
+                    let ret = para.get_item("input").unwrap().extract::<PyRef<TensorF32>>(); 
+                    match ret {
+                        Ok(v) => {
+                            if op.add_input(&v).is_ok() {
+                                if para.contains("weight").unwrap() && para.contains("bias").unwrap()  {
+                                    let ret1 = para.get_item("weight").unwrap().extract::<PyRef<TensorF32>>(); 
+                                    let ret2 = para.get_item("bias").unwrap().extract::<PyRef<TensorF32>>(); 
+
+                                    match (ret1, ret2) {
+                                        (Ok(v1), Ok(v2)) => {
+                                            if op.add_input(&v1).is_ok() && op.add_input(&v2).is_ok() {
+                                                if para.contains("mean").unwrap() && para.contains("variance").unwrap() {
+                                                    let ret3 = para.get_item("mean").unwrap().extract::<PyRef<TensorF32>>(); 
+                                                    let ret4 = para.get_item("variance").unwrap().extract::<PyRef<TensorF32>>(); 
+                                                    match (ret3, ret4) {
+                                                        (Ok(v3), Ok(v4)) => {
+                                                            if op.add_input(&v3).is_ok() && op.add_input(&v4).is_ok() {
+                                                                op.calculate_output();
+                                                            }
+                                                        }
+                                                        _ => {
+                                                            panic! {"Not the valid mean and variance type!"};
+                                                        }
+                                                    }
+                                                } else {
+                                                    op.calculate_output();
+                                                }
+                                            }
+                                        }
+                                        _ => {
+                                            panic! {"Not the valid weight and bias type!"};
+                                        }
+                                    }
+                                } else {
+                                    op.calculate_output();
+                                }
+                            }
+                        }
+                        _ => {
+                            panic! {"Not a valid input type!"};
+                        }
+                    }
                 } else if para.contains("input").unwrap()  {
-                        let ret = para
-                            .get_item("input")
-                            .unwrap()
-                            .extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
+                        let ret = para.get_item("input").unwrap().extract::<PyRef<TensorF32>>(); 
                         match ret {
                             Ok(v) => {
                                 if v.name.find("input") == Some(0) || v.name.find("x") == Some(0) {
@@ -632,18 +672,29 @@ impl Model {
                                 }
                                 if op.add_input(&v).is_ok() {
                                     if para.contains("weight").unwrap()  {
-                                        let ret = para
-                                            .get_item("weight")
-                                            .unwrap()
-                                            .extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
+                                        let ret = para.get_item("weight").unwrap().extract::<PyRef<TensorF32>>();
                                         match ret {
                                             Ok(v) => {
                                                 if op.add_input(&v).is_ok() {
-                                                    op.calculate_output();
+                                                    if para.contains("bias").unwrap() {
+                                                        let ret1 = para.get_item("bias").unwrap().extract::<PyRef<TensorF32>>();
+                                                        match ret1 {
+                                                            Ok(v1) => {
+                                                                if op.add_input(&v1).is_ok() {
+                                                                    op.calculate_output();
+                                                                }
+                                                            }
+                                                            _ => {
+                                                                panic! {"Not a valid bias type!"};
+                                                            }
+                                                        }
+                                                    } else {
+                                                        op.calculate_output();
+                                                    }
                                                 }
                                             }
                                             _ => {
-                                                panic! {"Not a valid input type!"};
+                                                panic! {"Not a valid weight type!"};
                                             }
                                         }
                                     } else {
