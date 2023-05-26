@@ -3,7 +3,8 @@ import torch.nn as nn
 from torch.onnx import TrainingMode
 
 # Sample pytorch model definition
-class SimpleCNN(nn.Module):
+#input 32x32
+class SimpleCNN1(nn.Module):
     def __init__(self):
         super().__init__()
         self.features = nn.Sequential(
@@ -26,9 +27,7 @@ class SimpleCNN(nn.Module):
 
     def forward(self, x):
         x = self.features(x)
-        print(x.shape)
         x = torch.flatten(x, 1)
-        print(x.shape)
         x = self.classifier(x)
         return x
 

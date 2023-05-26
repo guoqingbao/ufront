@@ -81,6 +81,80 @@ maturin build --release -i python3.10 #for python3.10
 
 6. In addition to translating Pytorch, Keras, Tensorflow, and ONNX models into the standard computing IR (TOSA), the Rust frontend also provide standard computing workflows including operators, forward, backward, gradient update, etc. for training.
 
+## End-to-end demo
+
+``` python
+import torch
+import numpy as np
+from torchvision.models import resnet18, resnet50, squeezenet1_1, regnet_x_32gf, maxvit_t, shufflenet_v2_x1_5, inception_v3, mobilenet_v3_small, efficientnet_v2_s, densenet121, convnext_small
+import torchvision.models as models
+from ufront.pytorch.model import UFrontTorch 
+# pip install iree-compiler iree-runtime iree-tools-tf -f https://openxla.github.io/iree/pip-release-links.html
+import iree.compiler as ireec
+from iree.compiler import tools
+from iree import runtime
+
+batch_size = 1
+import tensorflow as tf
+
+def decode_result(result):
+  return tf.keras.applications.resnet50.decode_predictions(result, top=5)[0]
+    
+def load_read_image():
+    content_path = tf.keras.utils.get_file(
+    'YellowLabradorLooking_new.jpg',
+    'https://storage.googleapis.com/download.tensorflow.org/example_images/YellowLabradorLooking_new.jpg')
+
+    image = tf.io.read_file(content_path)
+    image = tf.image.decode_image(image, channels=3)
+    image = tf.image.resize(image, (224, 224))
+    image = image[tf.newaxis, :]
+    return np.moveaxis(image.numpy(), -1, 1)/ 255.0
+
+if __name__ == "__main__":
+    # net = resnet18(pretrained=True)
+    net = resnet50(pretrained=True)
+    net.train(False) 
+    input = load_read_image()
+    print("Pytorch: ", decode_result(net.forward(torch.Tensor(input)).detach().numpy()))
+
+    model = UFrontTorch(net, batch_size=batch_size, pass_weights=True) # convert torch model to ufront model
+    #This will trigger Rust frontend for actual model conversion and graph building
+    #operators can also be managed by python side (each operator here corresponding to an operator in the Rust computation graph)
+    output_tensors = model(inputs = [input])
+
+    #The output of the model (forward pass have not been triggered at the moment!)
+    # if model.model.__class__.__name__ not in ["MaxVit", "SwinTransformer", "VisionTransformer", "MultiHeadAttention"]:
+    #     output = model.softmax(input=output_tensors[0], name="softmax_out")
+
+    #This will trigger model compilation, i.e., convert Rust computation graph to a unified high-level IR and lower it to TOSA IR
+    model.compile(optimizer={"type":"sgd", "lr":"0.01", "momentum":"0", "nesterov":"False", "weight_decay":"0"},
+                        loss='sparse_categorical_crossentropy', metrics=['accuracy', 'sparse_categorical_crossentropy'])
+    tosa_ir= model.dump_tosa_ir()
+
+    print("Compiling TOSA model...")
+    if torch.cuda.is_available():
+        binary = ireec.compile_str(tosa_ir,
+                        target_backends=["cuda"], 
+                        input_type=ireec.InputType.TOSA)
+        module = runtime.load_vm_flatbuffer(binary, driver="cuda")
+    else:
+        binary = ireec.compile_str(tosa_ir,
+                        target_backends=["llvm-cpu"], 
+                        input_type=ireec.InputType.TOSA)
+        module = runtime.load_vm_flatbuffer(binary,backend="llvm-cpu") 
+
+    print("UFront: ", decode_result(module.forward(input).to_host()))
+```
+
+output:
+
+Pytorch:  [('n02099712', 'Labrador_retriever', 8.617878), ('n02099849', 'Chesapeake_Bay_retriever', 8.343), ('n02092339', 'Weimaraner', 7.604711), ('n15075141', 'toilet_tissue', 7.396191), ('n02808304', 'bath_towel', 6.9576306)]
+
+Compiling TOSA model...
+
+UFront:  [('n02099712', 'Labrador_retriever', 8.617871), ('n02099849', 'Chesapeake_Bay_retriever', 8.342996), ('n02092339', 'Weimaraner', 7.6047263), ('n15075141', 'toilet_tissue', 7.396185), ('n02808304', 'bath_towel', 6.9576297)]
+
 ## Sample usage for Pytorch Models
 ``` python
 import torch.nn as nn

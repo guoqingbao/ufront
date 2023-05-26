@@ -393,6 +393,7 @@ class Conv2dNode(ModuleNode):
                 name=self.name,
             )     
         else:      
+            
             requires_grad = self.module.weight.requires_grad
             weight = self.module.weight.detach().numpy() if requires_grad \
                 else self.module.weight.numpy()
@@ -576,6 +577,17 @@ class BatchNorm2dNode(ModuleNode):
 
     def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
+
+        if umodel.weight_type == WeightType.INTERNAL:
+            return umodel.batch_norm(
+                input=input_tensor,
+                # weight=weight_op.get_output(0),
+                # bias=bias_op.get_output(0),
+                eps=float(self.module.eps), momentum=self.module.momentum, affine=self.module.affine,
+                track_running_stats=self.module.track_running_stats,
+                name=self.name,
+            )
+
         requires_grad = self.module.weight.requires_grad
         weight = self.module.weight.detach().numpy() if requires_grad \
             else self.module.weight.numpy()

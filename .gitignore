@@ -77,3 +77,4 @@ docs/_build/
 *.compiler
 .onnx/
 test.py
+*.whl
