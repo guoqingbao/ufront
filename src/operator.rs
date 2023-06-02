@@ -1097,6 +1097,10 @@ impl Operator {
             if params.contains_key("keepdims") {
                 params["keepdims"] = params["keepdims"].to_lowercase();
             }
+        } else if self.op_type == OpType::GELU {
+            if params.contains_key("approximate") {
+                params["approximate"] = params["approximate"].to_lowercase();
+            }
         }
 
         if self.op_type == OpType::CONV2D || self.op_type == OpType::LINEAR{
@@ -1115,9 +1119,13 @@ impl Operator {
             params.remove("weight_q");
             params.remove("weight_k");
             params.remove("weight_v");
+            params.remove("bias_q");
+            params.remove("bias_k");
+            params.remove("bias_v");
             params.remove("weight_o");
+            params.remove("bias_o");
             
-            let mut segment_sizes = vec![0; 8];
+            let mut segment_sizes = vec![0; 12];
             for i in 0..self.inputs.len() {
                 segment_sizes[i] = 1;
             }
@@ -1127,13 +1135,13 @@ impl Operator {
             // println!("array<i64:{strsize}>")
         }
 
-        if self.op_type == OpType::BATCH_NORM{
+        if self.op_type == OpType::BATCH_NORM || self.op_type == OpType::LAYER_NORM{
             params.remove("weight");
             params.remove("bias");
             params.remove("mean");
             params.remove("variance");
             
-            let mut segment_sizes = vec![0; 5];
+            let mut segment_sizes = if self.op_type == OpType::BATCH_NORM {vec![0; 5]} else {vec![0; 3]};
             for i in 0..self.inputs.len() {
                 segment_sizes[i] = 1;
             }

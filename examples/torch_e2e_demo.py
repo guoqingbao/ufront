@@ -7,9 +7,8 @@ from ufront.pytorch.model import UFrontTorch
 import iree.compiler as ireec
 from iree.compiler import tools
 from iree import runtime
-
-batch_size = 1
 import tensorflow as tf
+from multihead_attention import MultiHeadAttention, MultiHeadAttentionNet, EncoderNet
 
 def decode_result(result):
   return tf.keras.applications.resnet50.decode_predictions(result, top=5)[0]
@@ -26,10 +25,26 @@ def load_read_image():
     return np.moveaxis(image.numpy(), -1, 1)/ 255.0
 
 if __name__ == "__main__":
-    # net = resnet18(pretrained=True)
-    net = resnet50(pretrained=True)
-    net.train(False) 
+    batch_size = 1
+    GPU = True
     input = load_read_image()
+    # net = resnet18(pretrained=True)# ok
+    # net = resnet50(pretrained=True)# ok
+    # net = densenet121(pretrained=True)# ok
+    # net = inception_v3(pretrained=True) # ok
+    # net = squeezenet1_1(pretrained=True) #note
+    # net = shufflenet_v2_x1_5(pretrained=True)# ok
+    # net = mobilenet_v3_small(pretrained=True)#note
+    net = models.vision_transformer.vit_b_16(weights=True) #ok
+    # input = torch.empty(1, 197, 768).normal_(std=0.02)
+    # mask = MultiHeadAttention.gen_history_mask(input)
+    # net = MultiHeadAttention(128, 16)
+    # net = MultiHeadAttentionNet()
+    # net = EncoderNet()
+
+    net.train(False) 
+    
+    # ret = net.forward(torch.Tensor(input)).detach().numpy()
     print("Pytorch: ", decode_result(net.forward(torch.Tensor(input)).detach().numpy()))
 
     model = UFrontTorch(net, batch_size=batch_size, pass_weights=True) # convert torch model to ufront model
@@ -44,10 +59,13 @@ if __name__ == "__main__":
     #This will trigger model compilation, i.e., convert Rust computation graph to a unified high-level IR and lower it to TOSA IR
     model.compile(optimizer={"type":"sgd", "lr":"0.01", "momentum":"0", "nesterov":"False", "weight_decay":"0"},
                         loss='sparse_categorical_crossentropy', metrics=['accuracy', 'sparse_categorical_crossentropy'])
+
+    modelir = model.dump_ir()
+
     tosa_ir= model.dump_tosa_ir()
 
     print("Compiling TOSA model...")
-    if torch.cuda.is_available():
+    if GPU:
         binary = ireec.compile_str(tosa_ir,
                         target_backends=["cuda"], 
                         input_type=ireec.InputType.TOSA)

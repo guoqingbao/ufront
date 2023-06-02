@@ -451,7 +451,16 @@ impl Model {
         match args {
             Some(para) => {
                 for key in para.keys() {
-                    if key.to_string() != "input" {
+                    if key.to_string() == "np_tensor" 
+                    || key.to_string() == "weight" || key.to_string() == "bias" 
+                    || key.to_string() == "q" || key.to_string() == "k" || key.to_string() == "v" 
+                    || key.to_string() == "x" || key.to_string() == "y" || key.to_string() == "tensors" 
+                    || key.to_string() == "weight_q" || key.to_string() == "weight_k" || key.to_string() == "weight_v" || key.to_string() == "weight_o"  
+                    || key.to_string() == "bias_q" || key.to_string() == "bias_k" || key.to_string() == "bias_v" || key.to_string() == "bias_o"  
+                    {
+                        // println!("Ignored {key}");
+                    }
+                    else if key.to_string() != "input" {
                         op.params
                             .insert(key.to_string(), para.get_item(key).unwrap().to_string());
                     } else {
@@ -512,6 +521,19 @@ impl Model {
                         let q = para.get_item("q").unwrap().extract::<PyRef<TensorF32>>(); 
                         let k = para.get_item("k").unwrap().extract::<PyRef<TensorF32>>(); 
                         let v = para.get_item("v").unwrap().extract::<PyRef<TensorF32>>(); 
+                        
+                        if self.argshapes.len() == 0 {
+                            match &q {
+                                Ok(v) => {
+                                    if v.name.find("input") == Some(0) || v.name.find("x") == Some(0) {
+                                        self.args.insert(v.name.clone(), argstr.clone());
+                                        self.argshapes.insert(v.name.clone(), v.get_ir());
+                                        info!("Multihead Attention inputs come from forward input!");
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
 
                         match (q, k, v) {
                             (Ok(q1), Ok(k1), Ok(v1)) => {
@@ -522,18 +544,33 @@ impl Model {
                                     if para.contains("weight_q").unwrap()
                                     && para.contains("weight_k").unwrap()
                                     && para.contains("weight_v").unwrap()
+                                    && para.contains("bias_q").unwrap()
+                                    && para.contains("bias_k").unwrap()
+                                    && para.contains("bias_v").unwrap()
                                     && para.contains("weight_o").unwrap()
+                                    && para.contains("bias_o").unwrap()
+
                                     {
                                         let weight_q = para.get_item("weight_q").unwrap().extract::<PyRef<TensorF32>>(); 
                                         let weight_k = para.get_item("weight_k").unwrap().extract::<PyRef<TensorF32>>(); 
                                         let weight_v = para.get_item("weight_v").unwrap().extract::<PyRef<TensorF32>>(); 
+                                        let bias_q = para.get_item("bias_q").unwrap().extract::<PyRef<TensorF32>>(); 
+                                        let bias_k = para.get_item("bias_k").unwrap().extract::<PyRef<TensorF32>>(); 
+                                        let bias_v = para.get_item("bias_v").unwrap().extract::<PyRef<TensorF32>>(); 
+
                                         let weight_o = para.get_item("weight_o").unwrap().extract::<PyRef<TensorF32>>(); 
-                                        match (weight_q, weight_k, weight_v, weight_o) {
-                                            (Ok(wq), Ok(wk), Ok(wv), Ok(wo)) => {
+                                        let bias_o = para.get_item("bias_o").unwrap().extract::<PyRef<TensorF32>>(); 
+
+                                        match (weight_q, weight_k, weight_v, bias_q, bias_k, bias_v, weight_o, bias_o) {
+                                            (Ok(wq), Ok(wk), Ok(wv), Ok(bq), Ok(bk), Ok(bv), Ok(wo), Ok(bo)) => {
                                                 if op.add_input(&wq).is_ok()
                                                 && op.add_input(&wk).is_ok()
                                                 && op.add_input(&wv).is_ok()
+                                                && op.add_input(&bq).is_ok()
+                                                && op.add_input(&bk).is_ok()
+                                                && op.add_input(&bv).is_ok()
                                                 && op.add_input(&wo).is_ok()
+                                                && op.add_input(&bo).is_ok()
                                                 {
                                                     op.calculate_output();
                                                 }
@@ -619,10 +656,14 @@ impl Model {
                     } else {
                         panic! {"Missing important arguments (q, k, or v?)"};
                     }
-                } else if op_type == OpType::BATCH_NORM && para.contains("input").unwrap() {
+                } else if (op_type == OpType::BATCH_NORM || op_type == OpType::LAYER_NORM)&& para.contains("input").unwrap() {
                     let ret = para.get_item("input").unwrap().extract::<PyRef<TensorF32>>(); 
                     match ret {
                         Ok(v) => {
+                            if self.argshapes.len() == 0 && (v.name.find("input") == Some(0) || v.name.find("x") == Some(0)) {
+                                self.args.insert(v.name.clone(), argstr.clone());
+                                self.argshapes.insert(v.name.clone(), v.get_ir());
+                            }
                             if op.add_input(&v).is_ok() {
                                 if para.contains("weight").unwrap() && para.contains("bias").unwrap()  {
                                     let ret1 = para.get_item("weight").unwrap().extract::<PyRef<TensorF32>>(); 

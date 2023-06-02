@@ -815,7 +815,7 @@ class GeluMNode(ModuleNode):
 
     def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return umodel.gelu(input=input_tensor, name=self.name)
+        return umodel.gelu(input=input_tensor, approximate=self.module.approximate!=None, name=self.name)
 
 
 class LayerNormNode(ModuleNode):
@@ -860,7 +860,23 @@ class LayerNormNode(ModuleNode):
 
     def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return umodel.layer_norm(input=input_tensor, normalized_shape=list(self.module.normalized_shape), 
+        requires_grad = self.module.weight.requires_grad
+        weight = self.module.weight.detach().numpy() if requires_grad \
+            else self.module.weight.numpy()
+        # weight = weight.reshape((1, weight.shape[0], 1, 1))
+        weight_op = umodel.parameter(np_tensor=weight.astype(np.float32), dtype=numpy_to_ufront_dtype(weight.dtype), requires_grad=requires_grad, name=self.name + "_weight")
+
+        requires_grad = self.module.bias.requires_grad
+        bias = self.module.bias.detach().numpy() if requires_grad \
+            else self.module.bias.numpy()
+        # bias = bias.reshape((1, bias.shape[0], 1, 1))
+        bias_op = umodel.parameter(np_tensor=bias.astype(np.float32), dtype=numpy_to_ufront_dtype(bias.dtype), requires_grad=requires_grad, name=self.name + "_bias")
+
+
+        return umodel.layer_norm(input=input_tensor, 
+                                 weight=weight_op.get_output(0),
+                                 bias=bias_op.get_output(0),
+                                 normalized_shape=list(self.module.normalized_shape), 
                                   eps=float(self.module.eps), elementwise_affine=self.module.elementwise_affine, name=self.name)
 
 
@@ -1192,16 +1208,21 @@ class MultiheadAttentionNode(ModuleNode):
                 v=v,
                 embed_dim=embed_dim,
                 num_heads=num_heads,
-                dropout=dropout,
+                dropout=float(dropout),
                 batch_first=batch_first,
                 name=self.name,
             )
         else:
             assert self.module.out_proj.weight != None, "out_proj.weight cannot be None!"
+            # assert self.module._qkv_same_embed_dim, "qkv must have same dim!"
 
             requires_grad_o = self.module.out_proj.weight.requires_grad
             weight_o = self.module.out_proj.weight.detach().numpy() if requires_grad_o \
                     else self.module.out_proj.weight.numpy()
+            
+            requires_grad_bias_o = self.module.out_proj.bias.requires_grad
+            bias_o = self.module.out_proj.bias.detach().numpy() if requires_grad_bias_o \
+                    else self.module.out_proj.bias.numpy()
             
             if self.module.in_proj_weight != None:
                 requires_grad = self.module.in_proj_weight.requires_grad
@@ -1209,10 +1230,20 @@ class MultiheadAttentionNode(ModuleNode):
                     else self.module.in_proj_weight.numpy()
                 
                 length = int(weight_in.shape[0] / 3)
-                weight_q = weight_in[0:length,:]
-                weight_k = weight_in[length:2*length,:]
-                weight_v = weight_in[2*length:3*length,:]
+                weight_q = weight_in[0:length]
+                weight_k = weight_in[length:2*length]
+                weight_v = weight_in[2*length:]
+                
                 requires_grad_q = requires_grad_k = requires_grad_v = requires_grad
+
+                requires_grad_bias = self.module.in_proj_bias.requires_grad
+                bias_in = self.module.in_proj_bias.detach().numpy() if requires_grad_bias \
+                    else self.module.in_proj_bias.numpy()
+                length = int(bias_in.shape[0] / 3)
+                
+                bias_q = bias_in[0:length]
+                bias_k = bias_in[length:2*length]
+                bias_v = bias_in[2*length:]
             else:
                 requires_grad_q = self.module.q_proj_weight.requires_grad
                 weight_q = self.module.q_proj_weight.detach().numpy() if requires_grad_q \
@@ -1225,12 +1256,24 @@ class MultiheadAttentionNode(ModuleNode):
                 requires_grad_v = self.module.v_proj_weight.requires_grad
                 weight_v = self.module.v_proj_weight.detach().numpy() if requires_grad_v \
                     else self.module.v_proj_weight.numpy()
+                
+                requires_grad_bias = self.module.bias_q.requires_grad
+                bias_q = self.module.bias_q.detach().numpy() if requires_grad_bias \
+                    else self.module.bias_q.numpy()
+                bias_k = self.module.bias_k.detach().numpy() if requires_grad_bias \
+                    else self.module.bias_k.numpy()
+                bias_v = self.module.bias_v.detach().numpy() if requires_grad_bias \
+                    else self.module.bias_v.numpy()
                             
             operator_q = umodel.parameter(np_tensor=weight_q.astype(np.float32), dtype=numpy_to_ufront_dtype(weight_q.dtype), requires_grad=requires_grad_q, name=self.name + "_weight_q")
             operator_k = umodel.parameter(np_tensor=weight_k.astype(np.float32), dtype=numpy_to_ufront_dtype(weight_k.dtype), requires_grad=requires_grad_k, name=self.name + "_weight_k")
             operator_v = umodel.parameter(np_tensor=weight_v.astype(np.float32), dtype=numpy_to_ufront_dtype(weight_v.dtype), requires_grad=requires_grad_v, name=self.name + "_weight_v")
+            operator_bias_q = umodel.parameter(np_tensor=bias_q.astype(np.float32), dtype=numpy_to_ufront_dtype(bias_q.dtype), requires_grad=requires_grad_bias, name=self.name + "_bias_q")
+            operator_bias_k = umodel.parameter(np_tensor=bias_k.astype(np.float32), dtype=numpy_to_ufront_dtype(bias_k.dtype), requires_grad=requires_grad_bias, name=self.name + "_bias_k")
+            operator_bias_v = umodel.parameter(np_tensor=bias_v.astype(np.float32), dtype=numpy_to_ufront_dtype(bias_v.dtype), requires_grad=requires_grad_bias, name=self.name + "_bias_v")
 
             operator_o = umodel.parameter(np_tensor=weight_o.astype(np.float32), dtype=numpy_to_ufront_dtype(weight_o.dtype), requires_grad=requires_grad_o, name=self.name + "_weight_o")
+            operator_bias_o = umodel.parameter(np_tensor=bias_o.astype(np.float32), dtype=numpy_to_ufront_dtype(bias_o.dtype), requires_grad=requires_grad_bias_o, name=self.name + "_bias_o")
 
             return umodel.multihead_attention(
                 q=q,
@@ -1239,10 +1282,16 @@ class MultiheadAttentionNode(ModuleNode):
                 weight_q=operator_q.get_output(0),
                 weight_k=operator_k.get_output(0),
                 weight_v=operator_v.get_output(0),
+                bias_q=operator_bias_q.get_output(0),
+                bias_k=operator_bias_k.get_output(0),
+                bias_v=operator_bias_v.get_output(0),
+
                 weight_o=operator_o.get_output(0),
+                bias_o=operator_bias_o.get_output(0),
+
                 embed_dim=embed_dim,
                 num_heads=num_heads,
-                dropout=dropout,
+                dropout=float(dropout),
                 batch_first=batch_first,
                 name=self.name,
             )
@@ -1650,6 +1699,8 @@ class ScalarTrueDivNode(FunctionNode):
         scalar = self.innodes[1]
         if hasattr(scalar, "name"):
             scalar = node_to_output[scalar.name]
+        if type(scalar) == TensorF32:
+            scalar = float(scalar.ndarray[0])
         assert type(scalar) is float
         return umodel.struediv(
             input=input_tensor, scalar=scalar, name=self.name,
@@ -3128,6 +3179,8 @@ class UFrontTorch():
             if type(v) == TensorF32:
                 dtype = ufront_to_numpy_dtype(v.dtype)
                 kwargs["args"][key] = torch.from_numpy(v.ndarray.astype(dtype))
+            elif type(v) == int or type(v) == float:
+                kwargs["args"][key] = torch.Tensor([v])
             args.append(kwargs["args"][key])
         
         ret = self.external_functions[kwargs['func']](*args)
@@ -3135,7 +3188,7 @@ class UFrontTorch():
             # print("Results after calling the external function: ", ret.shape)
             nparray = ret.numpy()
             # if kwargs['func'] == "swapaxes":
-            nparray = np.zeros(nparray.shape, dtype=np.float32)
+            # nparray = np.zeros(nparray.shape, dtype=np.float32)
             return TensorF32(nparray, kwargs['func']) # convert to Rust f32 tensor
         else:
             return ret
