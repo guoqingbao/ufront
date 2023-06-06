@@ -12,17 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
+import numpy as np
 try:
     from tensorflow.keras.models import Model as tf_keras_Model
     from tensorflow.keras import optimizers as tf_keras_optimizer
+    import tensorflow as tf
+    from tensorflow.keras import layers
     import tf2onnx
 except:
     print("You need to first install tensorflow and tf2onnx before using keras models!")
-
-#from tensorflow.keras import losses as tf_keras_losses
-#from tensorflow.keras import metrics as tf_keras_metrics
-# from tensorflow.keras.callbacks import Callback, LearningRateScheduler, VerifyMetrics, EpochVerifyMetrics
 
 # Revised for Unified Computing Frontend (UFront)
 # Enflame Tech. (ERA)
@@ -30,106 +28,16 @@ from ..onnx.model import ONNXModelKeras
 from ..ufront import (OpType, ActiMode, AggrMode, PoolType, TensorF32, DataType, ParamSyncType, Initializer)
 from ..ufront import Model, PyOperator, TensorF32, Optimizer, LossType, MetricsType #Rust frontend
 
-tracing_id = 100
-
-class Tensor(object):
-  def __init__(self, batch_size,
-               key,
-               shape,
-               name,
-               batch_shape=None,
-               dtype=None):
-
-    self._ffhandle = None
-    if type(dtype) == DataType:
-      self.dtype = dtype
-    else:
-      if dtype == None or dtype == "float32" or dtype == "f32":
-          self.dtype =  DataType.Float
-      elif dtype == "float64" or dtype == "f64":
-          self.dtype =  DataType.Double
-      elif dtype == "int32" or dtype == "i32":
-          self.dtype =  DataType.Int32
-      elif dtype == "int64" or dtype == "i64":
-          self.dtype =  DataType.Int64
-      elif dtype == "float16" or dtype == "f16":
-          self.dtype =  DataType.Half
-      else:
-          assert 0, "Unsupported datatype"
-
-    if batch_shape != None:
-      self.batch_shape = batch_shape
-    else:
-      self.batch_shape = (batch_size,) + tuple(shape[1:])
-    #print(self.batch_shape)
-    self.num_dims = len(self.batch_shape)
-    self.key = key
-    self.name = name
-
-  @property
-  def ffhandle(self):
-    return self._ffhandle
-    
-  @ffhandle.setter
-  def ffhandle(self, handle):
-    assert isinstance(handle, Tensor) == True, "[Tensor]: ffhandle is not the correct type"
-    assert self._ffhandle == None, "[Tensor]: check handle, already set"
-    self._ffhandle = handle
-    self.__verify_ffhandle_shape()
-    self.__verify_ffhandle_dtype()
-
-  @property
-  def dtype_str(self):
-    if self.dtype == DataType.Float:
-      return "float32"
-    elif self.dtype == DataType.Double:
-      return "float64"
-    elif self.dtype == DataType.Half:
-      return "float16"
-    elif self.dtype == DataType.Int32:
-      return "int32"
-    elif self.dtype == DataType.Int64:
-      return "int64"
-
-  def create_ff_tensor(self, ffmodel, name):
-    assert self.batch_shape[0] != 0, "[Tensor]: batch size is not set"
-    if (self.num_dims == 2 or self.num_dims == 4):
-      #print(self.batch_shape, type(self.batch_shape))
-      self._ffhandle = ffmodel.create_tensor(self.batch_shape, self.dtype, True, name)
-    else:
-      assert 0, "un-supported dims"
-    self.__verify_ffhandle_shape()
-    self.__verify_ffhandle_dtype()
-
-  def set_batch_size(self, size):
-    lst = list(self.batch_shape)
-    lst[0] = size
-    self.batch_shape = tuple(lst)
-
-  def __verify_ffhandle_shape(self):
-    assert self.num_dims == self._ffhandle.dims, "[Tensor]: check tensor shape"
-    for i in range(0, self.num_dims):
-      assert self.batch_shape[i] == self._ffhandle.shape[i], "[Tensor]: please check shape dim %d (%d == %d)" %(i, self.batch_shape[i], self._ffhandle.dims[i])
-
-  def __verify_ffhandle_dtype(self):
-    assert self.dtype == self._ffhandle.dtype
-
 class BaseModel(object):
-  def __init__(self, inputs, onnx_model, batch_size, transformer):
+  def __init__(self, inputs, onnx_model, batch_size, transformer, pass_weights):
     self.ufront_model = Model()
     self.transformer=transformer
     self._onnx_model = onnx_model
-    self._input_tensors = []
-    for key in inputs:
-      input_tensor = inputs[key]
-      t = Tensor(batch_size=batch_size, key=key, name=input_tensor.name, shape=input_tensor.shape, dtype=input_tensor.dtype)
-      self._input_tensors.append(t)
-    
+    self.pass_weights=pass_weights
     self._loss = None
     self._metrics = []
     self._label_type = DataType.Float
-    self._my_onnx_model = None
-    self._output_tensor = None
+    self._my_onnx_model = ONNXModelKeras(self._onnx_model, self.ufront_model, self.transformer, self.pass_weights)
     self._num_samples = 0
     self._input_dataloaders = []
     self._input_dataloaders_dim = []
@@ -137,12 +45,17 @@ class BaseModel(object):
     self._label_dataloader_dim = 0
     self.batch_size = batch_size
     
-    global tracing_id
-    self.__tracing_id = tracing_id
-    tracing_id += 1
-    self._create_input_tensors()
-    self._create_layers()
-    
+    input_dict = {}
+    for key, input in inputs.items():
+        if type(input) == tf.Tensor:
+            input = input.numpy()
+        input1 = np.ones(shape=input.shape, dtype=input.dtype)
+        input1[:] = input
+        input_tensor = TensorF32(input1, key) # convert to Rust f32 tensor
+        input_dict[key] = input_tensor
+
+    self._output_tensor = self._my_onnx_model.apply(input_dict)
+
   def compile(self,
               optimizer,
               loss=None,
@@ -210,7 +123,7 @@ class BaseModel(object):
 
     self.ufront_model.optimizer = self._ffoptimizer
     self.ufront_model.compile(loss_type=self._loss, metrics=self._metrics, comp_mode=comp_mode)
-    self._create_label_tensor()
+    # self._create_label_tensor()
     
   #TODO: finish API
   def fit(self,
@@ -273,22 +186,6 @@ class BaseModel(object):
     self.ufront_model.init_layers()
     self._train(epochs, callbacks, eval=False)
 
-  def _create_label_tensor(self):
-    self._label_tensor = Tensor(batch_size=self.batch_size, key="label", name="label", shape=(self.batch_size, 1), dtype=self._label_type)
-
-  def _create_input_tensors(self):
-    idx = 0
-    for input_tensor in self._input_tensors:
-      self._input_tensors[idx].create_ff_tensor(self.ufront_model, "input"+str(idx+1))
-      idx += 1
-      
-  def _create_layers(self):
-    self._my_onnx_model = ONNXModelKeras(self._onnx_model, self.ufront_model, self.transformer)
-    input_dict = {}
-    for input_tensor in self._input_tensors:
-      input_dict[input_tensor.name] = input_tensor.ffhandle
-    self._output_tensor = self._my_onnx_model.apply(input_dict)
-
   def get_output_operator(self):
     return self._my_onnx_model.get_output_operator()
     
@@ -339,7 +236,7 @@ class BaseModel(object):
     ts_start = self._ffconfig.get_current_time()
     epoch = 0
     epoch_flag = True
-    self.__tracing_id += 1
+    # self.__tracing_id += 1
     while (epoch < epochs) and (epoch_flag == True):
       if callbacks != None:
         for callback in callbacks:
@@ -360,7 +257,7 @@ class BaseModel(object):
           dataloader.next_batch(self.ufront_model)
         self._label_dataloader.next_batch(self.ufront_model)
 
-        self._ffconfig.begin_trace(self.__tracing_id)
+        # self._ffconfig.begin_trace(self.__tracing_id)
         self.ufront_model.forward()
         # for layer in self._layers:
         #   layer.ffhandle.forward(self.ufront_model)
@@ -370,7 +267,7 @@ class BaseModel(object):
           self.ufront_model.update()
         else:
           self.ufront_model.compute_metrics()
-        self._ffconfig.end_trace(self.__tracing_id)
+        # self._ffconfig.end_trace(self.__tracing_id)
 
         if callbacks != None:
           for callback in callbacks:
@@ -394,17 +291,23 @@ class BaseModel(object):
         callback.on_train_end()
    
 class UFrontKeras(tf_keras_Model):
-  def __init__(self, inputs, outputs, 
-            batch_size, verbose=False, name=None, transformer=False):
-    super(UFrontKeras, self).__init__(inputs=inputs, outputs=outputs, name=name)
-    if (isinstance(inputs, dict) == True):
-      # import onnx
-      # onnx_model = onnx.load_model("Keras_VIT.onnx")
-      # self._base_model = BaseModel(inputs=inputs, onnx_model=onnx_model, batch_size=batch_size, transformer=transformer)
-      onnx_model = tf2onnx.convert.from_keras(self, opset=18 if transformer else 17)
-      self._base_model = BaseModel(inputs=inputs, onnx_model=onnx_model[0], batch_size=batch_size, transformer=transformer)
-    else:
-      assert 0, "Inputs must be in dict format, e.g., {1: input_tensor1}"
+  def __init__(self, base_model, inputs,
+            batch_size, verbose=False, transformer=False, pass_weights=False):
+    super(UFrontKeras, self).__init__(inputs=base_model.inputs, outputs=base_model.output, name=base_model.name)
+    if (isinstance(inputs, list) == False):
+      assert 0, "Inputs must be in list format, e.g., [input_tensor1, input_tensor2]"
+    input_dict = {}
+    for i in range(len(base_model.inputs)):
+      input = base_model.inputs[i]
+      input_dict[input.name] = inputs[i]
+    # import onnx
+    # onnx_model = onnx.load_model("Keras_VIT.onnx")
+    # self._base_model = BaseModel(inputs=inputs, onnx_model=onnx_model, batch_size=batch_size, transformer=transformer, pass_weights=pass_weights)
+    # onnx.save_model(onnx_model[0], f="Keras_VIT.onnx")
+    
+    onnx_model = tf2onnx.convert.from_keras(self, opset=18 if transformer else 17)
+    self._base_model = BaseModel(inputs=input_dict, onnx_model=onnx_model[0], batch_size=batch_size, transformer=transformer, pass_weights=pass_weights)
+
 
   def umodel(self):
     return self._base_model._my_onnx_model.umodel

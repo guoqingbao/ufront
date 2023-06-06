@@ -690,7 +690,7 @@ class DropoutMNode(ModuleNode):
         input_tensor = node_to_output[self.innodes[0].name]
         rate = self.module.p
         return umodel.dropout(
-            input=input_tensor, rate=rate, seed=0, name=self.name,
+            input=input_tensor, rate=rate, seed=0, training = self.module.training, name=self.name,
         )
 
 
@@ -2665,8 +2665,12 @@ class DropoutFNode(FunctionNode):
     def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
         rate = self.kwargs["p"]
+        if "training" in self.kwargs:
+            training = self.kwargs["training"]
+        else:
+            training = False
         return umodel.dropout(
-            input=input_tensor, rate=rate, seed=0, name=self.name,
+            input=input_tensor, rate=rate, seed=0, training=training, name=self.name,
         )
 
 

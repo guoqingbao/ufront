@@ -31,7 +31,7 @@ except:
     print("Some of the onnx models requires onnxsim library, please install onnxsim before usage!")
 
 import struct
-from ..ufront import (OpType, ActiMode, AggrMode, PoolType, TensorF32, DataType, ParamSyncType, Initializer)
+from ..ufront import (OpType, ActiMode, AggrMode, PoolType, TensorF32, DataType, WeightType, ParamSyncType, Initializer)
 from ..ufront import Model, PyOperator, TensorF32, Optimizer, LossType, MetricsType #Rust frontend
 from ..utils import list_product, onnx_to_ufront_dtype, numpy_to_ufront_dtype, ufront_to_numpy_dtype
 
@@ -58,11 +58,14 @@ class ONNXTensor(object):
 
 class ONNXModel(object):
     const_tensor_idx = 1
-    def __init__(self, onnx_model, umodel=None, simplify = False):
+    def __init__(self, onnx_model, umodel=None, simplify = False, pass_weights=False):
         if umodel != None:
             self.umodel = umodel
         else:
             self.umodel = Model()
+
+        self.umodel.weight_type = WeightType.EXTERNAL if pass_weights else WeightType.INTERNAL
+        
         if type(onnx_model) == str:
             model = onnx.load(onnx_model)
         elif simplify:
@@ -274,7 +277,34 @@ class ONNXModel(object):
             training_mode = attribute["training_mode"].i == 1
 
         input = node_to_output[node.input[0]]
-        return self.umodel.batch_norm(input=input, affine=True, eps=eps, momentum=momentum[0] if type(momentum)== list or type(momentum)==tuple else momentum, track_running_stats=training_mode)
+
+        # if self.umodel.weight_type == WeightType.INTERNAL or not training_mode or len(node.input) < 2:
+        # if self.umodel.weight_type == WeightType.INTERNAL or len(node.input) < 2:
+        if training_mode and len(node.input) > 4:
+            weight = node_to_output[node.input[1]]
+
+            weight = weight.reshape((1, weight.shape[0], 1, 1))
+            weight_op = self.umodel.parameter(np_tensor=weight.astype(np.float32), dtype=numpy_to_ufront_dtype(weight.dtype), requires_grad=True, name=node.input[1])
+
+            bias = node_to_output[node.input[2]]
+            bias = bias.reshape((1, bias.shape[0], 1, 1))
+            bias_op = self.umodel.parameter(np_tensor=bias.astype(np.float32), dtype=numpy_to_ufront_dtype(bias.dtype), requires_grad=True, name=node.input[2])
+
+            running_mean = node_to_output[node.input[3]]
+            running_mean = running_mean.reshape((1, running_mean.shape[0], 1, 1))
+            running_mean_op = self.umodel.parameter(np_tensor=running_mean.astype(np.float32), dtype=numpy_to_ufront_dtype(running_mean.dtype), requires_grad=True, name=node.input[3])
+            
+            running_var = node_to_output[node.input[4]]
+            running_var = running_var.reshape((1, running_var.shape[0], 1, 1))
+            running_var_op = self.umodel.parameter(np_tensor=running_var.astype(np.float32), dtype=numpy_to_ufront_dtype(running_var.dtype), requires_grad=True, name=node.input[4])
+            return self.umodel.batch_norm(input=input, weight=weight_op.get_output(0),
+                                        bias=bias_op.get_output(0),
+                                        mean=running_mean_op.get_output(0),
+                                        variance=running_var_op.get_output(0),
+                                        affine=True, eps=eps, momentum=momentum[0] if type(momentum)== list or type(momentum)==tuple else momentum, track_running_stats=training_mode)
+        else:
+            return self.umodel.batch_norm(input=input, affine=True, eps=eps, momentum=momentum[0] if type(momentum)== list or type(momentum)==tuple else momentum, track_running_stats=training_mode)
+        
 
     def handleConv(self, node, node_to_output):
         input = node_to_output[node.input[0]]
@@ -299,13 +329,36 @@ class ONNXModel(object):
 
         group = attribute["group"].i
         out_channels = self.inputs[node.input[1]].shape[0]
-        return self.umodel.conv2d(input=input, out_channels=out_channels, 
-                kernel=[kernel[0], kernel[1]],
-                stride=[stride[0], stride[1]], 
-                pad=[padding[2], padding[3]] if len(padding) == 4 else [padding[0], padding[1]], 
-                dilation = dilation,
-                activation=ActiMode.AC_MODE_NONE, groups=group, name=node.name)
+        if self.umodel.weight_type == WeightType.INTERNAL or len(node.input) < 2:
+            return self.umodel.conv2d(input=input, out_channels=out_channels, 
+                    kernel=[kernel[0], kernel[1]],
+                    stride=[stride[0], stride[1]], 
+                    pad=[padding[2], padding[3]] if len(padding) == 4 else [padding[0], padding[1]], 
+                    dilation = dilation,
+                    activation=ActiMode.AC_MODE_NONE, groups=group, name=node.name)
+        else:
+            weight = node_to_output[node.input[1]]
+            weight_op = self.umodel.parameter(np_tensor=weight.astype(np.float32), dtype=numpy_to_ufront_dtype(weight.dtype), requires_grad=True, name=node.input[1])
+            if len(node.input) > 2:
+                bias = node_to_output[node.input[2]]
+                bias_op = self.umodel.parameter(np_tensor=bias.astype(np.float32), dtype=numpy_to_ufront_dtype(bias.dtype), requires_grad=True, name=node.input[2])
 
+                return self.umodel.conv2d(input=input, weight=weight_op.get_output(0), bias=bias_op.get_output(0),
+                                          out_channels=out_channels, 
+                        kernel=[kernel[0], kernel[1]],
+                        stride=[stride[0], stride[1]], 
+                        pad=[padding[2], padding[3]] if len(padding) == 4 else [padding[0], padding[1]], 
+                        dilation = dilation,
+                        activation=ActiMode.AC_MODE_NONE, groups=group, name=node.name)
+            else:
+                return self.umodel.conv2d(input=input, weight=weight_op.get_output(0), 
+                                          out_channels=out_channels, 
+                        kernel=[kernel[0], kernel[1]],
+                        stride=[stride[0], stride[1]], 
+                        pad=[padding[2], padding[3]] if len(padding) == 4 else [padding[0], padding[1]], 
+                        dilation = dilation,
+                        activation=ActiMode.AC_MODE_NONE, groups=group, name=node.name)
+            
     def handleDropout(self, node, node_to_output):
         input = node_to_output[node.input[0]]
         inplace = False
@@ -317,7 +370,7 @@ class ONNXModel(object):
             if len(node.input) > 2:
                 inplace = node_to_output[node.input[2]]
         seed = 0
-        return self.umodel.dropout(input=input, rate=rate, seed=0, name=node.name)
+        return self.umodel.dropout(input=input, rate=rate, seed=0, training=False, inplace=inplace, name=node.name)
 
     def handleFlatten(self, node, node_to_output):
         input = node_to_output[node.input[0]]
@@ -347,11 +400,24 @@ class ONNXModel(object):
     def handleDense(self, node, node_to_output):
         input = node_to_output[node.input[0]]
         attribute = {x.name: x for x in node.attribute}
-        if "weight_shape" in attribute:
-            dim = attribute["weight_shape"].ints[-1]
+        if "out_dim" in attribute:
+            dim = attribute["out_dim"].i 
+        elif len(node.input) > 1:
+            weight = node_to_output[node.input[1]]
+            dim = weight.shape[-2] if weight.shape[-1] == input.shape[1] else weight.shape[-1]
+            
+        if self.umodel.weight_type == WeightType.INTERNAL or len(node.input) < 2:
+            return self.umodel.dense(input=input, out_dim=dim, name=node.name)
         else:
-            dim = attribute["out_dim"].i
-        return self.umodel.dense(input=input, out_dim=dim, name=node.name)
+            weight = node_to_output[node.input[1]]
+            weight_op = self.umodel.parameter(np_tensor=weight.astype(np.float32), dtype=numpy_to_ufront_dtype(weight.dtype), requires_grad=True, name=node.input[1])
+            if len(node.input) > 2:
+                bias = node_to_output[node.input[2]]
+                bias_op = self.umodel.parameter(np_tensor=bias.astype(np.float32), dtype=numpy_to_ufront_dtype(bias.dtype), requires_grad=True, name=node.input[2])
+                return self.umodel.dense(input=input, weight=weight_op.get_output(0), bias=bias_op.get_output(0), out_dim=dim, name=node.name)
+            else:
+                return self.umodel.dense(input=input, weight=weight_op.get_output(0), out_dim=dim, name=node.name)
+
 
     def handleMaxPool(self, node, node_to_output):
         input = node_to_output[node.input[0]]
@@ -385,7 +451,7 @@ class ONNXModel(object):
         if len(node.input) > 1:
             input2 = node_to_output[node.input[1]]
 
-        return self.umodel.gelu(input=input1 if type(input1)==TensorF32 else input2, name=node.name)
+        return self.umodel.gelu(input=input1 if type(input1)==TensorF32 else input2, approximate=True, name=node.name)
     
     def handlePad(self, node, node_to_output):
         input = node_to_output[node.input[0]]
@@ -499,14 +565,10 @@ class ONNXModel(object):
             
         if type(input2) != TensorF32:
             assert type(input2) == np.ndarray, "The given input is not an ndarray!"
-            operator = self.addTensor(input2, False, node.input[1])
-            self.operators.append(operator)
-            input2 = operator.get_output(0)
-        elif type(input1) != TensorF32:
-            assert type(input1) == np.ndarray, "The given input is not an ndarray!"
-            operator = self.addTensor(input1, False, node.input[0])
-            self.operators.append(operator)
-            input1 = operator.get_output(0)
+            # operator = self.addTensor(input2, False, node.input[1])
+            weight_op = self.umodel.parameter(np_tensor=input2.astype(np.float32), dtype=numpy_to_ufront_dtype(input2.dtype), requires_grad=True, name=node.input[1])
+            # self.operators.append(operator)
+            input2 = weight_op.get_output(0)
 
         if len(input1.shape) < 3 and len(input2.shape) < 3:
             return self.umodel.matmul(x = input1, y=input2, name=node.name)
@@ -713,6 +775,20 @@ class ONNXModel(object):
     def handleself_attention(self, node, node_to_output):
         return self.handleMultiHeadAttention(node, node_to_output) 
     
+    def handleHardSigmoid(self, node, node_to_output):
+        input = node_to_output[node.input[0]]
+        return self.umodel.hardsigmoid(input = input, name=node.name)
+
+    def handleHardSwish(self, node, node_to_output):
+        input = node_to_output[node.input[0]]
+        return self.umodel.hardswish(input = input, name=node.name)
+    
+    def handleClip(self, node, node_to_output):
+        input = node_to_output[node.input[0]]
+        minimum = node_to_output[node.input[1]]
+        maximum = node_to_output[node.input[2]]
+        return self.umodel.clip(input = input, minimum=minimum, maximum=maximum, name=node.name)
+    
     def process_initializer(self, inputs, initializer):
         # print("Processing initializer...")
         for item in initializer:
@@ -746,12 +822,16 @@ class ONNXModel(object):
                 if type(input_tensors) == list:
                     input_tensor = input_tensors[i]
                     if type(input_tensor) != TensorF32:
-                        input_tensor = TensorF32(input_tensor, input.name) # convert to Rust f32 tensor
+                        input1 = np.ones(shape=input_tensor.shape, dtype=input_tensor.dtype)
+                        input1[:] = input_tensor
+                        input_tensor = TensorF32(input1, input.name) # convert to Rust f32 tensor
                     self.inputs[input.name] = input_tensor
                 elif type(input_tensors) == dict:
                     input_tensor = input_tensors[input.name]
                     if type(input_tensor) != TensorF32:
-                        input_tensor = TensorF32(input_tensor, input.name) # convert to Rust f32 tensor
+                        input1 = np.ones(shape=input_tensor.shape, dtype=input_tensor.dtype)
+                        input1[:] = input_tensor
+                        input_tensor = TensorF32(input1, input.name) # convert to Rust f32 tensor
                     self.inputs[input.name] = input_tensor
                 else:
                     assert 0, "Not a valid input type!"
@@ -797,8 +877,8 @@ class ONNXModel(object):
 
         node_to_output.update(self.inputs)
 
-        # for node in self.model.graph.node:
-        #     print(node.name)
+        for node in self.model.graph.node:
+            print(node.name)
 
         for node in self.model.graph.node:
             handler_name = 'handle' + node.op_type
@@ -853,7 +933,7 @@ class ONNXModel(object):
                             #print(node, add_node)
                             flag_found = True
                             dim = self.inputs[node.input[1]].shape[1]
-                            dense_node = onnx.helper.make_node('Dense', inputs=[node.input[0]], outputs=[add_node.output[0]], out_dim=dim, name="Dense_"+str(dense_idx))
+                            dense_node = onnx.helper.make_node('Dense', inputs=node.input, outputs=[add_node.output[0]], out_dim=dim, name="Dense_"+str(dense_idx))
                             dense_idx += 1
                             #print(dense_node)
                             break
@@ -865,7 +945,7 @@ class ONNXModel(object):
                 elif node.op_type == 'Gemm':
                     flag_found = True
                     dim = self.inputs[node.input[1]].shape[0]
-                    dense_node = onnx.helper.make_node('Dense', inputs=[node.input[0]], outputs=[node.output[0]], out_dim=dim, name="Dense_"+str(dense_idx))
+                    dense_node = onnx.helper.make_node('Dense', inputs=node.input, outputs=[node.output[0]], out_dim=dim, name="Dense_"+str(dense_idx))
                     dense_idx += 1
                     self.model.graph.node.insert(idx, dense_node)
                     self.model.graph.node.remove(node)
@@ -894,7 +974,7 @@ class ONNXModel(object):
 
                     target_output = node.output
                     if name == "Dense" and node.op_type == "MatMul":
-                        matmul_weight_for_dense = node.input[1]
+                        matmul_weight_for_dense = node.input[1:]
                     # self.model.graph.node.remove(node)
                     node.name = "#REMOVED"
                     REMOVED.append(node)
@@ -903,11 +983,12 @@ class ONNXModel(object):
                     if is_target:
                         is_target = False
                         if name == "Dense" and matmul_weight_for_dense != None:
+                            target_input.extend(list(matmul_weight_for_dense))
                             node = onnx.helper.make_node(name, inputs=target_input, outputs=target_output, name="Ext"+name+"_"+str(target_idx))
-                            new_attr = onnx.helper.make_attribute("weight_shape", list(self.inputs[matmul_weight_for_dense].shape))
-                            node.attribute.append(new_attr)
-                        else:
-                            node = onnx.helper.make_node(name, inputs=target_input, outputs=target_output, name="Ext"+name+"_"+str(target_idx))
+                            # new_attr = onnx.helper.make_attribute("weight_shape", list(self.inputs[matmul_weight_for_dense].shape))
+                            # node.attribute.append(new_attr)
+                        # else:
+                        node = onnx.helper.make_node(name, inputs=target_input, outputs=target_output, name="Ext"+name+"_"+str(target_idx))
 
                         self.model.graph.node.insert(idx, node)
                         target_idx += 1
@@ -922,8 +1003,8 @@ class ONNXModel(object):
 
     
 class ONNXModelKeras(ONNXModel):
-    def __init__(self, onnx_model, umodel=None, transformer=False):
-        super(ONNXModelKeras, self).__init__(onnx_model=onnx_model, umodel=umodel)
+    def __init__(self, onnx_model, umodel=None, transformer=False, pass_weights=False):
+        super(ONNXModelKeras, self).__init__(onnx_model=onnx_model, umodel=umodel, pass_weights=pass_weights)
         self.transformer=transformer
         for node in onnx_model.graph.node:
             if node.name.find("u_front_keras/") != -1:
@@ -987,10 +1068,11 @@ class UFrontONNX(ONNXModel):
         verbose=False,
         seq_length=None,
         transformer=False,
-        simplify = False
+        simplify = False,
+        pass_weights = False
     ): 
         self.umodel = Model() # Ufront Rust model
-        super(UFrontONNX, self).__init__(onnx_model, self.umodel, simplify)
+        super(UFrontONNX, self).__init__(onnx_model, self.umodel, simplify, pass_weights)
         # self.input_names = input_names
         self.batch_size = batch_size
         self.seq_length = seq_length

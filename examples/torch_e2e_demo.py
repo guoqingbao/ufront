@@ -34,8 +34,8 @@ if __name__ == "__main__":
     # net = inception_v3(pretrained=True) # ok
     # net = squeezenet1_1(pretrained=True) #note
     # net = shufflenet_v2_x1_5(pretrained=True)# ok
-    # net = mobilenet_v3_small(pretrained=True)#note
-    net = models.vision_transformer.vit_b_16(weights=True) #ok
+    net = mobilenet_v3_small(pretrained=True, dropout=0.0)#note
+    # net = models.vision_transformer.vit_b_16(weights=True) #ok
     # input = torch.empty(1, 197, 768).normal_(std=0.02)
     # mask = MultiHeadAttention.gen_history_mask(input)
     # net = MultiHeadAttention(128, 16)
@@ -63,7 +63,9 @@ if __name__ == "__main__":
     modelir = model.dump_ir()
 
     tosa_ir= model.dump_tosa_ir()
-
+    f = open("torch_resnet50.mlir", "w")
+    f.write(tosa_ir)
+    f.close()
     print("Compiling TOSA model...")
     if GPU:
         binary = ireec.compile_str(tosa_ir,

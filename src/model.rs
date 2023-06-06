@@ -1193,4 +1193,9 @@ impl Model {
     pub fn cast(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator>  {
         self.handle_operator(OpType::CAST, kwds)
     }
+
+    #[pyo3(signature = (**kwds))]
+    pub fn clip(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
+        self.handle_operator(OpType::CLIP, kwds)
+    }
 }

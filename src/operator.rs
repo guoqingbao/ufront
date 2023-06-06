@@ -411,6 +411,7 @@ impl Operator {
             | OpType::EQ //output shape of equal op (compare a tensor with a scalar) is the shape of input
             | OpType::MASKEDFILL //output shape of masked_fill is equal to the input
             | OpType:: MULTIHEAD_ATTENTION //output shape of multiheaded attention is equal to shape of input "q" (first item in input list) when batch_first=True
+            | OpType::CLIP
              => {
                 // let activations = vec![OpType::ELU, OpType::RELU, OpType::GELU, OpType::SIGMOID, OpType::TANH];
                 // let inplace = if self.params.contains_key("inplace") {self.params["inplace"]=="True"} else {false};
@@ -1100,6 +1101,10 @@ impl Operator {
         } else if self.op_type == OpType::GELU {
             if params.contains_key("approximate") {
                 params["approximate"] = params["approximate"].to_lowercase();
+            }
+        } else if self.op_type == OpType::DROPOUT {
+            if params.contains_key("training") {
+                params["training"] = params["training"].to_lowercase();
             }
         }
 

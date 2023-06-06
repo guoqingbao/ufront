@@ -166,6 +166,7 @@ pub enum OpType {
     CAST,
     TENSOR,
     MATMUL,
+    CLIP,
 }
 
 #[pymethods]
@@ -240,7 +241,7 @@ impl OpType {
             OpType::CAST => "cast",
             OpType::TENSOR => "tensor",
             OpType::MATMUL => "matmul",
-
+            OpType::CLIP => "clip",
             // _ => panic!("Not supported operator!"),
         }
     }
@@ -315,6 +316,7 @@ impl OpType {
             "cast" => OpType::CAST,
             "tensor" => OpType::TENSOR,
             "matmul" => OpType::MATMUL,
+            "clip" => OpType::CLIP,
             _ => {
                 panic!("Not supported type!");
             }
