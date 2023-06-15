@@ -815,7 +815,7 @@ class ONNXModel(object):
     
     def apply(self, input_tensors):
         node_to_output = OrderedDict()
-        
+        inputs_nodes = []
         for i in range(len(self.model.graph.input)):
             input = self.model.graph.input[i]
             if input.name.find("input") >=0 or (i==0 and input.name.find("x") >=0):
@@ -826,6 +826,7 @@ class ONNXModel(object):
                         input1[:] = input_tensor
                         input_tensor = TensorF32(input1, input.name) # convert to Rust f32 tensor
                     self.inputs[input.name] = input_tensor
+                    inputs_nodes.append(input_tensor)
                 elif type(input_tensors) == dict:
                     input_tensor = input_tensors[input.name]
                     if type(input_tensor) != TensorF32:
@@ -833,6 +834,7 @@ class ONNXModel(object):
                         input1[:] = input_tensor
                         input_tensor = TensorF32(input1, input.name) # convert to Rust f32 tensor
                     self.inputs[input.name] = input_tensor
+                    inputs_nodes.append(input_tensor)
                 else:
                     assert 0, "Not a valid input type!"
             elif input.name.find(".weight") < 0 and input.name.find(".bias") < 0 and input.name.find("onnx::") < 0:
@@ -852,6 +854,10 @@ class ONNXModel(object):
                 if input.name not in self.inputs:
                     self.inputs[input.name] = input
             # print("input ", i, ": ", input.name)
+
+        if len(inputs_nodes) > 0:
+            self.umodel.input(tensors=inputs_nodes, num_of_inputs=len(inputs_nodes))
+            inputs_nodes = []
 
         self.process_initializer(self.inputs, self.model.graph.initializer)
 
@@ -877,8 +883,8 @@ class ONNXModel(object):
 
         node_to_output.update(self.inputs)
 
-        for node in self.model.graph.node:
-            print(node.name)
+        # for node in self.model.graph.node:
+        #     print(node.name)
 
         for node in self.model.graph.node:
             handler_name = 'handle' + node.op_type

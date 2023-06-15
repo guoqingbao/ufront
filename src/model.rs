@@ -341,7 +341,7 @@ impl Model {
     }
 
     pub fn dump_ir(&self) -> String {
-        info!("{:?}", self.argshapes);
+        // info!("{:?}", self.argshapes);
         let mut argstr = "".to_string();
         for arg in self.argshapes.keys() {
             argstr += "%";
@@ -447,7 +447,7 @@ impl Model {
             params: HashMap::<String, String>::new(),
             raw_ptr: 0,
         };
-        let mut argstr = "".to_string();
+        // let mut argstr = "".to_string();
         match args {
             Some(para) => {
                 for key in para.keys() {
@@ -463,12 +463,36 @@ impl Model {
                     else if key.to_string() != "input" {
                         op.params
                             .insert(key.to_string(), para.get_item(key).unwrap().to_string());
-                    } else {
-                        argstr = para.get_item(key).unwrap().to_string();
-                    }
+                    } 
+                    // else {
+                    //     argstr = para.get_item(key).unwrap().to_string();
+                    // }
                 }
 
-                self.add_operator(&mut op);
+                if op_type == OpType::INPUT {
+                    if para.contains("tensors").unwrap() {
+                        let ret = para
+                            .get_item("tensors")
+                            .unwrap()
+                            .extract::<Vec<PyRef<TensorF32>>>(); // .downcast::<TensorF32>();
+                        match ret {
+                            Ok(vlist) => {
+                                for v in vlist {
+                                    // self.args.insert(v.name.clone(), argstr.clone());
+                                    self.argshapes.insert(v.name.clone(), v.get_ir());
+                                }
+                                info!("Input: {:?}!", self.argshapes);
+                            }
+                            _ => {
+                                panic! {"Not valid inputs!"};
+                            }
+                        }
+                    } else {
+                        panic! {"Missing important arguments (tensors?)"};
+                    }
+                } else {
+                    self.add_operator(&mut op);
+                }
 
                 if op_type == OpType::CONCAT {
                     if para.contains("tensors").unwrap() {
@@ -495,7 +519,7 @@ impl Model {
                         panic! {"Missing important arguments (tensors?)"};
                     }
                 } else if op_type == OpType::ADD || op_type == OpType::MULTIPLY || op_type == OpType::SUBTRACT || op_type == OpType::MATMUL ||
-                        op_type == OpType::BATCH_MATMUL || op_type == OpType::LESS ||
+                        op_type == OpType::BATCH_MATMUL || op_type == OpType::LESS || op_type == OpType::AND ||
                         ((op_type == OpType::SLICE) && !para.contains("input").unwrap() )    {
                     if para.contains("x").unwrap() && para.contains("y").unwrap() {
                         let x = para.get_item("x").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
@@ -522,18 +546,18 @@ impl Model {
                         let k = para.get_item("k").unwrap().extract::<PyRef<TensorF32>>(); 
                         let v = para.get_item("v").unwrap().extract::<PyRef<TensorF32>>(); 
                         
-                        if self.argshapes.len() == 0 {
-                            match &q {
-                                Ok(v) => {
-                                    if v.name.find("input") == Some(0) || v.name.find("x") == Some(0) {
-                                        self.args.insert(v.name.clone(), argstr.clone());
-                                        self.argshapes.insert(v.name.clone(), v.get_ir());
-                                        info!("Multihead Attention inputs come from forward input!");
-                                    }
-                                }
-                                _ => {}
-                            }
-                        }
+                        // if self.argshapes.len() == 0 {
+                        //     match &q {
+                        //         Ok(v) => {
+                        //             if v.name.find("input") == Some(0) || v.name.find("x") == Some(0) {
+                        //                 self.args.insert(v.name.clone(), argstr.clone());
+                        //                 self.argshapes.insert(v.name.clone(), v.get_ir());
+                        //                 info!("Multihead Attention inputs come from forward input!");
+                        //             }
+                        //         }
+                        //         _ => {}
+                        //     }
+                        // }
 
                         match (q, k, v) {
                             (Ok(q1), Ok(k1), Ok(v1)) => {
@@ -608,7 +632,8 @@ impl Model {
                             DataType::Float
                             | DataType::Double
                             | DataType::Int32
-                            | DataType::Int64 => {}
+                            | DataType::Int64
+                            | DataType::Bool => {}
                             _ => {
                                 panic! {"Not supported type!"};
                             }
@@ -660,10 +685,10 @@ impl Model {
                     let ret = para.get_item("input").unwrap().extract::<PyRef<TensorF32>>(); 
                     match ret {
                         Ok(v) => {
-                            if self.argshapes.len() == 0 && (v.name.find("input") == Some(0) || v.name.find("x") == Some(0)) {
-                                self.args.insert(v.name.clone(), argstr.clone());
-                                self.argshapes.insert(v.name.clone(), v.get_ir());
-                            }
+                            // if self.argshapes.len() == 0 && (v.name.find("input") == Some(0) || v.name.find("x") == Some(0)) {
+                            //     self.args.insert(v.name.clone(), argstr.clone());
+                            //     self.argshapes.insert(v.name.clone(), v.get_ir());
+                            // }
                             if op.add_input(&v).is_ok() {
                                 if para.contains("weight").unwrap() && para.contains("bias").unwrap()  {
                                     let ret1 = para.get_item("weight").unwrap().extract::<PyRef<TensorF32>>(); 
@@ -707,10 +732,10 @@ impl Model {
                         let ret = para.get_item("input").unwrap().extract::<PyRef<TensorF32>>(); 
                         match ret {
                             Ok(v) => {
-                                if v.name.find("input") == Some(0) || v.name.find("x") == Some(0) {
-                                    self.args.insert(v.name.clone(), argstr.clone());
-                                    self.argshapes.insert(v.name.clone(), v.get_ir());
-                                }
+                                // if v.name.find("input") == Some(0) || v.name.find("x") == Some(0) {
+                                //     self.args.insert(v.name.clone(), argstr.clone());
+                                //     self.argshapes.insert(v.name.clone(), v.get_ir());
+                                // }
                                 if op.add_input(&v).is_ok() {
                                     if para.contains("weight").unwrap()  {
                                         let ret = para.get_item("weight").unwrap().extract::<PyRef<TensorF32>>();
@@ -747,6 +772,8 @@ impl Model {
                                 panic! {"Not a valid input type!"};
                             }
                         }
+                } else if op_type == OpType::ARANGE { //arange has no inputs
+                    op.calculate_output();
                 }
 
                 Python::with_gil(|py| Py::new(py, op).unwrap())
@@ -814,16 +841,17 @@ impl Model {
             params: HashMap::<String, String>::new(),
             raw_ptr: 0,
         };
-        let mut argstr = "".to_string();
+        // let mut argstr = "".to_string();
         match kwds {
             Some(para) => {
                 for key in para.keys() {
                     if key.to_string() != "input" {
                         op.params
                             .insert(key.to_string(), para.get_item(key).unwrap().to_string());
-                    } else {
-                        argstr = para.get_item(key).unwrap().to_string();
-                    }
+                    } 
+                    // else {
+                    //     argstr = para.get_item(key).unwrap().to_string();
+                    // }
                 }
 
                 let callback = para.get_item("callback").unwrap().extract::<PyObject>();
@@ -894,7 +922,11 @@ impl Model {
         self.handle_operator(OpType::SLICE, kwds)
     }
 
-    pub fn input(&mut self) {}
+    #[pyo3(signature = (**kwds))]
+    pub fn input(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
+        self.handle_operator(OpType::INPUT, kwds)
+    }
+
     pub fn output(&self) {}
 
     #[pyo3(signature = (**kwds))]
@@ -977,8 +1009,11 @@ impl Model {
         self.handle_operator(OpType::LAYER_NORM, kwds)
     }
 
-    pub fn embedding(&self) {}
-
+    #[pyo3(signature = (**kwds))]
+    pub fn embedding(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
+        self.handle_operator(OpType::EMBEDDING, kwds)
+    }
+    
     #[pyo3(signature = (**kwds))]
     pub fn expand(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::EXPAND, kwds)
@@ -1166,7 +1201,40 @@ impl Model {
 
     pub fn getattr(&self) {}
 
-    pub fn float(&self) {}
+    #[pyo3(signature = (**kwds))]
+    pub fn float(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator>  {
+        self.handle_operator(OpType::FLOAT, kwds)
+    }
+
+    #[pyo3(signature = (**kwds))]
+    pub fn bool(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator>  {
+        self.handle_operator(OpType::BOOL, kwds)
+    }
+
+    #[pyo3(signature = (**kwds))]
+    pub fn invert(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator>  {
+        self.handle_operator(OpType::INVERT, kwds)
+    }
+
+    #[pyo3(signature = (**kwds))]
+    pub fn And(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator>  {
+        self.handle_operator(OpType::AND, kwds)
+    }
+
+    #[pyo3(signature = (**kwds))]
+    pub fn detach(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator>  {
+        self.handle_operator(OpType::DETACH, kwds)
+    }
+
+    #[pyo3(signature = (**kwds))]
+    pub fn cumsum(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator>  {
+        self.handle_operator(OpType::CUMSUM, kwds)
+    }
+
+    #[pyo3(signature = (**kwds))]
+    pub fn arange(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator>  {
+        self.handle_operator(OpType::ARANGE, kwds)
+    }
 
     #[pyo3(signature = (**kwds))]
     pub fn masked_fill(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator>  {

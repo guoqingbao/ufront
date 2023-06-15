@@ -167,6 +167,12 @@ pub enum OpType {
     TENSOR,
     MATMUL,
     CLIP,
+    BOOL,
+    INVERT,
+    AND,
+    DETACH,
+    CUMSUM,
+    ARANGE,
 }
 
 #[pymethods]
@@ -242,6 +248,12 @@ impl OpType {
             OpType::TENSOR => "tensor",
             OpType::MATMUL => "matmul",
             OpType::CLIP => "clip",
+            OpType::BOOL => "bool",
+            OpType::INVERT => "invert",
+            OpType::AND => "And",
+            OpType::DETACH => "detach",
+            OpType::CUMSUM => "cumsum",
+            OpType::ARANGE => "arange",
             // _ => panic!("Not supported operator!"),
         }
     }
@@ -317,6 +329,12 @@ impl OpType {
             "tensor" => OpType::TENSOR,
             "matmul" => OpType::MATMUL,
             "clip" => OpType::CLIP,
+            "bool" => OpType::BOOL,
+            "invert" => OpType::INVERT,
+            "And" => OpType::AND,
+            "detach" => OpType::DETACH,
+            "cumsum" => OpType::CUMSUM,
+            "arange" => OpType::ARANGE,
             _ => {
                 panic!("Not supported type!");
             }

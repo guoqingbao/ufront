@@ -244,7 +244,8 @@ class ModuleNode(Node):
         elif isinstance(module, torch.nn.MultiheadAttention):
             return MultiheadAttentionNode(node, module)
         else:
-            assert 0, f"Unknown module: {module}"
+            # assert 0, f"Unknown module: {module}"
+            return None
 
 
 class LinearNode(ModuleNode):
@@ -1099,7 +1100,7 @@ class EmbeddingNode(ModuleNode):
     def __init__(self, node, module):
         super().__init__(node, module)
         self.op_type = OpType.EMBEDDING
-        self.assert_num_args(1, Comparator.EQ)
+        self.assert_num_args(1, Comparator.GEQ)
 
     def parse(self):
         s = [self.name]
@@ -1123,24 +1124,42 @@ class EmbeddingNode(ModuleNode):
             input=input_tensor,
             num_embeddings=num_embeddings,
             embedding_dim=embedding_dim,
-            aggr=AggrMode.AGGR_MODE_NONE,
+            # aggr=AggrMode.AGGR_MODE_NONE,
             kernel_initializer=init,
             name=name,
         )
 
     def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        num_embeddings = self.module.num_embeddings
-        embedding_dim = self.module.embedding_dim
-        assert type(num_embeddings) is int
-        assert type(embedding_dim) is int
-        return umodel.embedding(
-            input=input_tensor,
-            num_embeddings=num_embeddings,
-            embedding_dim=embedding_dim,
-            aggr=AggrMode.AGGR_MODE_NONE,
-            name=self.name,
-        )
+        if self.module != None:
+            num_embeddings = self.module.num_embeddings
+            embedding_dim = self.module.embedding_dim
+            assert type(num_embeddings) is int
+            assert type(embedding_dim) is int
+            return umodel.embedding(
+                input=input_tensor,
+                num_embeddings=num_embeddings,
+                embedding_dim=embedding_dim,
+                # aggr=AggrMode.AGGR_MODE_NONE,
+                name=self.name,
+            )
+        elif len(self.innodes) > 1:
+            weight = node_to_output[self.innodes[1].name]
+            if type(weight) != TensorF32:
+                weight_op = umodel.parameter(np_tensor=weight.astype(np.float32), dtype=numpy_to_ufront_dtype(weight.dtype), requires_grad=True, name=self.name + "_weight")
+
+            num_embeddings = weight.shape[0]
+            embedding_dim = weight.shape[1]
+            return umodel.embedding(
+                input=input_tensor,
+                num_embeddings=num_embeddings,
+                embedding_dim=embedding_dim,
+                weight=weight_op.get_output(0) if type(weight) != TensorF32 else weight,
+                # aggr=AggrMode.AGGR_MODE_NONE,
+                name=self.name,
+            )
+        else:
+            assert 0, "Invalid argument for embedding, missing weight or num_embeddings & embedding_dim!"
 
 class MultiheadAttentionNode(ModuleNode):
     def __init__(self, node, module):
@@ -1320,7 +1339,7 @@ class FunctionNode(Node):
             node (torch.fx.node.Node): ``torch.fx`` node from which to
                 construct a corresponding :class:`Node`.
         """
-        name = node.name
+        name : str = node.name
         if name.find("add") >= 0:
             if FunctionNode.is_right_scalar_op(node):
                 return ScalarAddNode(node, FunctionNode.ScalarPosition.RIGHT)
@@ -1337,7 +1356,7 @@ class FunctionNode(Node):
             elif FunctionNode.is_left_scalar_op(node):
                 return ScalarSubNode(node, FunctionNode.ScalarPosition.LEFT)
             elif FunctionNode.is_elemwise_op(node):
-                assert 0, "FlexFlow does not support element-wise subtraction"
+                return SubNode(node)
             else:
                 assert 0, "Unknown `sub()` usage with `innodes`: " \
                     f"{node.innodes}"
@@ -1354,6 +1373,22 @@ class FunctionNode(Node):
                 #     f"Unknown `mul()` usage with `innodes`: {node.innodes}"
         elif name.find("floordiv") >= 0 or name.find("floor_divide") >= 0:
             return ScalarFloorDivNode(node)
+        elif name.startswith("neg"):
+            return NegNode(node)
+        elif name.startswith("bool"):
+            return BoolNode(node)
+        elif name.startswith("invert"):
+            return InvertNode(node)
+        elif name.startswith("and"):
+            return AndNode(node)
+        elif name.startswith("detach"):
+            return DetachNode(node)
+        elif name.startswith("cumsum"):
+            return CumsumNode(node)
+        elif name.startswith("arange"):
+            return ArangeNode(node)
+        elif name.startswith("less") or name.startswith("lt"):
+            return LessNode(node)
         elif name.find("truediv") >= 0: return ScalarTrueDivNode(node)
         elif name.find("cat") == 0: return ConcatNode(node)
         elif name.find("split") >= 0: return SplitChunkNode(node, OpType.SPLIT)
@@ -1392,7 +1427,7 @@ class FunctionNode(Node):
         elif name.find("conv2d") >= 0: return Conv2dNode(node)
         elif name.find("linear") >= 0: return LinearNode(node)
         elif name.find("layer_norm") >= 0: return LayerNormNode(node, None)
-        elif name.find("embedding") >= 0: return EmbeddingNode(node)
+        elif name.find("embedding") >= 0: return EmbeddingNode(node, None)
         elif name.find("batch_norm") >= 0: return BatchNorm2dNode(node)
         else:
             return None
@@ -1599,6 +1634,17 @@ class ScalarAddNode(FunctionNode):
         )
 
 
+class SubNode(FunctionNode):
+    def __init__(self, node):
+        super().__init__(node)
+        self.op_type = OpType.SUBTRACT
+        self.assert_num_args(2, Comparator.EQ)
+
+    def to_ff(self, umodel, node_to_output):
+        input_tensor1 = node_to_output[self.innodes[0].name]
+        input_tensor2 = node_to_output[self.innodes[1].name]
+        return umodel.subtract(x=input_tensor1, y=input_tensor2, name=self.name)
+    
 class AddNode(FunctionNode):
     def __init__(self, node):
         super().__init__(node)
@@ -1661,6 +1707,8 @@ class ScalarSubNode(FunctionNode):
         )
 
     def to_ff(self, umodel, node_to_output):
+        # if self.scalar_pos == None:
+        #     return node_to_output[self.innodes[0]] - node_to_output[self.innodes[1]]
         input_tensor, scalar = \
             FunctionNode.parse_scalar_op(self, node_to_output)
         return umodel.ssub(
@@ -1866,9 +1914,22 @@ class GetItemNode(FunctionNode):
             else:
                 assert type(slices) is tuple, f"Expected tuple slices but got {type(slices)}"
                 # slice_tensor = list(slices)
-                start, step, stop = slices[0].start,  slices[0].step,  slices[0].stop
-                slice_tensor = "[[{}, {}, {}], {}]".format(start if start!= None else "\"None\"", step if step!= None else "\"None\"", stop if stop!= None else "\"None\"", slices[1])
-                
+                isEllipsis  = False
+                for slice in slices:
+                    if slice is Ellipsis:
+                        isEllipsis = True
+                        break
+
+                if isEllipsis:
+                    slice_tensor = str(slices)
+                else:
+                    if slices[0] != None:
+                        start, step, stop = slices[0].start,  slices[0].step,  slices[0].stop
+                        slice_tensor = "[[{}, {}, {}], {}]".format(start if start!= None else "\"None\"", step if step!= None else "\"None\"", stop if stop!= None else "\"None\"", slices[1] if slices[1]!= None else "\"None\"")
+                    else:
+                        start, step, stop = slices[1].start,  slices[1].step,  slices[1].stop
+                        slice_tensor = "[{}, [{}, {}, {}]]".format(slices[0] if slices[0]!= None else "\"None\"", start if start!= None else "\"None\"", step if step!= None else "\"None\"", stop if stop!= None else "\"None\"")
+                    
                 output_shape = np.zeros(shape=input_tensor.shape, dtype=np.float32)[slices].shape
             
             # print(np.max(slices), " ", np.min(slices), " : ", list(slices))
@@ -1985,6 +2046,128 @@ class BatchMatMulNode(FunctionNode):
         )
 
 
+class NegNode(FunctionNode):
+    def __init__(self, node):
+        super().__init__(node)
+        self.op_type = OpType.SCALAR_MULTIPLY
+        self.assert_num_args(1, Comparator.EQ)
+
+    def to_ff(self, umodel, node_to_output):
+        input_tensor = node_to_output[self.innodes[0].name]
+        if type(input_tensor) == TensorF32:
+            return umodel.smultiply(
+                input=input_tensor, scalar=-1.0, name=self.name,
+            )
+        else:
+            return input_tensor * -1.0
+
+class BoolNode(FunctionNode):
+    def __init__(self, node):
+        super().__init__(node)
+        self.op_type = OpType.BOOL
+        self.assert_num_args(1, Comparator.EQ)
+
+    def to_ff(self, umodel, node_to_output):
+        input_tensor = node_to_output[self.innodes[0].name]
+        if type(input_tensor) == TensorF32:
+            return umodel.bool(
+                input=input_tensor, name=self.name,
+            )
+        else:
+            return input_tensor > 0
+
+class InvertNode(FunctionNode):
+    def __init__(self, node):
+        super().__init__(node)
+        self.op_type = OpType.INVERT
+        self.assert_num_args(1, Comparator.EQ)
+
+    def to_ff(self, umodel, node_to_output):
+        input_tensor = node_to_output[self.innodes[0].name]
+        if type(input_tensor) == TensorF32:
+            return umodel.invert(
+                input=input_tensor, name=self.name,
+            )
+        elif type(input_tensor) == np.ndarray:
+            return np.invert(input_tensor)
+        else:
+            return ~input_tensor
+
+class AndNode(FunctionNode):
+    def __init__(self, node):
+        super().__init__(node)
+        self.op_type = OpType.AND
+        self.assert_num_args(2, Comparator.EQ)
+
+    def to_ff(self, umodel, node_to_output):
+        input_tensor1 = node_to_output[self.innodes[0].name]
+        input_tensor2 = node_to_output[self.innodes[1].name]
+        if type(input_tensor1) == TensorF32 and type(input_tensor2) == TensorF32:
+            return umodel.And(
+                x=input_tensor1, y=input_tensor2, name=self.name,
+            )
+        else:
+            return input_tensor1 & input_tensor2
+
+class LessNode(FunctionNode):
+    def __init__(self, node):
+        super().__init__(node)
+        self.op_type = OpType.LESS
+        self.assert_num_args(2, Comparator.EQ)
+
+    def to_ff(self, umodel, node_to_output):
+        input_tensor1 = node_to_output[self.innodes[0].name]
+        input_tensor2 = node_to_output[self.innodes[1].name]
+        if type(input_tensor1) == TensorF32 and type(input_tensor2) == TensorF32:
+            return umodel.less(
+                x=input_tensor1, y=input_tensor2, name=self.name,
+            )
+        else:
+            return input_tensor1 < input_tensor2
+        
+class DetachNode(FunctionNode):
+    def __init__(self, node):
+        super().__init__(node)
+        self.op_type = OpType.DETACH
+        self.assert_num_args(1, Comparator.EQ)
+
+    def to_ff(self, umodel, node_to_output):
+        input_tensor = node_to_output[self.innodes[0].name]
+        if type(input_tensor) == TensorF32:
+            return umodel.detach(
+                input=input_tensor, name=self.name,
+            )
+        else:
+            return input_tensor
+        
+class CumsumNode(FunctionNode):
+    def __init__(self, node):
+        super().__init__(node)
+        self.op_type = OpType.CUMSUM
+        self.axis = node.kwargs["dim"]
+        self.assert_num_args(1, Comparator.EQ)
+
+    def to_ff(self, umodel, node_to_output):
+        input_tensor = node_to_output[self.innodes[0].name]
+        if type(input_tensor) == TensorF32:
+            return umodel.cumsum(
+                input=input_tensor, axis=self.axis, name=self.name,
+            )
+        else:
+            return np.cumsum(input_tensor, self.axis)
+
+class ArangeNode(FunctionNode):
+    def __init__(self, node):
+        super().__init__(node)
+        self.op_type = OpType.ARANGE
+        self.assert_num_args(1, Comparator.EQ)
+
+    def to_ff(self, umodel, node_to_output):
+        input_tensor = node_to_output[self.innodes[0].name]
+        return umodel.arange(start=0, end=input_tensor, step=1, name=self.name)
+
+        
+                      
 class ScalarMulNode(FunctionNode):
     def __init__(self, node, scalar_pos):
         super().__init__(node)
@@ -2104,6 +2287,8 @@ class GetAttrNode(FunctionNode):
             return input_tensor.shape
         if attr == "dims" or attr == "dim":
             return input_tensor.dims
+        if attr == "device":
+            return "cpu"
         else:
             return getattr(input_tensor, attr)
 
@@ -2617,7 +2802,11 @@ class FloatNode(FunctionNode):
 
     def to_ff(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return input_tensor
+        if type(input_tensor) == TensorF32:
+            return umodel.float(input=input_tensor, name=self.name)
+        else:
+            assert type(input_tensor) == np.ndarray, "Only accept TensorF32 or numpy array for converting to float type!"
+            return input_tensor.astype(np.float)
 
 
 class TypeAsNode(FunctionNode):
@@ -3015,6 +3204,11 @@ class TorchCallNode(CallNode):
                 args["arg"+str(idx)] = arg
             idx += 1
 
+        for k, v in self.kwargs.items():
+            argtypes[k] = type(v)
+            args[k] = v
+            idx += 1
+
         return umodel.call(
             func=self.funcname, args=args, argtypes = argtypes, callback=self.callback, name=self.name
         )
@@ -3131,10 +3325,75 @@ class OutputNode(Node):
                     )
                     output_tensors[:] += [softmax_logits]
             else:
-                output_tensors[:] += [node_to_output[other.name]]
+                if other != None:
+                    if type(other) == tuple:
+                        kv_cache = []
+                        for (k, v) in list(other):
+                            kv_cache[:] += [(node_to_output[k.name], node_to_output[v.name])]
+                        output_tensors[:] += [[kv_cache]]
+                    else:
+                        output_tensors[:] += [node_to_output[other.name]]
+                else:
+                    output_tensors.append(other)
+                
 
 # TorchFunctions = {'einsum':torch.einsum, 'swapaxes':torch.swapaxes}
 
+import torch
+
+from torch.fx import Tracer
+from torch.fx import symbolic_trace
+from torch.fx.graph_module import GraphModule
+
+class UFrontTracer(Tracer):
+    """
+    ``Tracer`` is the class that implements the symbolic tracing functionality
+    of ``torch.fx.symbolic_trace``. A call to ``symbolic_trace(m)`` is equivalent
+    to ``Tracer().trace(m)``.
+    This Tracer override the ``is_leaf_module`` function to make symbolic trace
+    right in some cases.
+    """
+    def __init__(self, *args, customed_leaf_module=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.customed_leaf_module = customed_leaf_module
+
+    def is_leaf_module(self, m: torch.nn.Module, module_qualified_name : str) -> bool:
+        """
+        A method to specify whether a given ``nn.Module`` is a "leaf" module.
+        Leaf modules are the atomic units that appear in
+        the IR, referenced by ``call_module`` calls. By default,
+        Modules in the PyTorch standard library namespace (torch.nn)
+        are leaf modules. All other modules are traced through and
+        their constituent ops are recorded, unless specified otherwise
+        via this parameter.
+        Args:
+            m (Module): The module being queried about
+            module_qualified_name (str): The path to root of this module. For example,
+                if you have a module hierarchy where submodule ``foo`` contains
+                submodule ``bar``, which contains submodule ``baz``, that module will
+                appear with the qualified name ``foo.bar.baz`` here.
+        """
+        if self.customed_leaf_module and isinstance(m, self.customed_leaf_module):
+            return True
+        
+        if hasattr(m, '_is_leaf_module') and m._is_leaf_module:
+            return True
+
+        return m.__module__.startswith('torch.nn') and not isinstance(m, torch.nn.Sequential)
+
+
+
+# class UFrontIf(torch.nn.Module):
+#     def __init__(self):
+#         super().__init__()
+#         self._is_leaf_module = True
+    
+#     def forward(self, x):
+#         if x.sum() > 0:
+#             return x + 1
+#         else:
+#             return x - 1
+        
 class UFrontTorch():
     def __init__(
         self,
@@ -3184,7 +3443,12 @@ class UFrontTorch():
                 dtype = ufront_to_numpy_dtype(v.dtype)
                 kwargs["args"][key] = torch.from_numpy(v.ndarray.astype(dtype))
             elif type(v) == int or type(v) == float:
-                kwargs["args"][key] = torch.Tensor([v])
+                if kwargs["argtypes"][key] == torch.Tensor:
+                    kwargs["args"][key] = torch.Tensor([v])
+                else:
+                    kwargs["args"][key] = v
+            else:
+                kwargs["args"][key] = v
             args.append(kwargs["args"][key])
         
         ret = self.external_functions[kwargs['func']](*args)
@@ -3224,26 +3488,34 @@ class UFrontTorch():
         #             sequence_length=self.seq_length,
         #         )
         # else:
-        traced = torch.fx.symbolic_trace(self.model)
-
+        # traced = torch.fx.symbolic_trace(self.model)
+        tracer = UFrontTracer()
+        traced_graph = tracer.trace(self.model)
         # Convert the fx graph to an internal graph representation
         name_to_module = {}
         for name, module in self.model.named_modules():
             name_to_module[name] = module
             # print(name)
         graph = []
-        for fx_node in traced.graph.nodes:
-            # print(fx_node.op, " : ", fx_node.name)
-            if fx_node.op == "call_module":
-                module_name = fx_node.target
-                module = name_to_module[module_name]
-                node = ModuleNode.construct_node(fx_node, module)
+        for fx_node in traced_graph.nodes:
+            # if fx_node.op == "placeholder":
+            #     print(fx_node.op, " : ", fx_node.name)
+            if fx_node.op == "output":
+                node = OutputNode(fx_node)
             elif fx_node.op == "placeholder":
                 node = InputNode(fx_node)
             elif fx_node.op == "get_attr":
-                node = AttributeNode(fx_node, self.model) # not supported yet!
-            elif fx_node.op == "call_function" or fx_node.op == "call_method":
-                node = FunctionNode.construct_node(fx_node)
+                node = AttributeNode(fx_node, self.model) 
+            elif fx_node.op == "call_function" or fx_node.op == "call_method" or fx_node.op == "call_module":
+                if fx_node.op == "call_module":
+                    module_name = fx_node.target
+                    module = name_to_module[module_name]
+                    node = ModuleNode.construct_node(fx_node, module)
+                    if node is None:
+                        node = FunctionNode.construct_node(fx_node)
+                else:
+                    node = FunctionNode.construct_node(fx_node)
+
                 if node is None:
                     # if fx_node.name.find("einsum") >=0 or fx_node.name.find("swapaxes") >=0: 
                     if hasattr(fx_node.target, "__module__") and (fx_node.target.__module__ == "torch.functional" or fx_node.target.__module__=="torch"):
@@ -3258,8 +3530,6 @@ class UFrontTorch():
                         node = RepeatNode(fx_node)
                     else:
                         node = CallNode(fx_node, self.normal_callback)
-            elif fx_node.op == "output":
-                node = OutputNode(fx_node)
             else:
                 assert 0, f"Unknown operator type: {fx_node.op}"
             if node != None:
@@ -3395,15 +3665,17 @@ class UFrontTorch():
                 input = input.numpy()
             input1 = np.ones(shape=input.shape, dtype=input.dtype)
             input1[:] = input
-            input_tensor = TensorF32(input1, "input" + str(idx)) # convert to Rust f32 tensor
+            input_tensor = TensorF32(input1.astype(np.float32), "input" + str(idx)) # convert to Rust f32 tensor
             input_tensors.append(input_tensor)
             idx += 1
 
+        inputs_nodes = []
         for node in graph:
             if verbose:
                 print(f"{node.ir_string}")
             if isinstance(node, InputNode):
                 node_output = node.to_ff(input_tensors, input_index)
+                inputs_nodes.append(node_output)
                 input_index += 1
             elif isinstance(node, OutputNode):
                 node.to_ff(self.ufront_model, node_to_output, output_tensors)
@@ -3411,7 +3683,9 @@ class UFrontTorch():
             else:
                 # if type(node) in [GetItemNode, GetAttrNode, AttributeNode, EqNode, AssertNode, ScalarAddNode, ScalarFloorDivNode, ScalarMulNode, ScalarSubNode, ScalarTrueDivNode]:
                 #     print(type(node), ": ", node.name)
-
+                if len(inputs_nodes) > 0:
+                    self.ufront_model.input(tensors=inputs_nodes, num_of_inputs=len(inputs_nodes))
+                    inputs_nodes = []
                 operator = node.to_ff(self.ufront_model, node_to_output)
                 if type(operator) == PyOperator:
                     self.operators.append(operator)

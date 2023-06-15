@@ -22,6 +22,7 @@ lib64/
 parts/
 sdist/
 var/
+chatglm_q/
 # include/
 man/
 venv/
@@ -78,3 +79,5 @@ docs/_build/
 .onnx/
 test.py
 *.whl
+examples/llm.py
+examples/output_ir/torch_chatglm-6b.ir
