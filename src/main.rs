@@ -17,7 +17,7 @@ use numpy::pyo3::Python;
 use numpy::IntoPyArray;
 use numpy::{PyArray, ToPyArray};
 use operator::PyOperator;
-use tensor::TensorF32;
+use tensor::Tensor;
 use types::OpType;
 
 fn main() {
@@ -71,10 +71,10 @@ fn main() {
     // model.compile();
     model.forward();
 
-    // tensorf32.set_ndarray(arr)
-    // print("Obtained dimension: ", tensorf32.get_dims())
+    // tensorf.set_ndarray(arr)
+    // print("Obtained dimension: ", tensorf.get_dims())
 
-    // a = tensorf32.get_ndarray()
+    // a = tensorf.get_ndarray()
     Python::with_gil(|py| {
         let a = operator.get_input_ndarray(0, py);
         println!("Retrive tensor from Rust: {a:?}");

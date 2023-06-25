@@ -25,8 +25,8 @@ except:
 # Revised for Unified Computing Frontend (UFront)
 # Enflame Tech. (ERA)
 from ..onnx.model import ONNXModelKeras
-from ..ufront import (OpType, ActiMode, AggrMode, PoolType, TensorF32, DataType, ParamSyncType, Initializer)
-from ..ufront import Model, PyOperator, TensorF32, Optimizer, LossType, MetricsType #Rust frontend
+from ..ufront import (OpType, ActiMode, AggrMode, PoolType, Tensor, DataType, ParamSyncType, Initializer)
+from ..ufront import Model, PyOperator, Tensor, Optimizer, LossType, MetricsType #Rust frontend
 
 class BaseModel(object):
   def __init__(self, inputs, onnx_model, batch_size, transformer, pass_weights):
@@ -51,7 +51,7 @@ class BaseModel(object):
             input = input.numpy()
         input1 = np.ones(shape=input.shape, dtype=input.dtype)
         input1[:] = input
-        input_tensor = TensorF32(input1, key) # convert to Rust f32 tensor
+        input_tensor = Tensor(input1, key) # convert to Rust f32 tensor
         input_dict[key] = input_tensor
 
     self._output_tensor = self._my_onnx_model.apply(input_dict)

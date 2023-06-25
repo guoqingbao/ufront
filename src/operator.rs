@@ -14,15 +14,16 @@
 //
 use crate::databuffer::DataBuffer;
 use crate::databuffer::Buffer;
+// use crate::tensor::Tensor;
 use crate::tensor::Tensor;
-use crate::tensor::TensorF32;
+use crate::tensor::TensorU;
 use crate::types::DataType;
 use crate::types::OpType;
 use core::panic;
-use std::println;
-use ndarray::ArrayD;
+use std::any::TypeId;
+use half::{f16, bf16};
 use ::num::abs;
-use numpy::{IntoPyArray, PyArrayDyn, PyReadonlyArrayDyn};
+use numpy::{PyReadonlyArrayDyn};
 // use pyo3::exceptions::PyOSError;
 use indexmap::IndexMap;
 use pyo3::prelude::*;
@@ -30,7 +31,6 @@ use pyo3::types::PyDict;
 use std::collections::HashMap;
 // use std::os::raw::c_void;
 use itertools::Itertools;
-use std::num;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 static IDX: AtomicUsize = AtomicUsize::new(0);
@@ -46,8 +46,8 @@ pub trait OperatorTrait {
 #[repr(C)]
 pub struct Operator {
     // pub id : usize,
-    pub inputs: Vec<TensorF32>,
-    pub outputs: Vec<TensorF32>,
+    pub inputs: Vec<Tensor>,
+    pub outputs: Vec<Tensor>,
     pub op_type: OpType,
     pub params: IndexMap<String, String>,
     pub channel_first: bool,
@@ -86,8 +86,8 @@ impl Operator {
         // let mut params_ : HashMap<String, String> = HashMap::new();
         // params_.extend(params.into_iter());
         // Python::with_gil(|py| {
-        //     let inputs: Py<TensorF32> = Py::new(py, TensorF32 { tensor : None})?;
-        //     let outputs: Py<TensorF32> = Py::new(py, TensorF32 { tensor : None})?;
+        //     let inputs: Py<Tensor> = Py::new(py, Tensor { tensor : None})?;
+        //     let outputs: Py<Tensor> = Py::new(py, Tensor { tensor : None})?;
 
         //     let operator = Operator {id : id, inputs : inputs, outputs : outputs, op_type : op, params : params_};
         //     // return operator;
@@ -115,6 +115,26 @@ impl Operator {
         num
     }
 
+    pub fn empty_tensor(typeid: TypeId, sz: usize, shape: Vec<usize>) -> TensorU {
+        if typeid == TypeId::of::<f32>() {
+            TensorU {
+                shape: shape,
+                data_buffer: DataBuffer::CPUDataBuffer(Buffer::new::<f32>(sz, None)),
+            }
+        } else if typeid == TypeId::of::<f16>() {
+            TensorU {
+                shape: shape,
+                data_buffer: DataBuffer::CPUDataBuffer(Buffer::new::<f16>(sz, None)),
+            }
+        } else if typeid == TypeId::of::<bf16>() {
+            TensorU {
+                shape: shape,
+                data_buffer: DataBuffer::CPUDataBuffer(Buffer::new::<bf16>(sz, None)),
+            }
+        } else {
+            panic!("Invalid type! {:?}", typeid);
+        }
+    }
     // pub fn get_input_ndarray<'py>(&self, idx : usize, py: Python<'py>) -> &'py PyArrayDyn<f32>{
     //     info!("Operator::get_input_ndarray {}", idx);
     //     if idx < self.num_of_inputs() {
@@ -134,37 +154,114 @@ impl Operator {
 
     // }
 
-    // pub fn get_input(&self, idx : usize) -> Result<&TensorF32, ()> {
+    // pub fn get_input(&self, idx : usize) -> Result<&Tensor, ()> {
 
     //     Err(())
     //     // return Err(PyOSError::new_err("Failed to obtain tensor!".to_string()))
     // }
 
-    pub fn get_input(&self, idx: usize) -> Result<&TensorF32, ()> {
+    pub fn get_input<'py>(&mut self, idx: usize, py: Python<'py>) -> Py<Tensor> {
         info!("Operator::get_input idx {idx}");
         if idx < self.num_of_inputs() {
-            return Ok(&self.inputs[idx]);
+            // return Ok(&mut self.inputs[idx]);
+            // return self.inputs[idx];
+            match &self.inputs[idx].tensor {
+                Some(v) => {
+                    let tensor_ = TensorU {
+                        shape: v.shape.to_vec(),
+                        data_buffer: v.data_buffer.clone(),
+                    };
+
+                    return Py::new(
+                            py,
+                            Tensor {
+                                tensor: Some(tensor_),
+                                name: self.inputs[idx].name.clone(),
+                                dtype: self.inputs[idx].dtype,
+                            },
+                        )
+                        .unwrap();
+                }
+                _ => {
+                    panic!("Unable to obtain output!");
+                }
+
+            }
         }
-        Err(())
+        panic!("Error get_input!");
+        // Err(())
     }
 
-    pub fn get_output(&self, idx: usize) -> Result<&TensorF32, ()> {
+    pub fn get_output<'py>(&self, idx: usize, py: Python<'py>) -> Py<Tensor>{
         info!("Operator::get_output idx {idx}");
         if idx < self.num_of_outputs() {
-            return Ok(&self.outputs[idx]);
+            // return Ok(&self.outputs[idx]);
+            match &self.outputs[idx].tensor {
+                Some(v) => {
+                    let tensor_ = TensorU {
+                        shape: v.shape.to_vec(),
+                        data_buffer: v.data_buffer.clone(),
+                    };
+
+                    return Py::new(
+                            py,
+                            Tensor {
+                                tensor: Some(tensor_),
+                                name: self.outputs[idx].name.clone(),
+                                dtype: self.outputs[idx].dtype,
+                            },
+                        )
+                        .unwrap();
+                }
+                _ => {
+                    panic!("Unable to obtain output!");
+                }
+
+            }
+
+            // return self.outputs[idx].get_ndarray(py);
         }
-        Err(())
+        // Err(())
+        panic!("Error get_output!");
+
     }
 
-    pub fn add_input(&mut self, x: Tensor<f32>, name: String, dtype: DataType) {
-        self.inputs.push(TensorF32 {
+    pub fn get_input_ndarray<'py>(&mut self, idx: usize, py: Python<'py>) -> &'py PyAny {
+        info!("Operator::get_input idx {idx}");
+        if idx < self.num_of_inputs() {
+            // return Ok(&mut self.inputs[idx]);
+            return self.inputs[idx].get_ndarray(py);
+        }
+        panic!("Error get_input!");
+        // Err(())
+    }
+
+    pub fn get_output_ndarray<'py>(&mut self, idx: usize, py: Python<'py>) -> &'py PyAny{
+        info!("Operator::get_output idx {idx}");
+        if idx < self.num_of_outputs() {
+            // return Ok(&self.outputs[idx]);
+            return self.outputs[idx].get_ndarray(py);
+        }
+        // Err(())
+        panic!("Error get_output!");
+
+    }
+
+    pub fn add_input(&mut self, x: TensorU, name: String, dtype: DataType) {
+        self.inputs.push(Tensor {
             tensor: Some(x),
             name,
             dtype: dtype,
         });
     }
 
-    pub fn add_output(&mut self, x: Tensor<f32>, dtype: Option<DataType>) {
+    pub fn get_unique_name(&self) -> String {
+        let mut name = self.params["name"].clone();
+        let idx = IDX.fetch_add(1, Ordering::SeqCst);
+        name += idx.to_string().as_str();
+        return name;
+    }
+    pub fn add_output(&mut self, x: TensorU, dtype: Option<DataType>) {
         
         let _dtype = match dtype {
             Some(t) => { t }
@@ -172,17 +269,17 @@ impl Operator {
         };
 
         // if !self.outputs.is_empty() {
-            let mut name = self.params["name"].clone();
-            let idx = IDX.fetch_add(1, Ordering::SeqCst);
-            name += idx.to_string().as_str();
+            // let mut name = self.params["name"].clone();
+            // let idx = IDX.fetch_add(1, Ordering::SeqCst);
+            // name += idx.to_string().as_str();
 
-            self.outputs.push(TensorF32 {
+            self.outputs.push(Tensor {
                 tensor: Some(x),
-                name,
+                name: self.get_unique_name(),
                 dtype: _dtype,
             });
         // } else {
-        //     self.outputs.push(TensorF32 {
+        //     self.outputs.push(Tensor {
         //         tensor: Some(x),
         //         name: self.params["name"].to_string(),
         //         dtype: _dtype,
@@ -241,12 +338,7 @@ impl Operator {
                             let output_shape = if self.channel_first {vec![v.shape[0], output_channel, h, w]} else {vec![v.shape[0], h, w, output_channel]};
                             let sz: usize = output_shape.iter().product();
                             info!("Output tensor with shape {:?} created within Rust for operator {:?}!", output_shape, self.op_type);
-                            let tensor = Tensor::<f32> {
-                                shape: output_shape,
-                                // data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
-                                data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(sz, None)),
-
-                            };
+                            let tensor = Operator::empty_tensor(v.data_buffer.get_type_id(), sz, output_shape);
                             self.add_output(tensor, Some(self.inputs[0].dtype));
                         }
                         _ => {
@@ -270,14 +362,8 @@ impl Operator {
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
                             output_shape, self.op_type
                         );
-                        let tensor = Tensor::<f32> {
-                            shape: output_shape.clone(),
-                            // data_buffer: DataBuffer::CPUDataBuffer(vec![
-                            //     0f32;
-                            //     output_shape.iter().product()
-                            // ]),
-                            data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(output_shape.iter().product(), None)),
-                        };
+                        let tensor = Operator::empty_tensor(v1.data_buffer.get_type_id(), output_shape.iter().product(), output_shape);
+
                         self.add_output(tensor, Some(self.inputs[0].dtype));
                     }
                     _ => {
@@ -305,12 +391,7 @@ impl Operator {
                                 output_shape, self.op_type
                             );
                             let sz: usize = output_shape.iter().product();
-                            let tensor = Tensor::<f32> {
-                                shape: output_shape,
-                                // data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
-                                data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(sz, None)),
-
-                            };
+                            let tensor = Operator::empty_tensor(v.data_buffer.get_type_id(), sz, output_shape);
                             self.add_output(tensor, Some(self.inputs[0].dtype));
                         }
                         _ => {
@@ -369,12 +450,7 @@ impl Operator {
                                     output_shape, self.op_type
                                 );
                                 let sz: usize = output_shape.iter().product();
-                                let tensor = Tensor::<f32> {
-                                    shape: output_shape,
-                                    // data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
-                                    data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(sz, None)),
-
-                                };
+                                let tensor = Operator::empty_tensor(v.data_buffer.get_type_id(), sz, output_shape);
                                 self.add_output(tensor, Some(self.inputs[0].dtype));
                             }
                             _ => {
@@ -408,11 +484,7 @@ impl Operator {
                 let output_shape = vec![1, length];
 
                 let sz: usize = output_shape.iter().product();
-                let tensor = Tensor::<f32> {
-                    shape: output_shape.clone(),
-                    // data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
-                    data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(sz, None)),
-                };
+                let tensor = Operator::empty_tensor(TypeId::of::<i32>(), sz, output_shape.clone());
                 self.add_output(tensor, Some(DataType::Int32));
                 info!(
                     "Output tensor with shape {:?} created within Rust for operator {:?}!",
@@ -434,11 +506,8 @@ impl Operator {
                         let output_shape = vec![v.shape[0], v.shape[1], embedding_dim];
                         
                         let sz: usize = output_shape.iter().product();
-                        let tensor = Tensor::<f32> {
-                            shape: output_shape.clone(),
-                            // data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
-                            data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(sz, None)),
-                        };
+                        let tensor = Operator::empty_tensor(v.data_buffer.get_type_id(), sz, output_shape.clone());
+
                         self.add_output(tensor, Some(self.inputs[0].dtype));
                         info!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
@@ -499,15 +568,7 @@ impl Operator {
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
                             v.shape, self.op_type
                         );
-                        let tensor = Tensor::<f32> {
-                            shape: v.shape.clone(),
-                            // data_buffer: DataBuffer::CPUDataBuffer(vec![
-                            //     0f32;
-                            //     v.shape.iter().product()
-                            // ]),
-                            data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(v.shape.iter().product(), None)),
-
-                        };
+                        let tensor = Operator::empty_tensor(v.data_buffer.get_type_id(), v.shape.iter().product(), v.shape.clone());
                         
                         if OpType::LESS == self.op_type {
                             self.add_output(tensor, Some(DataType::Bool));
@@ -554,15 +615,7 @@ impl Operator {
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
                             output_shape, self.op_type
                         );
-                        let tensor = Tensor::<f32> {
-                            shape: output_shape.clone(),
-                            // data_buffer: DataBuffer::CPUDataBuffer(vec![
-                            //     0f32;
-                            //     output_shape.iter().product()
-                            // ]),
-                            data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(output_shape.iter().product(), None)),
-
-                        };
+                        let tensor = Operator::empty_tensor(v1.data_buffer.get_type_id(), output_shape.iter().product(), output_shape);
                         self.add_output(tensor, Some(self.inputs[0].dtype));
                     }
                     _ => {
@@ -579,8 +632,11 @@ impl Operator {
                 let mut output_shape = vec![0, 0, 0, 0];
                 let idx_i = self.params["axis"].trim().parse::<i32>().unwrap();
                 let mut idx : usize = 0;
+                let mut typeid = TypeId::of::<f32>();
                 if let Some(v) = &mut self.inputs[0].tensor {
                     output_shape = v.shape.clone();
+                    typeid = v.data_buffer.get_type_id();
+
                     if idx_i < 0 {
                         idx = v.shape.len() - abs(idx_i) as usize;
                     } else {
@@ -601,12 +657,7 @@ impl Operator {
                     output_shape, self.op_type
                 );
                 let sz: usize = output_shape.iter().product();
-                let tensor = Tensor::<f32> {
-                    shape: output_shape,
-                    // data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
-                    data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(sz, None)),
-
-                };
+                let tensor = Operator::empty_tensor(typeid, sz, output_shape);
                 self.add_output(tensor, Some(self.inputs[0].dtype));
             }
             OpType::SPLIT | OpType::CHUNK => {
@@ -617,7 +668,13 @@ impl Operator {
                 //C1 -> list.1
                 //C2 -> list.2
                 //..
-
+                let mut typeid = TypeId::of::<f32>();
+                match &self.inputs[0].tensor {
+                    Some(v) => {
+                        typeid = v.data_buffer.get_type_id();
+                    }
+                    _=>{}
+                }
                 match &mut self.inputs[0].tensor {
                     Some(v) => {
                         let params = self.params.clone();
@@ -663,12 +720,7 @@ impl Operator {
                             for size in sizes {
                                 output_shape[idx as usize] = size;
                                 let sz: usize = output_shape.iter().product();
-                                let tensor = Tensor::<f32> {
-                                    shape: output_shape.clone(),
-                                    // data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
-                                    data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(sz, None)),
-
-                                };
+                                let tensor = Operator::empty_tensor(typeid, sz, output_shape.clone());
                                 self.add_output(tensor, Some(self.inputs[0].dtype));
                                 info!("Output tensor with shape {:?} created within Rust for operator {:?}!", output_shape, self.op_type);
                             }
@@ -712,12 +764,7 @@ impl Operator {
                             }
                         }
                         let sz: usize = v.shape.iter().product();
-                        // let output_shape = vec![v.shape[0], sz/v.shape[0]];
-                        let tensor = Tensor::<f32> {
-                            shape: output_shape.clone(),
-                            // data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
-                            data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(sz, None)),
-                        };
+                        let tensor = Operator::empty_tensor(v.data_buffer.get_type_id(), sz, output_shape.clone());
                         self.add_output(tensor, Some(self.inputs[0].dtype));
                         info!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
@@ -739,11 +786,7 @@ impl Operator {
 
                         let output_shape : Vec<usize> = self.params["shape"].replace(['[', ']'], "").split(",").map(|x| x.trim().parse::<usize>().unwrap()).collect();
                         let sz: usize = v.shape.iter().product();
-                        let tensor = Tensor::<f32> {
-                            shape: output_shape.clone(),
-                            data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(sz, None)),
-                            // data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
-                        };
+                        let tensor = Operator::empty_tensor(v.data_buffer.get_type_id(), sz, output_shape.clone());
                         self.add_output(tensor, Some(self.inputs[0].dtype));
                         info!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
@@ -771,11 +814,7 @@ impl Operator {
                             output_shape.extend([v.shape.get(idx).unwrap()]);
                         }
                         let sz: usize = v.shape.iter().product();
-                        let tensor = Tensor::<f32> {
-                            shape: output_shape.clone(),
-                            // data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
-                            data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(sz, None)),
-                        };
+                        let tensor = Operator::empty_tensor(v.data_buffer.get_type_id(), sz, output_shape.clone());
                         self.add_output(tensor, Some(self.inputs[0].dtype));
                         info!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
@@ -806,11 +845,7 @@ impl Operator {
                             output_shape[i]= if dim!=-1 {dim as usize} else {v.shape[i]};
                         }
                         let sz: usize = v.shape.iter().product();
-                        let tensor = Tensor::<f32> {
-                            shape: output_shape.clone(),
-                            // data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
-                            data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(sz, None)),
-                        };
+                        let tensor = Operator::empty_tensor(v.data_buffer.get_type_id(), sz, output_shape.clone());
                         self.add_output(tensor, Some(self.inputs[0].dtype));
                         info!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
@@ -837,11 +872,7 @@ impl Operator {
                         let mut output_shape = v.shape.clone(); //vec![v.shape[0], output_dim, v.shape[2], v.shape[3]];
                         output_shape[v.shape.len() - 1] = output_dim;
                         let sz: usize = output_shape.iter().product();
-                        let tensor = Tensor::<f32> {
-                            shape: output_shape.clone(),
-                            // data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
-                            data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(sz, None)),
-                        };
+                        let tensor = Operator::empty_tensor(v.data_buffer.get_type_id(), sz, output_shape.clone());
                         self.add_output(tensor, Some(self.inputs[0].dtype));
                         info!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
@@ -864,11 +895,8 @@ impl Operator {
                         let output_shape : Vec<usize> = self.params["output_shape"].replace(['[', ']'], "").split(",").map(|x| x.trim().parse::<usize>().unwrap()).collect();
 
                         let sz: usize = output_shape.iter().product();
-                        let tensor = Tensor::<f32> {
-                            shape: output_shape.clone(),
-                            // data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
-                            data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(sz, None)),
-                        };
+                        let tensor = Operator::empty_tensor(v.data_buffer.get_type_id(), sz, output_shape.clone());
+
                         self.add_output(tensor, Some(self.inputs[0].dtype));
                         info!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
@@ -885,28 +913,29 @@ impl Operator {
             OpType::PARAMETER | OpType::TENSOR => {
                 //formula
                 //output_shape = input_shape
-                match &mut self.inputs[0].tensor {
-                    Some(v) => {
-                        let output_shape = v.shape.clone();
-                        let sz: usize = output_shape.iter().product();
+                self.outputs.append(&mut self.inputs);
+                self.outputs[0].name = self.get_unique_name();
 
-                        let tensor = Tensor::<f32> {
-                            shape: output_shape.clone(),
-                            data_buffer: v.data_buffer.clone()
-                            // data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
-                            // data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(sz, Some(v.data_buffer.to_vec()))),
-                        };
-                        self.add_output(tensor, Some(self.inputs[0].dtype));
-                        info!(
-                            "Output tensor with shape {:?} created within Rust for operator {:?}!",
-                            output_shape,
-                            self.op_type
-                        );
-                    }
-                    _ => {
-                        panic!("Invalid tensor for parameter!");
-                    }
-                }
+                // match &mut self.inputs[0].tensor {
+                //     Some(v) => {
+                //         let output_shape = v.shape.clone();
+                //         let sz: usize = output_shape.iter().product();
+
+                //         let tensor = TensorU {
+                //             shape: output_shape.clone(),
+                //             data_buffer: v.data_buffer.clone()
+                //         };
+                //         self.add_output(tensor, Some(self.inputs[0].dtype));
+                //         info!(
+                //             "Output tensor with shape {:?} created within Rust for operator {:?}!",
+                //             output_shape,
+                //             self.op_type
+                //         );
+                //     }
+                //     _ => {
+                //         panic!("Invalid tensor for parameter!");
+                //     }
+                // }
             }
             OpType::MEAN => {
                 //keepdims
@@ -946,11 +975,7 @@ impl Operator {
                         } 
 
                         let sz: usize = output_shape.iter().product();
-                        let tensor = Tensor::<f32> {
-                            shape: output_shape.clone(),
-                            // data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
-                            data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(sz, None)),
-                        };
+                        let tensor = Operator::empty_tensor(v.data_buffer.get_type_id(), sz, output_shape.clone());
                         self.add_output(tensor, Some(self.inputs[0].dtype));
                         info!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
@@ -1001,14 +1026,9 @@ impl Operator {
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
                             output_shape, self.op_type
                         );
-                        let tensor = Tensor::<f32> {
-                            shape: output_shape.clone(),
-                            // data_buffer: DataBuffer::CPUDataBuffer(vec![
-                            //     0f32;
-                            //     output_shape.iter().product()
-                            // ]),
-                            data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(output_shape.iter().product(), None)),
-                        };
+                        let sz = output_shape.iter().product();
+                        let tensor = Operator::empty_tensor(v1.data_buffer.get_type_id(), sz, output_shape);
+
                         self.add_output(tensor, Some(self.inputs[0].dtype));
                     }
                     _ => {
@@ -1036,11 +1056,7 @@ impl Operator {
                
 
                         let sz: usize = output_shape.iter().product();
-                        let tensor = Tensor::<f32> {
-                            shape: output_shape.clone(),
-                            // data_buffer: DataBuffer::CPUDataBuffer(vec![0f32; sz]),
-                            data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(sz, None)),
-                        };
+                        let tensor = Operator::empty_tensor(v.data_buffer.get_type_id(), sz, output_shape.clone());
                         self.add_output(tensor, Some(self.inputs[0].dtype));
                         info!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
@@ -1089,7 +1105,7 @@ impl Operator {
         let lst: Vec<&str> = strargs.split("), ").collect();
         let mut retlst: Vec<String> = Vec::<String>::new();
         for item in lst {
-            match item.find("TensorF32") {
+            match item.find("Tensor") {
                 Some(_) => {
                     continue;
                 }
@@ -1136,10 +1152,14 @@ impl Operator {
             if params.contains_key("initializer") {
                 params["initializer"] = params["initializer"].replace('\n', "");
             } else {
-                match &self.inputs[0].tensor {
+                match &self.outputs[0].tensor {
                     Some(v) => match &v.data_buffer { 
                         DataBuffer::CPUDataBuffer(data) => {
-                            params.insert("initializer".to_string(), format!("{:?}", data.as_ptr()));
+                            if self.outputs[0].dtype == DataType::Float {
+                                params.insert("initializer".to_string(), format!("{:?}", data.as_ptr::<f32>()));
+                            } else {
+                                params.insert("initializer".to_string(), format!("{:?}", data.as_ptr::<f16>()));
+                            }
                             // let v = data.to_vec()[100];
                             // let memaddr = format!("{:?}", data.as_ptr());
                             // println!("Rust address {memaddr} 100th value {v}");
@@ -1413,50 +1433,55 @@ impl PyOperator {
         }
     }
 
-    pub fn get_input_ndarray<'py>(&self, idx: usize, py: Python<'py>) -> &'py PyArrayDyn<f32> {
+    pub fn get_input_ndarray<'py>(&self, idx: usize, py: Python<'py>) -> &'py PyAny {
         info!("Operator::get_input_ndarray idx {idx}");
         if self.raw_ptr > 0 && idx < self.num_of_inputs() {
-            let operator = self.raw_ptr as *const Operator;
+            let operator = self.raw_ptr as *mut Operator;
             unsafe {
-                match (*operator).get_input(idx) {
-                    Ok(tensor) => match &tensor.tensor {
-                        Some(v) => match &v.data_buffer {
-                            DataBuffer::CPUDataBuffer(data) => {
-                                ArrayD::from_shape_vec(v.shape.to_vec(), data.to_vec())
-                                    .unwrap()
-                                    .into_pyarray(py)
-                            }
-                            _ => panic!("Tensor conversion failed!"),
-                        },
-                        _ => panic!("Tensor not initialized!"),
-                    },
-                    _ => panic!("Tensor not initialized!"),
-                }
+                return (*operator).get_input_ndarray(idx, py);
+                // match &mut (*operator).get_input(idx) {
+                //     Ok(&mut tensor) => {
+                //         tensor.get_ndarray(py)
+                //     }
+                    // Ok(tensor) => match &tensor.tensor {
+                    //     Some(v) => match &v.data_buffer {
+                    //         DataBuffer::CPUDataBuffer(data) => {
+                    //             ArrayD::from_shape_vec(v.shape.to_vec(), data.to_vec())
+                    //                 .unwrap()
+                    //                 .into_pyarray(py)
+                    //         }
+                    //         _ => panic!("Tensor conversion failed!"),
+                    //     },
+                    //     _ => panic!("Tensor not initialized!"),
+                    // },
+                //     _ => panic!("Tensor not initialized!"),
+                // }
             }
         } else {
             panic!("Tensor not initialized or index out of bound!")
         }
     }
 
-    pub fn get_output_ndarray<'py>(&self, idx: usize, py: Python<'py>) -> &'py PyArrayDyn<f32> {
+    pub fn get_output_ndarray<'py>(&self, idx: usize, py: Python<'py>) -> &'py PyAny {
         info!("Operator::get_output_ndarray {idx}");
         if self.raw_ptr > 0 && idx < self.num_of_outputs() {
-            let operator = self.raw_ptr as *const Operator;
+            let operator = self.raw_ptr as *mut Operator;
             unsafe {
-                match (*operator).get_output(idx) {
-                    Ok(tensor) => match &tensor.tensor {
-                        Some(v) => match &v.data_buffer {
-                            DataBuffer::CPUDataBuffer(data) => {
-                                ArrayD::from_shape_vec(v.shape.to_vec(), data.to_vec())
-                                    .unwrap()
-                                    .into_pyarray(py)
-                            }
-                            _ => panic!("Tensor conversion failed!"),
-                        },
-                        _ => panic!("Tensor not initialized!"),
-                    },
-                    _ => panic!("Tensor not initialized!"),
-                }
+                return (*operator).get_output_ndarray(idx, py);
+                // match (*operator).get_output(idx) {
+                //     Ok(tensor) => match &tensor.tensor {
+                //         Some(v) => match &v.data_buffer {
+                //             DataBuffer::CPUDataBuffer(data) => {
+                //                 ArrayD::from_shape_vec(v.shape.to_vec(), data.to_vec())
+                //                     .unwrap()
+                //                     .into_pyarray(py)
+                //             }
+                //             _ => panic!("Tensor conversion failed!"),
+                //         },
+                //         _ => panic!("Tensor not initialized!"),
+                //     },
+                //     _ => panic!("Tensor not initialized!"),
+                // }
             }
         } else {
             panic!("Tensor not initialized or index out of bound!")
@@ -1467,9 +1492,9 @@ impl PyOperator {
         let x = x.as_array();
         match x.as_slice() {
             Some(v) => {
-                let tensor = Tensor::<f32> {
+                let tensor = TensorU {
                     shape: x.shape().to_vec(),
-                    data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(v.len(), Some(v.to_vec()))),
+                    data_buffer: DataBuffer::CPUDataBuffer(Buffer::new(v.len(), Some(v.to_vec()))),
                 };
 
                 if self.raw_ptr > 0 {
@@ -1490,14 +1515,14 @@ impl PyOperator {
         }
     }
 
-    pub fn add_input(&mut self, x: &TensorF32) -> PyResult<()> {
+    pub fn add_input(&mut self, x: &Tensor) -> PyResult<()> {
         info!("Operator::add_input");
         if self.raw_ptr > 0 {
             unsafe {
                 let operator = std::mem::transmute::<u64, *mut Operator>(self.raw_ptr);
                 match &x.tensor {
                     Some(v) => {
-                        let tensor = Tensor::<f32> {
+                        let tensor = TensorU {
                             shape: v.shape.to_vec(),
                             data_buffer: v.data_buffer.clone(),
                         };
@@ -1525,14 +1550,14 @@ impl PyOperator {
         }
     }
 
-    pub fn add_output(&mut self, x: &TensorF32) {
+    pub fn add_output(&mut self, x: &Tensor) {
         info!("Operator::add_output");
         if self.raw_ptr > 0 {
             unsafe {
                 let operator = std::mem::transmute::<u64, *mut Operator>(self.raw_ptr);
                 match &x.tensor {
                     Some(v) => {
-                        let tensor = Tensor::<f32> {
+                        let tensor = TensorU {
                             shape: v.shape.to_vec(),
                             data_buffer: v.data_buffer.clone(),
                         };
@@ -1547,56 +1572,52 @@ impl PyOperator {
             panic!("OUtput not added to the graph!");
         }
     }
-    // pub fn get_input<'py>( &self, py: Python<'py>, idx : usize) -> Result<&'py TensorF32, ()> {
-    //     if self.raw_ptr > 0 {
-    //         let operator = self.raw_ptr as *const Operator;
-    //         unsafe {
-
-    //             match  (*operator).get_input(idx){
-    //                 Ok(v) => {
-    //                      Ok(v)
-    //                 },
-    //                 _ => {Err(())} //PyOSError::new_err("Invalid operator pointer!".to_string())
-    //             }
-
-    //         }
-    //     }
-    //     else { Err(())} //PyOSError::new_err("Invalid operator pointer!".to_string()
-    // }
-
-    pub fn get_output(&self, idx: usize) -> Py<TensorF32> {
+    pub fn get_input<'py>( &self, idx : usize, py: Python<'py>) -> Py<Tensor> {
         if self.raw_ptr > 0 {
-            let operator = self.raw_ptr as *const Operator;
+            let operator = self.raw_ptr as *mut Operator;
             unsafe {
-                match (*operator).get_output(idx) {
-                    Ok(tensorf32) => match &tensorf32.tensor {
-                        Some(v) => {
-                            let tensor = Tensor::<f32> {
-                                shape: v.shape.to_vec(),
-                                data_buffer: v.data_buffer.clone(),
-                            };
+                return (*operator).get_input(idx, py);
+            }
+        }
+        else {
+            panic!("Invalid operator pointer!");
+        }
+    }
 
-                            Python::with_gil(|py| {
-                                Py::new(
-                                    py,
-                                    TensorF32 {
-                                        tensor: Some(tensor),
-                                        name: tensorf32.name.clone(),
-                                        dtype: tensorf32.dtype,
-                                    },
-                                )
-                                .unwrap()
-                            })
-                        }
-                        _ => {
-                            panic!("Unable to obtain output!");
-                        }
-                    },
+    pub fn get_output<'py>(&self, idx: usize, py: Python<'py>) -> Py<Tensor> {
+        if self.raw_ptr > 0 {
+            let operator = self.raw_ptr as *mut Operator;
+            unsafe {
+                return (*operator).get_output(idx, py);
+                // match (*operator).get_output(idx) {
+                //     Ok(tensor) => match &tensor.tensor {
+                //         Some(v) => {
+                //             let tensor_ = TensorU {
+                //                 shape: v.shape.to_vec(),
+                //                 data_buffer: v.data_buffer.clone(),
+                //             };
 
-                    _ => {
-                        panic!("Unable to obtain output!");
-                    }
-                }
+                //             Python::with_gil(|py| {
+                //                 Py::new(
+                //                     py,
+                //                     Tensor {
+                //                         tensor: Some(tensor_),
+                //                         name: tensor.name.clone(),
+                //                         dtype: tensor.dtype,
+                //                     },
+                //                 )
+                //                 .unwrap()
+                //             })
+                //         }
+                //         _ => {
+                //             panic!("Unable to obtain output!");
+                //         }
+                //     },
+
+                //     _ => {
+                //         panic!("Unable to obtain output!");
+                //     }
+                // }
             }
         } else {
             panic!("Invalid operator pointer!");

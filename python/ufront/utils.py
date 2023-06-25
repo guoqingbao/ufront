@@ -1,6 +1,6 @@
 import numpy as np
 from functools import reduce
-from .ufront import (OpType, ActiMode, AggrMode, PoolType, TensorF32, DataType, ParamSyncType, Initializer)
+from .ufront import (OpType, ActiMode, AggrMode, PoolType, Tensor, DataType, ParamSyncType, Initializer)
 try:
     import onnx
 except:
@@ -37,6 +37,8 @@ def numpy_to_ufront_dtype(numpy_dtype):
         return DataType.Int64
     elif numpy_dtype in (np.float16, np.half, "float16", "half"):
         return DataType.Half
+    elif numpy_dtype.name == "bfloat16":
+        return DataType.BHalf
     elif numpy_dtype in (np.bool, "bool", "BOOL", "boolean", "Boolean"):
         return DataType.Bool
     else:

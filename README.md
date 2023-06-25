@@ -114,6 +114,14 @@ def load_read_image():
 if __name__ == "__main__":
     # net = resnet18(pretrained=True)
     net = resnet50(pretrained=True)
+    # net = densenet121(pretrained=True)
+    # net = inception_v3(pretrained=True) 
+    # net = squeezenet1_1(pretrained=True)
+    # net = shufflenet_v2_x1_5(pretrained=True)
+    # net = mobilenet_v3_small(pretrained=True, dropout=0.0)
+    # net = models.vision_transformer.vit_b_16(weights=True) 
+    
+    net = resnet50(pretrained=True)
     net.train(False) 
     input = load_read_image()
     print("Pytorch: ", decode_result(net.forward(torch.Tensor(input)).detach().numpy()))
@@ -161,7 +169,7 @@ import torch.nn as nn
 import numpy as np
 import torch
 
-# from ufront import Model, PyOperator, TensorF32, Optimizer, LossType, MetricsType #Rust frontend
+# from ufront import Model, PyOperator, Tensor, Optimizer, LossType, MetricsType #Rust frontend
 from ufront.pytorch.model import UFrontTorch #Pytorch wrapper
 
 # A sample pytorch model definition
@@ -206,12 +214,6 @@ if __name__ == "__main__":
     batch_size = 32
     input = np.zeros((batch_size, 3, 32, 32), dtype=np.float32)
     model = UFrontTorch(ComplexCNN(), batch_size=batch_size) # convert torch model to ufront model
-
-    #save model to file (compatible with flexflow)
-    # model.torch_to_file('cnn.ff')
-
-    #load model from file (compatible with flexflow)
-    # output_tensors = UFrontTorch.file_to_ff('cnn.ff', [input_tensor, input_tensor])
 
     #This will trigger Rust frontend for actual model conversion and graph building
     #operators can also be managed by python side (each operator here corresponding to an operator in the Rust computation graph)
@@ -281,7 +283,7 @@ func.func @forward(%input2: tensor<1x3x32x32xf32>, %input1: tensor<1x3x32x32xf32
 
 ## Sample usage for ONNX Models
 ``` python
-# from ufront import Model, PyOperator, TensorF32, Optimizer, LossType, MetricsType #Rust frontend
+# from ufront import Model, PyOperator, Tensor, Optimizer, LossType, MetricsType #Rust frontend
 from ufront.onnx.model import ONNXModel, ONNXModelKeras, UFrontONNX #ONNX wrapper
 
 import numpy as np
@@ -325,12 +327,6 @@ if __name__ == "__main__":
     print(model.dump_ir()) # UFront IR
 
     #model.dump_tosa_ir() #TOSA IR
-
-    #This will be supported later
-    #model.forward()
-    
-    #This will be supported later
-    #model.backward()
 
   ## IR Dump Results (for ONNX)
   ### (Converted from ONNX model to High-level IR after calling dump_ir(), i.e., TOSA-like dialect IR)
@@ -396,10 +392,7 @@ if __name__ == "__main__":
     (x_train, y_train), (x_test, y_test) = cifar10.load_data()
     x_train = x_train.astype('float32') / 255
     y_train = y_train.astype('int32')
-    print("shape: ", x_train.shape)
     
-    # inputs, outputs, model_name = SequentialCNN(shape=(3, 32, 32), dtype="float32", num_classes=10)
-    # inputs, outputs, model_name = ConcatenatedCNN(shape=(3, 32, 32), dtype="float32", num_classes=10)
     inputs, outputs, model_name = NestedCNN(shape=(3, 32, 32), dtype="float32", num_classes=10)
 
     model = UFrontKeras(inputs = inputs, outputs = outputs, batch_size = 32)
@@ -407,20 +400,12 @@ if __name__ == "__main__":
     model.compile(optimizer={"type":"sgd", "lr":"0.01", "momentum":"0", "nesterov":"False", "weight_decay":"0"},
                          loss='sparse_categorical_crossentropy', metrics=['accuracy', 'sparse_categorical_crossentropy'])
 
-    # opt = optimizers.SGD(learning_rate=0.01)
-    # model.compile(optimizer=opt, loss='sparse_categorical_crossentropy', metrics=['accuracy', 'sparse_categorical_crossentropy'])
-    
     print(model.summary()) 
 
     # for operator in operators:
     #   print(operator.ir) #show ir for each operator
     print(model.dump_ir()) #UFront IR
     #print(model.dump_tosa_ir()) #TOSA IR
-    #This will be supported later
-    #model.forward()
-    
-    #This will be supported later
-    #model.backward()
 
   ## IR Dump Results (for Keras)
   ### (Converted from Keras model to High-level IR after calling dump_ir(), i.e., TOSA-like dialect IR)
@@ -456,8 +441,8 @@ if __name__ == "__main__":
 
    input = np.ones((batch_size,3,32,32), dtype=np.float32)
 
-   tensor_input1 = ufront.TensorF32(input, name="input1")
-   tensor_input2 = ufront.TensorF32(input, name="input2")
+   tensor_input1 = ufront.Tensor(input, name="input1")
+   tensor_input2 = ufront.Tensor(input, name="input2")
 
    x = model.conv2d(input=tensor_input1, out_channels=32, kernel=[3, 3], stride=[1, 1], pad=[0, 0], groups=1)
    x1 = model.relu(input=x.get_output(0))
@@ -494,11 +479,6 @@ if __name__ == "__main__":
    print(model.dump_ir()) #UFront IR
    #print(model.dump_tosa_ir()) #TOSA IR
 
-   #This will be supported later
-   #model.forward()
-    
-   #This will be supported later
-   #model.backward()
 
   ## IR Dump Results (for Native usage)
   ### (Converted from natively defined model to High-level IR after calling dump_ir(), i.e., TOSA-like dialect IR)

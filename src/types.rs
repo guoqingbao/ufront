@@ -21,11 +21,12 @@ use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
 #[pyclass]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum DataType {
     Int32 = 100,
     Int64,
-    Half,
+    Half, //fp16
+    BHalf, //bf16
     Float,
     Double,
     Bool,
@@ -68,6 +69,7 @@ impl DataType {
             DataType::Int32 => 4,
             DataType::Int64 => 8,
             DataType::Half => 2,
+            DataType::BHalf => 2,
             DataType::Float => 4,
             DataType::Double => 8,
             DataType::Bool => 2,

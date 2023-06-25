@@ -32,9 +32,9 @@ if __name__ == "__main__":
     # net = resnet50(pretrained=True)# ok
     # net = densenet121(pretrained=True)# ok
     # net = inception_v3(pretrained=True) # ok
-    # net = squeezenet1_1(pretrained=True) #note
+    # net = squeezenet1_1(pretrained=True) #ok
     # net = shufflenet_v2_x1_5(pretrained=True)# ok
-    net = mobilenet_v3_small(pretrained=True, dropout=0.0)#note
+    net = mobilenet_v3_small(pretrained=True, dropout=0.0)#ok
     # net = models.vision_transformer.vit_b_16(weights=True) #ok
     # input = torch.empty(1, 197, 768).normal_(std=0.02)
     # mask = MultiHeadAttention.gen_history_mask(input)

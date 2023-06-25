@@ -10,7 +10,7 @@ operator = ufront.PyOperator(OpType.CONV2D, {"input_channel":"1", "output_channe
 model.add_operator(operator)
 
 arr = np.ones((3,3,3), dtype=np.float32)
-# tensorf32 = ufront.TensorF32(arr)
+# tensor = ufront.Tensor(arr)
 operator.add_input_ndarray(arr)
 
 
@@ -24,10 +24,10 @@ model.forward()
 
 
 
-# tensorf32.set_ndarray(arr)
-# print("Obtained dimension: ", tensorf32.get_dims())
+# tensor.set_ndarray(arr)
+# print("Obtained dimension: ", tensor.get_dims())
 
-# a = tensorf32.get_ndarray()
+# a = tensor.get_ndarray()
 a = operator.get_input_ndarray(0)
 print(a)
 print("Retrive tensor from Rust:\n ", a)

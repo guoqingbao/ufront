@@ -1,4 +1,4 @@
-# Copyright (c) Facebook, Inc. and its affiliates, Enflame Tech. All rights reserved.
+# Copyright (c) 2023 Enflame Tech, Facebook, Inc. and its affiliates (legacy code). All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,8 +31,8 @@ except:
     print("Some of the onnx models requires onnxsim library, please install onnxsim before usage!")
 
 import struct
-from ..ufront import (OpType, ActiMode, AggrMode, PoolType, TensorF32, DataType, WeightType, ParamSyncType, Initializer)
-from ..ufront import Model, PyOperator, TensorF32, Optimizer, LossType, MetricsType #Rust frontend
+from ..ufront import (OpType, ActiMode, AggrMode, PoolType, Tensor, DataType, WeightType, ParamSyncType, Initializer)
+from ..ufront import Model, PyOperator, Tensor, Optimizer, LossType, MetricsType #Rust frontend
 from ..utils import list_product, onnx_to_ufront_dtype, numpy_to_ufront_dtype, ufront_to_numpy_dtype
 
 class ONNXTensor(object):
@@ -100,9 +100,9 @@ class ONNXModel(object):
         input0 = node_to_output[node.input[0]]
         input1 = node_to_output[node.input[1]]
         # return self.umodel.add(x=input0, y=input1, name=node.name)
-        if type(input0) == TensorF32 and type(input1) == TensorF32:
+        if type(input0) == Tensor and type(input1) == Tensor:
             return self.umodel.add(x=input0, y=input1, name=node.name)
-        elif type(input0) == TensorF32:
+        elif type(input0) == Tensor:
             if type(input1) in [float, int, np.float32, np.float64, np.int32, np.int64, np.half]:
                 return self.umodel.sadd(
                     input=input0, scalar=input1, name=node.name
@@ -115,7 +115,7 @@ class ONNXModel(object):
                 return self.umodel.add(
                     x=input0, y=input1, name=node.name
                 )
-        elif type(input1) == TensorF32:
+        elif type(input1) == Tensor:
             if type(input0) in [float, int, np.float32, np.float64, np.int32, np.int64, np.half]:
                 return self.umodel.sadd(
                     input=input1, scalar=input0, name=node.name
@@ -136,16 +136,16 @@ class ONNXModel(object):
         input0 = node_to_output[node.input[0]]
         input1 = node_to_output[node.input[1]]
     
-        if type(input0) == TensorF32 and type(input1) == TensorF32:
+        if type(input0) == Tensor and type(input1) == Tensor:
             return self.umodel.subtract(x=input0, y=input1, name=node.name)
-        elif type(input0) == TensorF32:
+        elif type(input0) == Tensor:
             if type(input1) in [float, int, np.float32, np.float64, np.int32, np.int64, np.half]:
                 return self.umodel.ssub(input=input0, scalar=input1, name=node.name)
             else:
                 assert type(input1) == np.ndarray, "The given input is not an ndarray!"
                 return self.umodel.ssub(input=input0, operand=input1.tolist(), name=node.name)
             
-        elif type(input1) == TensorF32:
+        elif type(input1) == Tensor:
             if type(input0) in [float, int, np.float32, np.float64, np.int32, np.int64, np.half]:
                 return self.umodel.ssub(input=input1, scalar=input0, name=node.name)
             else:
@@ -157,9 +157,9 @@ class ONNXModel(object):
     def handleMul(self, node, node_to_output):
         input0 = node_to_output[node.input[0]]
         input1 = node_to_output[node.input[1]]
-        if type(input0) == TensorF32 and type(input1) == TensorF32:
+        if type(input0) == Tensor and type(input1) == Tensor:
             return self.umodel.multiply(x=input0, y=input1, name=node.name)
-        elif type(input0) == TensorF32:
+        elif type(input0) == Tensor:
             if type(input1) in [float, int, np.float32, np.float64, np.int32, np.int64, np.half]:
                 return self.umodel.smultiply(
                     input=input0, scalar=input1, name=node.name
@@ -173,7 +173,7 @@ class ONNXModel(object):
                 return self.umodel.multiply(
                     x=input0, y=input1, name=node.name
                 )
-        elif type(input1) == TensorF32:
+        elif type(input1) == Tensor:
             if type(input0) in [float, int, np.float32, np.float64, np.int32, np.int64, np.half]:
                 return self.umodel.smultiply(
                     input=input1, scalar=input0, name=node.name
@@ -199,7 +199,7 @@ class ONNXModel(object):
             if type(input).__name__ == "ValueInfoProto":
                 dims = [x.dim_value for x in input.type.tensor_type.shape.dim]
                 inputs[i] = self.umodel.create_tensor(dims, DataType.Float, True, input.name)
-            elif type(input) != TensorF32:
+            elif type(input) != Tensor:
                 allTensors = False
         if allTensors:
             return self.umodel.concat(tensors=inputs, axis=attribute['axis'].i, name=node.name) # tensor concat
@@ -451,7 +451,7 @@ class ONNXModel(object):
         if len(node.input) > 1:
             input2 = node_to_output[node.input[1]]
 
-        return self.umodel.gelu(input=input1 if type(input1)==TensorF32 else input2, approximate=True, name=node.name)
+        return self.umodel.gelu(input=input1 if type(input1)==Tensor else input2, approximate=True, name=node.name)
     
     def handlePad(self, node, node_to_output):
         input = node_to_output[node.input[0]]
@@ -546,7 +546,7 @@ class ONNXModel(object):
         # else:
         #     assert 0, "Unable to obtain input2!"
         
-        # if type(input1) ==TensorF32 and type(input2) == TensorF32:
+        # if type(input1) ==Tensor and type(input2) == Tensor:
         #     if len(input1.shape) < 3 and len(input2.shape) < 3:
         #         return self.umodel.matmul(x = input1, y=input2, name=node.name)
         #     else:
@@ -563,7 +563,7 @@ class ONNXModel(object):
         else:
             assert 0, "Unable to obtain input2!"
             
-        if type(input2) != TensorF32:
+        if type(input2) != Tensor:
             assert type(input2) == np.ndarray, "The given input is not an ndarray!"
             # operator = self.addTensor(input2, False, node.input[1])
             weight_op = self.umodel.parameter(np_tensor=input2.astype(np.float32), dtype=numpy_to_ufront_dtype(input2.dtype), requires_grad=True, name=node.input[1])
@@ -620,12 +620,12 @@ class ONNXModel(object):
     def handleLess(self, node, node_to_output):
         input1 = node_to_output[node.input[0]]
         input2 = node_to_output[node.input[1]]
-        if type(input2) != TensorF32:
+        if type(input2) != Tensor:
             assert type(input2) == np.ndarray, "The given input is not an ndarray!"
             operator = self.addTensor(input2, False, node.input[1])
             self.operators.append(operator)
             input2 = operator.get_output(0)
-        elif type(input1) != TensorF32:
+        elif type(input1) != Tensor:
             assert type(input1) == np.ndarray, "The given input is not an ndarray!"
             operator = self.addTensor(input1, False, node.input[0])
             self.operators.append(operator)
@@ -638,7 +638,7 @@ class ONNXModel(object):
         attribute = {x.name: x for x in node.attribute}
         dtype = attribute["to"].i
         dtype = onnx_to_ufront_dtype(dtype)
-        if type(input) == TensorF32:
+        if type(input) == Tensor:
             return self.umodel.cast(input = input, dtype=dtype, name=node.name)
         else:
             return input
@@ -821,18 +821,18 @@ class ONNXModel(object):
             if input.name.find("input") >=0 or (i==0 and input.name.find("x") >=0):
                 if type(input_tensors) == list:
                     input_tensor = input_tensors[i]
-                    if type(input_tensor) != TensorF32:
+                    if type(input_tensor) != Tensor:
                         input1 = np.ones(shape=input_tensor.shape, dtype=input_tensor.dtype)
                         input1[:] = input_tensor
-                        input_tensor = TensorF32(input1, input.name) # convert to Rust f32 tensor
+                        input_tensor = Tensor(input1, input.name) # convert to Rust f32 tensor
                     self.inputs[input.name] = input_tensor
                     inputs_nodes.append(input_tensor)
                 elif type(input_tensors) == dict:
                     input_tensor = input_tensors[input.name]
-                    if type(input_tensor) != TensorF32:
+                    if type(input_tensor) != Tensor:
                         input1 = np.ones(shape=input_tensor.shape, dtype=input_tensor.dtype)
                         input1[:] = input_tensor
-                        input_tensor = TensorF32(input1, input.name) # convert to Rust f32 tensor
+                        input_tensor = Tensor(input1, input.name) # convert to Rust f32 tensor
                     self.inputs[input.name] = input_tensor
                     inputs_nodes.append(input_tensor)
                 else:

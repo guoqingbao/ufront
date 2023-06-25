@@ -30,8 +30,9 @@ use crate::graph::Graph;
 use crate::graph::GraphTrait;
 use crate::operator::Operator;
 use crate::operator::PyOperator;
-use crate::prelude::Tensor;
-use crate::tensor::TensorF32;
+// use crate::prelude::Tensor;
+use crate::tensor::Tensor;
+use crate::tensor::TensorU;
 use crate::types::DataType;
 use crate::types::OpType;
 use crate::types::WeightType;
@@ -43,6 +44,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::rc::Rc;
 use std::sync::Once;
+use half::f16;
 
 static START: Once = Once::new();
 
@@ -474,7 +476,7 @@ impl Model {
                         let ret = para
                             .get_item("tensors")
                             .unwrap()
-                            .extract::<Vec<PyRef<TensorF32>>>(); // .downcast::<TensorF32>();
+                            .extract::<Vec<PyRef<Tensor>>>(); // .downcast::<Tensor>();
                         match ret {
                             Ok(vlist) => {
                                 for v in vlist {
@@ -499,7 +501,7 @@ impl Model {
                         let ret = para
                             .get_item("tensors")
                             .unwrap()
-                            .extract::<Vec<PyRef<TensorF32>>>(); // .downcast::<TensorF32>();
+                            .extract::<Vec<PyRef<Tensor>>>(); // .downcast::<Tensor>();
                         match ret {
                             Ok(vlist) => {
                                 for v in vlist {
@@ -522,8 +524,8 @@ impl Model {
                         op_type == OpType::BATCH_MATMUL || op_type == OpType::LESS || op_type == OpType::AND ||
                         ((op_type == OpType::SLICE) && !para.contains("input").unwrap() )    {
                     if para.contains("x").unwrap() && para.contains("y").unwrap() {
-                        let x = para.get_item("x").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
-                        let y = para.get_item("y").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
+                        let x = para.get_item("x").unwrap().extract::<PyRef<Tensor>>(); // .downcast::<Tensor>();
+                        let y = para.get_item("y").unwrap().extract::<PyRef<Tensor>>(); // .downcast::<Tensor>();
                         match (x, y) {
                             (Ok(v1), Ok(v2)) => {
                                 if op.add_input(&v1).is_ok() && op.add_input(&v2).is_ok() {
@@ -542,9 +544,9 @@ impl Model {
                         && para.contains("k").unwrap()
                         && para.contains("v").unwrap()
                     {
-                        let q = para.get_item("q").unwrap().extract::<PyRef<TensorF32>>(); 
-                        let k = para.get_item("k").unwrap().extract::<PyRef<TensorF32>>(); 
-                        let v = para.get_item("v").unwrap().extract::<PyRef<TensorF32>>(); 
+                        let q = para.get_item("q").unwrap().extract::<PyRef<Tensor>>(); 
+                        let k = para.get_item("k").unwrap().extract::<PyRef<Tensor>>(); 
+                        let v = para.get_item("v").unwrap().extract::<PyRef<Tensor>>(); 
                         
                         // if self.argshapes.len() == 0 {
                         //     match &q {
@@ -575,15 +577,15 @@ impl Model {
                                     && para.contains("bias_o").unwrap()
 
                                     {
-                                        let weight_q = para.get_item("weight_q").unwrap().extract::<PyRef<TensorF32>>(); 
-                                        let weight_k = para.get_item("weight_k").unwrap().extract::<PyRef<TensorF32>>(); 
-                                        let weight_v = para.get_item("weight_v").unwrap().extract::<PyRef<TensorF32>>(); 
-                                        let bias_q = para.get_item("bias_q").unwrap().extract::<PyRef<TensorF32>>(); 
-                                        let bias_k = para.get_item("bias_k").unwrap().extract::<PyRef<TensorF32>>(); 
-                                        let bias_v = para.get_item("bias_v").unwrap().extract::<PyRef<TensorF32>>(); 
+                                        let weight_q = para.get_item("weight_q").unwrap().extract::<PyRef<Tensor>>(); 
+                                        let weight_k = para.get_item("weight_k").unwrap().extract::<PyRef<Tensor>>(); 
+                                        let weight_v = para.get_item("weight_v").unwrap().extract::<PyRef<Tensor>>(); 
+                                        let bias_q = para.get_item("bias_q").unwrap().extract::<PyRef<Tensor>>(); 
+                                        let bias_k = para.get_item("bias_k").unwrap().extract::<PyRef<Tensor>>(); 
+                                        let bias_v = para.get_item("bias_v").unwrap().extract::<PyRef<Tensor>>(); 
 
-                                        let weight_o = para.get_item("weight_o").unwrap().extract::<PyRef<TensorF32>>(); 
-                                        let bias_o = para.get_item("bias_o").unwrap().extract::<PyRef<TensorF32>>(); 
+                                        let weight_o = para.get_item("weight_o").unwrap().extract::<PyRef<Tensor>>(); 
+                                        let bias_o = para.get_item("bias_o").unwrap().extract::<PyRef<Tensor>>(); 
 
                                         match (weight_q, weight_k, weight_v, bias_q, bias_k, bias_v, weight_o, bias_o) {
                                             (Ok(wq), Ok(wk), Ok(wv), Ok(bq), Ok(bk), Ok(bv), Ok(wo), Ok(bo)) => {
@@ -618,53 +620,104 @@ impl Model {
                         panic! {"Missing important arguments (q, k, or v?)"};
                     }
                 } else if op_type == OpType::PARAMETER || op_type == OpType::TENSOR {
-                    if para.contains("np_tensor").unwrap() && para.contains("dtype").unwrap() {
-                        let np_tensor = para
-                            .get_item("np_tensor")
-                            .unwrap()
-                            .extract::<PyReadonlyArrayDyn<f32>>();
-                        let dtype = para
-                            .get_item("dtype")
-                            .unwrap()
-                            .extract::<DataType>()
-                            .unwrap();
-                        match dtype {
-                            DataType::Float
-                            | DataType::Double
-                            | DataType::Int32
-                            | DataType::Int64
-                            | DataType::Bool => {}
-                            _ => {
-                                panic! {"Not supported type!"};
-                            }
-                        }
 
+                    if para.contains("np_tensor").unwrap() && para.contains("dtype").unwrap() && para.contains("name").unwrap() {
+                        let dtype = para.get_item("dtype").unwrap().extract::<DataType>().unwrap();
+                        let name = para.get_item("name").unwrap().extract::<String>().unwrap();               
+                        let mut tensor = Tensor {
+                            tensor: None,
+                            name,
+                            dtype: dtype,
+                        };
+                        
+                        let np_tensor = para.get_item("np_tensor");
                         match np_tensor {
-                            Ok(_np_tensor) => {
-                                let mut tensor = TensorF32 {
-                                    tensor: None,
-                                    name: para.get_item("name").unwrap().to_string(),
-                                    dtype: dtype,
-                                };
-                                tensor.set_ndarray(_np_tensor);
+                            Some(v) => {
+                                tensor.set_ndarray(v);
                                 if op.add_input(&tensor).is_ok() {
                                     op.calculate_output();
                                 }
                             }
-                            _ => {
-                                panic! {"Not a valid input type!"};
-                            }
+                            _ => {panic! {"Invalid tensor argument!"};}
                         }
+
+                        // if DataType::Float == dtype {
+                        //     let np_tensor = para.get_item("np_tensor").unwrap().extract::<PyReadonlyArrayDyn<f32>>();
+                        //     match np_tensor {
+                        //         Ok(v) => {
+                        //             tensor.set_ndarray(v);
+                        //             if op.add_input(&tensor).is_ok() {
+                        //                 op.calculate_output();
+                        //             }
+                        //         }
+                        //         _ => {panic! {"Invalid tensor argument!"};}
+                        //     }
+                        // } else if DataType::Half == dtype {
+                        //     let np_tensor = para.get_item("np_tensor").unwrap().extract::<PyReadonlyArrayDyn<f16>>();
+                        //     match np_tensor {
+                        //         Ok(v) => {
+                        //             tensor.set_ndarrayf16(v);
+                        //             if op.add_input(&tensor).is_ok() {
+                        //                 op.calculate_output();
+                        //             }
+                        //         }
+                        //         _ => {panic! {"Invalid tensor argument!"};}
+                        //     }
+                        // } else {
+                        //     panic! {"Not a valid tensor type!"};
+                        // }
+
                     } else {
-                        panic! {"Missing important arguments (q, k, or v?)"};
+                        panic! {"Missing important arguments ('np_tensor', 'dtype' and 'name')!"};
                     }
+
+                    // if para.contains("np_tensor").unwrap() && para.contains("dtype").unwrap() {
+                    //     let np_tensor = para
+                    //         .get_item("np_tensor")
+                    //         .unwrap()
+                    //         .extract::<PyReadonlyArrayDyn<f32>>();
+                    //     let dtype = para
+                    //         .get_item("dtype")
+                    //         .unwrap()
+                    //         .extract::<DataType>()
+                    //         .unwrap();
+                    //     match dtype {
+                    //         DataType::Float
+                    //         | DataType::Double
+                    //         | DataType::Int32
+                    //         | DataType::Int64
+                    //         | DataType::Bool => {}
+                    //         _ => {
+                    //             panic! {"Not supported type!"};
+                    //         }
+                    //     }
+
+                    //     match np_tensor {
+                    //         Ok(_np_tensor) => {
+                    //             let mut tensor = Tensor {
+                    //                 tensor: None,
+                    //                 name: para.get_item("name").unwrap().to_string(),
+                    //                 dtype: dtype,
+                    //             };
+                    //             tensor.set_ndarray(_np_tensor);
+                    //             if op.add_input(&tensor).is_ok() {
+                    //                 op.calculate_output();
+                    //             }
+                    //         }
+                    //         _ => {
+                    //             panic! {"Not a valid input type!"};
+                    //         }
+                    //     }
+                    // } else {
+                    //     panic! {"Missing important arguments (q, k, or v?)"};
+                    // }
                 } else if op_type == OpType::MASKEDFILL {
                     if para.contains("input").unwrap()
                         && para.contains("mask").unwrap()
                         && para.contains("value").unwrap()
                     {
-                        let input = para.get_item("input").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
-                        let mask = para.get_item("mask").unwrap().extract::<PyRef<TensorF32>>(); // .downcast::<TensorF32>();
+                        let input = para.get_item("input").unwrap().extract::<PyRef<Tensor>>(); // .downcast::<Tensor>();
+                        let mask = para.get_item("mask").unwrap().extract::<PyRef<Tensor>>(); // .downcast::<Tensor>();
 
                         match (input, mask) {
                             (Ok(input1), Ok(mask1)) => {
@@ -682,7 +735,7 @@ impl Model {
                         panic! {"Missing important arguments (q, k, or v?)"};
                     }
                 } else if (op_type == OpType::BATCH_NORM || op_type == OpType::LAYER_NORM)&& para.contains("input").unwrap() {
-                    let ret = para.get_item("input").unwrap().extract::<PyRef<TensorF32>>(); 
+                    let ret = para.get_item("input").unwrap().extract::<PyRef<Tensor>>(); 
                     match ret {
                         Ok(v) => {
                             // if self.argshapes.len() == 0 && (v.name.find("input") == Some(0) || v.name.find("x") == Some(0)) {
@@ -691,15 +744,15 @@ impl Model {
                             // }
                             if op.add_input(&v).is_ok() {
                                 if para.contains("weight").unwrap() && para.contains("bias").unwrap()  {
-                                    let ret1 = para.get_item("weight").unwrap().extract::<PyRef<TensorF32>>(); 
-                                    let ret2 = para.get_item("bias").unwrap().extract::<PyRef<TensorF32>>(); 
+                                    let ret1 = para.get_item("weight").unwrap().extract::<PyRef<Tensor>>(); 
+                                    let ret2 = para.get_item("bias").unwrap().extract::<PyRef<Tensor>>(); 
 
                                     match (ret1, ret2) {
                                         (Ok(v1), Ok(v2)) => {
                                             if op.add_input(&v1).is_ok() && op.add_input(&v2).is_ok() {
                                                 if para.contains("mean").unwrap() && para.contains("variance").unwrap() {
-                                                    let ret3 = para.get_item("mean").unwrap().extract::<PyRef<TensorF32>>(); 
-                                                    let ret4 = para.get_item("variance").unwrap().extract::<PyRef<TensorF32>>(); 
+                                                    let ret3 = para.get_item("mean").unwrap().extract::<PyRef<Tensor>>(); 
+                                                    let ret4 = para.get_item("variance").unwrap().extract::<PyRef<Tensor>>(); 
                                                     match (ret3, ret4) {
                                                         (Ok(v3), Ok(v4)) => {
                                                             if op.add_input(&v3).is_ok() && op.add_input(&v4).is_ok() {
@@ -729,7 +782,7 @@ impl Model {
                         }
                     }
                 } else if para.contains("input").unwrap()  {
-                        let ret = para.get_item("input").unwrap().extract::<PyRef<TensorF32>>(); 
+                        let ret = para.get_item("input").unwrap().extract::<PyRef<Tensor>>(); 
                         match ret {
                             Ok(v) => {
                                 // if v.name.find("input") == Some(0) || v.name.find("x") == Some(0) {
@@ -738,12 +791,12 @@ impl Model {
                                 // }
                                 if op.add_input(&v).is_ok() {
                                     if para.contains("weight").unwrap()  {
-                                        let ret = para.get_item("weight").unwrap().extract::<PyRef<TensorF32>>();
+                                        let ret = para.get_item("weight").unwrap().extract::<PyRef<Tensor>>();
                                         match ret {
                                             Ok(v) => {
                                                 if op.add_input(&v).is_ok() {
                                                     if para.contains("bias").unwrap() {
-                                                        let ret1 = para.get_item("bias").unwrap().extract::<PyRef<TensorF32>>();
+                                                        let ret1 = para.get_item("bias").unwrap().extract::<PyRef<Tensor>>();
                                                         match ret1 {
                                                             Ok(v1) => {
                                                                 if op.add_input(&v1).is_ok() {
@@ -793,32 +846,41 @@ impl Model {
         dtype: DataType,
         requires_grad: bool,
         name: String,
-    ) -> Py<TensorF32> {
+    ) -> Py<Tensor> {
         // let sp = shape.as_slice().to_vec();
-        match dtype {
-            DataType::Float | DataType::Double | DataType::Int32 | DataType::Int64 | DataType::Bool => {
-                let shape = shape.to_vec();
-                let tensor = Some(Tensor::<f32> {
+
+        let shape = shape.to_vec();
+        let tensor = match dtype {
+            DataType::Float => {
+                Some(TensorU {
                     shape: shape.clone(),
-                    data_buffer: DataBuffer::CPUDataBuffer(Buffer::<f32>::new(shape.iter().product(), Some(vec![0f32; shape.iter().product()]))),
-                });
-                info!("Tensor initialized with {shape:?} dimension within Rust");
-                Python::with_gil(|py| {
-                    Py::new(
-                        py,
-                        TensorF32 {
-                            tensor,
-                            name: name.clone(),
-                            dtype: dtype,
-                        },
-                    )
-                    .unwrap()
+                    data_buffer: DataBuffer::CPUDataBuffer(Buffer::new(shape.iter().product(), Some(vec![0f32; shape.iter().product()]))),
+                })
+            }
+            DataType::Half => {
+                Some(TensorU {
+                    shape: shape.clone(),
+                    data_buffer: DataBuffer::CPUDataBuffer(Buffer::new(shape.iter().product(), Some(vec![half::f16::ZERO; shape.iter().product()]))),
                 })
             }
             _ => {
                 panic!("Not supported type at the moment!");
             }
-        }
+        };
+        info!("Tensor initialized with {shape:?} dimension within Rust");
+        Python::with_gil(|py| {
+            Py::new(
+                py,
+                Tensor {
+                    tensor,
+                    name: name.clone(),
+                    dtype: dtype,
+                },
+            )
+            .unwrap()
+        })
+
+       
     }
 
     #[pyo3(signature = (**kwds))]
@@ -855,7 +917,7 @@ impl Model {
                 }
 
                 let callback = para.get_item("callback").unwrap().extract::<PyObject>();
-                let func_args = para.get_item("args").unwrap().extract::<&PyDict>(); // .downcast::<TensorF32>();
+                let func_args = para.get_item("args").unwrap().extract::<&PyDict>(); // .downcast::<Tensor>();
                 self.add_operator(&mut op);
 
                 match (callback, func_args) {
@@ -866,7 +928,7 @@ impl Model {
                             let x = _func_args
                                 .get_item(key)
                                 .unwrap()
-                                .extract::<PyRef<TensorF32>>();
+                                .extract::<PyRef<Tensor>>();
                             match x {
                                 Ok(_x) => {
                                     if op.add_input(&_x).is_ok() {
@@ -886,7 +948,7 @@ impl Model {
                                 // if para.contains("return").is_ok() {
                                 info!("Model::add_layer calculate output for {:?} by calling the external function {}", 
                                             op_type, para.get_item("func").unwrap().to_string());
-                                let tensor = ret.extract::<PyRef<TensorF32>>(py);
+                                let tensor = ret.extract::<PyRef<Tensor>>(py);
 
                                 match tensor {
                                     Ok(v) => {

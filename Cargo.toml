@@ -10,12 +10,13 @@ name = "ufront"
 crate-type = ["cdylib"]
 
 [dependencies]
-numpy = "0.18.0"
+#numpy = {version="0.19.0", features=["half"]}
+#numpy = {path= "rust-numpy", version="0.19.0", features=["half"]}
+numpy = {git = "https://github.com/PyO3/rust-numpy.git", features=["half"]}
 tuple-conv = "1.0.1"
-pyo3 = { version = "0.18.0", features = ["extension-module"] }
-#pyo3 = { version = "0.18.0" }
+pyo3 = { version = "0.19.0", features = ["extension-module"] }
 num = "0.4"
-half = "1.6"
+half = { version = "2.0"}
 ndarray = "0.15.6"
 num_enum = "0.5.1"
 dict_derive = "0.4.0"

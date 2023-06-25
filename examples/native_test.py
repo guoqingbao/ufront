@@ -8,8 +8,8 @@ batch_size = 1
 
 input = np.ones((batch_size,3,32,32), dtype=np.float32)
 
-tensor_input1 = ufront.TensorF32(input, name="input1")
-tensor_input2 = ufront.TensorF32(input, name="input2")
+tensor_input1 = ufront.Tensor(input, name="input1")
+tensor_input2 = ufront.Tensor(input, name="input2")
 
 x = model.conv2d(input=tensor_input1, out_channels=32, kernel=[3, 3], stride=[1, 1], pad=[0, 0], groups=1)
 x1 = model.relu(input=x.get_output(0))
@@ -46,7 +46,7 @@ x = model.softmax(input=x.get_output(0))
 # model.add_operator(operator)
 
 
-# tensorf32 = ufront.TensorF32(arr)
+# tensor = ufront.Tensor(arr)
 
 
 model.optimizer = Optimizer(params={"type":"sgd", "lr":"0.01", "momentum":"0", "nesterov":"False", "weight_decay":"0"})
