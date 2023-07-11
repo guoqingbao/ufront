@@ -1909,6 +1909,8 @@ class GetAttrNode(FunctionNode):
             return input_tensor.dims
         if attr == "device":
             return "cpu"
+        elif attr in ["float", "bool", "double", "int"]:
+            return umodel.cast(input_tensor, to=attr)
         else:
             return getattr(input_tensor, attr)
 

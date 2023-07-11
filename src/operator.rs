@@ -131,6 +131,11 @@ impl Operator {
                 shape: shape,
                 data_buffer: DataBuffer::CPUDataBuffer(Buffer::new::<bf16>(sz, None)),
             }
+        } else if typeid == TypeId::of::<i32>() {
+            TensorU {
+                shape: shape,
+                data_buffer: DataBuffer::CPUDataBuffer(Buffer::new::<i32>(sz, None)),
+            }
         } else {
             panic!("Invalid type! {:?}", typeid);
         }

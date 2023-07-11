@@ -8,8 +8,13 @@ import iree.compiler as ireec
 from iree.compiler import tools
 from iree import runtime
 import tensorflow as tf
-from multihead_attention import MultiHeadAttention, MultiHeadAttentionNet, EncoderNet
 
+#Tensorflow was used only for read image and decode results
+gpus = tf.config.experimental.list_physical_devices(device_type='GPU')
+for gpu in gpus:
+    tf.config.experimental.set_memory_growth(gpu, True)
+
+# from ufront import Tensor, DataType
 def decode_result(result):
   return tf.keras.applications.resnet50.decode_predictions(result, top=5)[0]
     
@@ -26,26 +31,23 @@ def load_read_image():
 
 if __name__ == "__main__":
     batch_size = 1
-    GPU = True
+    GPU = False
     input = load_read_image()
-    # net = resnet18(pretrained=True)# ok
-    # net = resnet50(pretrained=True)# ok
-    # net = densenet121(pretrained=True)# ok
-    # net = inception_v3(pretrained=True) # ok
-    # net = squeezenet1_1(pretrained=True) #ok
-    # net = shufflenet_v2_x1_5(pretrained=True)# ok
-    net = mobilenet_v3_small(pretrained=True, dropout=0.0)#ok
-    # net = models.vision_transformer.vit_b_16(weights=True) #ok
-    # input = torch.empty(1, 197, 768).normal_(std=0.02)
-    # mask = MultiHeadAttention.gen_history_mask(input)
-    # net = MultiHeadAttention(128, 16)
-    # net = MultiHeadAttentionNet()
-    # net = EncoderNet()
+    # net = resnet18(pretrained=True)
+    # net = resnet50(pretrained=True)
+    # net = densenet121(pretrained=True)
+    # net = inception_v3(pretrained=True) 
+    # net = squeezenet1_1(pretrained=True)
+    # net = shufflenet_v2_x1_5(pretrained=True)
+    net = mobilenet_v3_small(pretrained=True, dropout=0.0)
+    # net = models.vision_transformer.vit_b_16(weights=True) 
+
+    modelname = net.__class__.__name__
 
     net.train(False) 
     
-    # ret = net.forward(torch.Tensor(input)).detach().numpy()
-    print("Pytorch: ", decode_result(net.forward(torch.Tensor(input)).detach().numpy()))
+    torch_ret = torch.softmax(net.forward(torch.Tensor(input)), dim=1).detach().numpy()
+    print("Pytorch: ", decode_result(torch_ret))
 
     model = UFrontTorch(net, batch_size=batch_size, pass_weights=True) # convert torch model to ufront model
     #This will trigger Rust frontend for actual model conversion and graph building
@@ -54,7 +56,7 @@ if __name__ == "__main__":
 
     #The output of the model (forward pass have not been triggered at the moment!)
     # if model.model.__class__.__name__ not in ["MaxVit", "SwinTransformer", "VisionTransformer", "MultiHeadAttention"]:
-    #     output = model.softmax(input=output_tensors[0], name="softmax_out")
+    output = model.softmax(input=output_tensors[0], name="softmax_out")
 
     #This will trigger model compilation, i.e., convert Rust computation graph to a unified high-level IR and lower it to TOSA IR
     model.compile(optimizer={"type":"sgd", "lr":"0.01", "momentum":"0", "nesterov":"False", "weight_decay":"0"},
@@ -63,9 +65,7 @@ if __name__ == "__main__":
     modelir = model.dump_ir()
 
     tosa_ir= model.dump_tosa_ir()
-    f = open("torch_resnet50.mlir", "w")
-    f.write(tosa_ir)
-    f.close()
+
     print("Compiling TOSA model...")
     if GPU:
         binary = ireec.compile_str(tosa_ir,
@@ -78,4 +78,10 @@ if __name__ == "__main__":
                         input_type=ireec.InputType.TOSA)
         module = runtime.load_vm_flatbuffer(binary,backend="llvm-cpu") 
 
-    print("UFront: ", decode_result(module.forward(input).to_host()))
+    ufront_ret = module.forward(input).to_host()
+    print("UFront: ", decode_result(ufront_ret))
+
+    
+    dif = torch_ret - ufront_ret
+    mae = np.mean(abs(dif))
+    print("Model: ", modelname, ", MAE: ", mae)

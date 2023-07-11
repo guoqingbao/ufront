@@ -14,16 +14,9 @@
 //
 
 use core::panic;
-use numpy::PyReadonlyArrayDyn;
 use pyo3::prelude::*;
 use pyo3::types::IntoPyDict;
 use pyo3::types::PyDict;
-use pyo3::types::PyTuple;
-use tuple_conv::RepeatedTuple;
-// use pyo3::types::PyList;
-// use pyo3::wrap_pyfunction;
-// use pyo3_log;
-// use crate::error::RustError;
 use crate::databuffer::DataBuffer;
 use crate::databuffer::Buffer;
 use crate::graph::Graph;
@@ -41,10 +34,7 @@ use log::{info, warn, error};
 use crate::optimizer::Optimizer;
 
 use std::collections::HashMap;
-use std::convert::TryFrom;
-use std::rc::Rc;
 use std::sync::Once;
-use half::f16;
 
 static START: Once = Once::new();
 
@@ -128,7 +118,6 @@ pub struct Model {
     pub graph: Graph,
     #[pyo3(get, set)]
     pub optimizer: Optimizer,
-    args: IndexMap<String, String>,
     argshapes: IndexMap<String, String>,
     ssa_ids: HashMap<String, i32>,
     op_names: Vec<String>,
@@ -158,7 +147,6 @@ impl Model {
                 // optim_type: OptimizerType::SGD,
                 params,
             },
-            args: IndexMap::new(),
             argshapes: IndexMap::new(),
             ssa_ids: HashMap::new(),
             op_names: Vec::new(),
@@ -266,35 +254,18 @@ impl Model {
             idxmap.insert(key.to_string(), value.to_string());
         }
         info!("{}", logstr);
-
         let operator = Box::new(Operator::new(pyop.op_type, idxmap));
-
         let handle_ptr: *const Operator = &*operator;
-
         self.graph.operators.push(operator);
-
-        // let ptr = &mut self.graph.operators[idx];
         pyop.raw_ptr = handle_ptr as u64;
-        // return Python::with_gil(|py| -> PyResult<Py<PyOperator>> {
-        //     let foo: Py<PyOperator> = Py::new(py, PyOperator {id: id, op_type : optype})?;
-        //     return Ok(foo)
-        // });
-
-        //
         self.op_idx += 1;
-        // return Err(PyOSError::new_err("Failed to create operator!".to_string()));
     }
 
     #[pyo3(text_signature = "($self, pyop)")]
     pub fn remove_operator(&mut self, pyop: &mut PyOperator) {
-        // let idx = self.num_of_operators();
-        // let ptr = pyop.raw_ptr as *const Operator;
-
-        // unsafe {
         self.graph
             .operators
             .retain(|x| &**x as *const Operator as u64 != pyop.raw_ptr);
-        // }
 
         info!(
             "Op: {}, ptr: {} removed from computation graph!",
@@ -303,31 +274,7 @@ impl Model {
         );
         pyop.raw_ptr = 0;
     }
-    // #[pyo3(text_signature = "($self, optype, args)")]
-    // pub fn op(&mut self, optype:OpType, args: HashMap<String, String>) -> PyResult<Py<PyOperator>> {
-    //     // let _optype = OpType::try_from(optype as u32);
-    //     let id = self.num_of_operators();
-
-    //     print!("Op: {}, ", optype.as_str());
-    //     for (key, value) in &args {
-    //         print!("{}:{}, ", key, value)
-    //     }
-    //     print!("\n");
-    //     // let mut params_ : HashMap<String, String> = HashMap::new();
-    //     // params_.extend(args.into_iter());
-    //     let operator = Box::new(Operator::new(self.num_of_operators(), optype, args));
-
-    //     self.graph.operators.push(operator);
-    //     return Python::with_gil(|py| -> PyResult<Py<PyOperator>> {
-    //         let foo: Py<PyOperator> = Py::new(py, PyOperator {id: id, op_type : optype})?;
-    //         return Ok(foo)
-    //     });
-
-    //     //
-
-    //     // return Err(PyOSError::new_err("Failed to create operator!".to_string()));
-    // }
-
+    
     pub fn num_of_operators(&self) -> usize {
         self.graph.operators.len()
     }
@@ -399,57 +346,14 @@ impl Model {
 
         format!("{header} {{ \n{op_ir}\treturn {last_outname}: {output_shapes}\n}}")
     }
-    // pub fn num_of_op_inputs(&self, id : usize) -> usize {
-    //     for i in 0..self.graph.operators.len() {
-    //         if self.graph.operators[i].id == id {
-    //             return self.graph.operators[i].num_of_inputs();
-    //         }
-    //     }
-    //     return 0
-    // }
-
-    // pub fn num_of_op_outputs(&self, id : usize) -> usize {
-    //     for i in 0..self.graph.operators.len() {
-    //         if self.graph.operators[i].id == id {
-    //             return self.graph.operators[i].num_of_outputs();
-    //         }
-    //     }
-    //     return 0
-    // }
-
-    // pub fn get_op_input(&self, id : usize, idx : usize) {
-    //     for i in 0..self.graph.operators.len() {
-    //         if self.graph.operators[i].id == id {
-    //             if idx < self.graph.operators[i].num_of_inputs() {
-    //                 return self.graph.operators[i].get_input(idx)
-    //             }
-    //         }
-    //     }
-    //     // return None;
-    // }
-
-    // pub fn get_op_output(&self, id : usize, idx : usize) {
-    //     for i in 0..self.graph.operators.len() {
-    //         if self.graph.operators[i].id == id {
-    //             if idx < self.graph.operators[i].num_of_outputs() {
-    //                 return self.graph.operators[i].get_output(idx)
-    //             }
-    //         }
-    //     }
-    //     // return None;
-    // }
-
-    // }
-
+    
     #[pyo3(text_signature = "($self, op_type, args)")]
     pub fn add_layer(&mut self, op_type: OpType, args: Option<&PyDict>) -> Py<PyOperator> {
-        // let mut params = HashMap::<String, String>::new();
         let mut op = PyOperator {
             op_type,
             params: HashMap::<String, String>::new(),
             raw_ptr: 0,
         };
-        // let mut argstr = "".to_string();
         match args {
             Some(para) => {
                 for key in para.keys() {
@@ -466,9 +370,6 @@ impl Model {
                         op.params
                             .insert(key.to_string(), para.get_item(key).unwrap().to_string());
                     } 
-                    // else {
-                    //     argstr = para.get_item(key).unwrap().to_string();
-                    // }
                 }
 
                 if op_type == OpType::INPUT {
@@ -547,19 +448,6 @@ impl Model {
                         let q = para.get_item("q").unwrap().extract::<PyRef<Tensor>>(); 
                         let k = para.get_item("k").unwrap().extract::<PyRef<Tensor>>(); 
                         let v = para.get_item("v").unwrap().extract::<PyRef<Tensor>>(); 
-                        
-                        // if self.argshapes.len() == 0 {
-                        //     match &q {
-                        //         Ok(v) => {
-                        //             if v.name.find("input") == Some(0) || v.name.find("x") == Some(0) {
-                        //                 self.args.insert(v.name.clone(), argstr.clone());
-                        //                 self.argshapes.insert(v.name.clone(), v.get_ir());
-                        //                 info!("Multihead Attention inputs come from forward input!");
-                        //             }
-                        //         }
-                        //         _ => {}
-                        //     }
-                        // }
 
                         match (q, k, v) {
                             (Ok(q1), Ok(k1), Ok(v1)) => {
@@ -641,76 +529,10 @@ impl Model {
                             _ => {panic! {"Invalid tensor argument!"};}
                         }
 
-                        // if DataType::Float == dtype {
-                        //     let np_tensor = para.get_item("np_tensor").unwrap().extract::<PyReadonlyArrayDyn<f32>>();
-                        //     match np_tensor {
-                        //         Ok(v) => {
-                        //             tensor.set_ndarray(v);
-                        //             if op.add_input(&tensor).is_ok() {
-                        //                 op.calculate_output();
-                        //             }
-                        //         }
-                        //         _ => {panic! {"Invalid tensor argument!"};}
-                        //     }
-                        // } else if DataType::Half == dtype {
-                        //     let np_tensor = para.get_item("np_tensor").unwrap().extract::<PyReadonlyArrayDyn<f16>>();
-                        //     match np_tensor {
-                        //         Ok(v) => {
-                        //             tensor.set_ndarrayf16(v);
-                        //             if op.add_input(&tensor).is_ok() {
-                        //                 op.calculate_output();
-                        //             }
-                        //         }
-                        //         _ => {panic! {"Invalid tensor argument!"};}
-                        //     }
-                        // } else {
-                        //     panic! {"Not a valid tensor type!"};
-                        // }
-
                     } else {
                         panic! {"Missing important arguments ('np_tensor', 'dtype' and 'name')!"};
                     }
 
-                    // if para.contains("np_tensor").unwrap() && para.contains("dtype").unwrap() {
-                    //     let np_tensor = para
-                    //         .get_item("np_tensor")
-                    //         .unwrap()
-                    //         .extract::<PyReadonlyArrayDyn<f32>>();
-                    //     let dtype = para
-                    //         .get_item("dtype")
-                    //         .unwrap()
-                    //         .extract::<DataType>()
-                    //         .unwrap();
-                    //     match dtype {
-                    //         DataType::Float
-                    //         | DataType::Double
-                    //         | DataType::Int32
-                    //         | DataType::Int64
-                    //         | DataType::Bool => {}
-                    //         _ => {
-                    //             panic! {"Not supported type!"};
-                    //         }
-                    //     }
-
-                    //     match np_tensor {
-                    //         Ok(_np_tensor) => {
-                    //             let mut tensor = Tensor {
-                    //                 tensor: None,
-                    //                 name: para.get_item("name").unwrap().to_string(),
-                    //                 dtype: dtype,
-                    //             };
-                    //             tensor.set_ndarray(_np_tensor);
-                    //             if op.add_input(&tensor).is_ok() {
-                    //                 op.calculate_output();
-                    //             }
-                    //         }
-                    //         _ => {
-                    //             panic! {"Not a valid input type!"};
-                    //         }
-                    //     }
-                    // } else {
-                    //     panic! {"Missing important arguments (q, k, or v?)"};
-                    // }
                 } else if op_type == OpType::MASKEDFILL {
                     if para.contains("input").unwrap()
                         && para.contains("mask").unwrap()
@@ -738,10 +560,6 @@ impl Model {
                     let ret = para.get_item("input").unwrap().extract::<PyRef<Tensor>>(); 
                     match ret {
                         Ok(v) => {
-                            // if self.argshapes.len() == 0 && (v.name.find("input") == Some(0) || v.name.find("x") == Some(0)) {
-                            //     self.args.insert(v.name.clone(), argstr.clone());
-                            //     self.argshapes.insert(v.name.clone(), v.get_ir());
-                            // }
                             if op.add_input(&v).is_ok() {
                                 if para.contains("weight").unwrap() && para.contains("bias").unwrap()  {
                                     let ret1 = para.get_item("weight").unwrap().extract::<PyRef<Tensor>>(); 
@@ -785,10 +603,6 @@ impl Model {
                         let ret = para.get_item("input").unwrap().extract::<PyRef<Tensor>>(); 
                         match ret {
                             Ok(v) => {
-                                // if v.name.find("input") == Some(0) || v.name.find("x") == Some(0) {
-                                //     self.args.insert(v.name.clone(), argstr.clone());
-                                //     self.argshapes.insert(v.name.clone(), v.get_ir());
-                                // }
                                 if op.add_input(&v).is_ok() {
                                     if para.contains("weight").unwrap()  {
                                         let ret = para.get_item("weight").unwrap().extract::<PyRef<Tensor>>();
@@ -835,10 +649,7 @@ impl Model {
                 panic!("No arguments for operator {:?}", op_type);
             }
         }
-
-        // return &op;
     }
-    // impl FunctionTrait for Model {
 
     pub fn create_tensor(
         &mut self,
@@ -903,7 +714,6 @@ impl Model {
             params: HashMap::<String, String>::new(),
             raw_ptr: 0,
         };
-        // let mut argstr = "".to_string();
         match kwds {
             Some(para) => {
                 for key in para.keys() {
@@ -911,9 +721,6 @@ impl Model {
                         op.params
                             .insert(key.to_string(), para.get_item(key).unwrap().to_string());
                     } 
-                    // else {
-                    //     argstr = para.get_item(key).unwrap().to_string();
-                    // }
                 }
 
                 let callback = para.get_item("callback").unwrap().extract::<PyObject>();

@@ -83,35 +83,6 @@ impl Tensor {
                         }
                         _ => {panic! {"Invalid tensor argument!"};}
                     }
-
-                    // if DataType::Float == dtype {
-                    //     // println!("{:?}", para.get_item("np_tensor").unwrap());
-                    //     //.extract::<PyReadonlyArrayDyn<f32>>()
-                    //     let np_tensor = para.get_item("np_tensor");
-                    //     match np_tensor {
-                    //         Some(v) => {
-                    //             tensor.set_ndarray(v);
-                    //         }
-                    //         _ => {panic! {"Invalid tensor argument!"};}
-                    //     }
-                    // } else if  DataType::Half == dtype {
-                    //     let np_tensor = para.get_item("np_tensor").unwrap().extract::<PyReadonlyArrayDyn<f16>>();
-                    //     match np_tensor {
-                    //         Ok(v) => {
-                    //             tensor.set_ndarrayf16(v);
-                    //         }
-                    //         _ => {panic! {"Invalid tensor argument!"};}
-                    //     }
-                    // } 
-                    //else {
-                    //     let np_tensor = para.get_item("np_tensor").unwrap().extract::<PyReadonlyArrayDyn<bf16>>();
-                    //     match np_tensor {
-                    //         Ok(v) => {
-                    //             tensor.set_ndarraybf16(v);
-                    //         }
-                    //         _ => {panic! {"Invalid tensor argument!"};}
-                    //     }
-                    // }
                     Ok(PyClassInitializer::from(tensor))
                 } else {
                     panic! {"Missing important arguments!"};
@@ -181,7 +152,95 @@ impl Tensor {
                                     _ => panic!("Invalid tensor inputs!"),
                                 }
                             }
-                            _=> {panic!("Not supported tensor type!");}
+                            _=> {
+                                let np_tensorf64 = arr.extract::<PyReadonlyArrayDyn<f64>>();
+                                match np_tensorf64 {
+                                    Ok(v) => { 
+                                        let x = v.as_array();
+                                        match x.as_slice() {
+                                            Some(v) => {
+                                                self.tensor = Some(TensorU {
+                                                    shape: x.shape().to_vec(),
+                                                    data_buffer: DataBuffer::CPUDataBuffer(Buffer::new(v.len(), Some(v.to_vec()))),
+                                                });
+                                                info!(
+                                                    "Tensor initialized with {:?} dimension within Rust",
+                                                    x.shape().to_vec()
+                                                );
+                                            }
+                                            _ => panic!("Invalid tensor inputs!"),
+                                        }
+                                    }
+                                    _=> { 
+                                        let np_tensori32 = arr.extract::<PyReadonlyArrayDyn<i32>>();
+                                        match np_tensori32 {
+                                            Ok(v) => { 
+                                                let x = v.as_array();
+                                                match x.as_slice() {
+                                                    Some(v) => {
+                                                        self.tensor = Some(TensorU {
+                                                            shape: x.shape().to_vec(),
+                                                            data_buffer: DataBuffer::CPUDataBuffer(Buffer::new(v.len(), Some(v.to_vec()))),
+                                                        });
+                                                        info!(
+                                                            "Tensor initialized with {:?} dimension within Rust",
+                                                            x.shape().to_vec()
+                                                        );
+                                                    }
+                                                    _ => panic!("Invalid tensor inputs!"),
+                                                }
+                                            }
+                                            _=> { 
+                                                let np_tensori64 = arr.extract::<PyReadonlyArrayDyn<i64>>();
+                                                match np_tensori64 {
+                                                    Ok(v) => { 
+                                                        let x = v.as_array();
+                                                        match x.as_slice() {
+                                                            Some(v) => {
+                                                                self.tensor = Some(TensorU {
+                                                                    shape: x.shape().to_vec(),
+                                                                    data_buffer: DataBuffer::CPUDataBuffer(Buffer::new(v.len(), Some(v.to_vec()))),
+                                                                });
+                                                                info!(
+                                                                    "Tensor initialized with {:?} dimension within Rust",
+                                                                    x.shape().to_vec()
+                                                                );
+                                                            }
+                                                            _ => panic!("Invalid tensor inputs!"),
+                                                        }
+                                                    }
+                                                    _=> { 
+                                                        let np_tensorbool = arr.extract::<PyReadonlyArrayDyn<bool>>();
+                                                        match np_tensorbool {
+                                                            Ok(v) => { 
+                                                                let x = v.as_array();
+                                                                match x.as_slice() {
+                                                                    Some(v) => {
+                                                                        self.tensor = Some(TensorU {
+                                                                            shape: x.shape().to_vec(),
+                                                                            data_buffer: DataBuffer::CPUDataBuffer(Buffer::new(v.len(), Some(v.to_vec()))),
+                                                                        });
+                                                                        info!(
+                                                                            "Tensor initialized with {:?} dimension within Rust",
+                                                                            x.shape().to_vec()
+                                                                        );
+                                                                    }
+                                                                    _ => panic!("Invalid tensor inputs!"),
+                                                                }
+                                                            }
+                                                            _=> { 
+                                                                panic!("Not supported tensor type!");
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                    }
+                                }
+                                
+                            }
                         }
                     }
                 }
@@ -190,24 +249,6 @@ impl Tensor {
         }
 
     }
-
-    // #[setter]
-    // pub fn set_ndarrayf16(&mut self, x: PyReadonlyArrayDyn<f16>) {
-    //     let x = x.as_array();
-    //     match x.as_slice() {
-    //         Some(v) => {
-    //             self.tensor = Some(TensorU {
-    //                 shape: x.shape().to_vec(),
-    //                 data_buffer: DataBuffer::CPUDataBuffer(Buffer::new(v.len(), Some(v.to_vec()))),
-    //             });
-    //             info!(
-    //                 "Tensor initialized with {:?} dimension within Rust",
-    //                 x.shape().to_vec()
-    //             );
-    //         }
-    //         _ => panic!("Invalid tensor inputs!"),
-    //     }
-    // }
 
     #[getter]
     pub fn get_dims(&self) -> usize {
@@ -236,6 +277,26 @@ impl Tensor {
                     } 
                     else if self.dtype == DataType::BHalf {
                         ArrayD::from_shape_vec(v.shape.to_vec(), data.to_vec::<bf16>())
+                        .unwrap()
+                        .into_pyarray(py)
+                    } 
+                    else if self.dtype == DataType::Double {
+                        ArrayD::from_shape_vec(v.shape.to_vec(), data.to_vec::<f64>())
+                        .unwrap()
+                        .into_pyarray(py)
+                    } 
+                    else if self.dtype == DataType::Int32 {
+                        ArrayD::from_shape_vec(v.shape.to_vec(), data.to_vec::<i32>())
+                        .unwrap()
+                        .into_pyarray(py)
+                    } 
+                    else if self.dtype == DataType::Int64 {
+                        ArrayD::from_shape_vec(v.shape.to_vec(), data.to_vec::<i64>())
+                        .unwrap()
+                        .into_pyarray(py)
+                    } 
+                    else if self.dtype == DataType::Bool {
+                        ArrayD::from_shape_vec(v.shape.to_vec(), data.to_vec::<bool>())
                         .unwrap()
                         .into_pyarray(py)
                     } 
@@ -279,8 +340,18 @@ impl Tensor {
                     joined.extend(["f32".to_string()]);
                 } else if self.dtype == DataType::Half {
                     joined.extend(["f16".to_string()]);
-                } else {
+                } else if self.dtype == DataType::BHalf {
                     joined.extend(["bf16".to_string()]);
+                } else if self.dtype == DataType::Double {
+                    joined.extend(["f64".to_string()]);
+                } else if self.dtype == DataType::Int32 {
+                    joined.extend(["i32".to_string()]);
+                } else if self.dtype == DataType::Int64 {
+                    joined.extend(["i64".to_string()]);
+                } else if self.dtype == DataType::Bool {
+                    joined.extend(["bool".to_string()]);
+                } else {
+                    panic!("Not supported data type {:?}!", self.dtype);
                 }
                 format!("tensor<{}>", joined.join("x"))
             }
