@@ -27,6 +27,7 @@ except:
 from ..onnx.model import ONNXModelKeras
 from ..ufront import (OpType, ActiMode, AggrMode, PoolType, Tensor, DataType, ParamSyncType, Initializer)
 from ..ufront import Model, PyOperator, Tensor, Optimizer, LossType, MetricsType #Rust frontend
+from ..utils import list_product, onnx_to_ufront_dtype, numpy_to_ufront_dtype, ufront_to_numpy_dtype
 
 class BaseModel(object):
   def __init__(self, inputs, onnx_model, batch_size, transformer, pass_weights):
@@ -51,7 +52,7 @@ class BaseModel(object):
             input = input.numpy()
         input1 = np.ones(shape=input.shape, dtype=input.dtype)
         input1[:] = input
-        input_tensor = Tensor(input1, key) # convert to Rust f32 tensor
+        input_tensor = Tensor(np_tensor=input1, dtype=numpy_to_ufront_dtype(input1.dtype), name=key) # convert to Rust f32 tensor
         input_dict[key] = input_tensor
 
     self._output_tensor = self._my_onnx_model.apply(input_dict)
@@ -301,12 +302,10 @@ class UFrontKeras(tf_keras_Model):
       input = base_model.inputs[i]
       input_dict[input.name] = inputs[i]
     # import onnx
-    # onnx_model = onnx.load_model("Keras_VIT.onnx")
-    # self._base_model = BaseModel(inputs=inputs, onnx_model=onnx_model, batch_size=batch_size, transformer=transformer, pass_weights=pass_weights)
-    # onnx.save_model(onnx_model[0], f="Keras_VIT.onnx")
-    
-    onnx_model = tf2onnx.convert.from_keras(self, opset=18 if transformer else 17)
-    self._base_model = BaseModel(inputs=input_dict, onnx_model=onnx_model[0], batch_size=batch_size, transformer=transformer, pass_weights=pass_weights)
+    # onnx_model = onnx.load_model("resnet18.onnx")
+    # self._base_model = BaseModel(inputs=input_dict, onnx_model=onnx_model[0], batch_size=batch_size, transformer=transformer, pass_weights=pass_weights)
+    self.onnx_model = tf2onnx.convert.from_keras(self, opset=18 if transformer else 17)
+    self._base_model = BaseModel(inputs=input_dict, onnx_model=self.onnx_model[0], batch_size=batch_size, transformer=transformer, pass_weights=pass_weights)
 
 
   def umodel(self):
@@ -318,9 +317,11 @@ class UFrontKeras(tf_keras_Model):
   def dump_tosa_ir(self):
     return self._base_model.ufront_model.dump_tosa_ir()
   
-
   def get_output_operator(self):
     return self._base_model.get_output_operator()
+  
+  def get_onnx_format_model(self):
+    return self.onnx_model[0]
   
   def compile(self,
               optimizer,

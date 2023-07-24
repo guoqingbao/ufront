@@ -305,8 +305,13 @@ impl Operator {
                 let mut dilation_h = 1;
                 if self.params.contains_key("pad") {
                     let padding : Vec<usize> = self.params["pad"].replace(['[', ']'], "").split(",").map(|x| x.trim().parse::<usize>().unwrap()).collect();
-                    padding_h = padding[0];
-                    padding_w = padding[1];
+                    if padding.len() > 3 {
+                        padding_h = padding[1];
+                        padding_w = padding[3];
+                    } else {
+                        padding_h = padding[0];
+                        padding_w = padding[1];
+                    }
                 }
 
                 if self.params.contains_key("dilation") {
@@ -377,7 +382,10 @@ impl Operator {
                 }
             }
             OpType::POOL2D => {
-                if self.params.contains_key("pool_type") && self.params["pool_type"].trim() == "PoolType.POOL_ADAPTIVE" {
+                if self.params.contains_key("pool_type") && 
+                    (self.params["pool_type"].trim() == "PoolType.POOL_ADAPTIVE" ||
+                    self.params["pool_type"].trim() == "PoolType.POOL_ADAPTIVE_AVG" ||
+                    self.params["pool_type"].trim() == "PoolType.POOL_ADAPTIVE_MAX")  {
                     //formula [w,h]=output_size
                     match &self.inputs[0].tensor {
                         Some(v) => {
@@ -555,12 +563,17 @@ impl Operator {
             | OpType::MASKEDFILL //output shape of masked_fill is equal to the input
             | OpType::MULTIHEAD_ATTENTION //output shape of multiheaded attention is equal to shape of input "q" (first item in input list) when batch_first=True
             | OpType::CLIP
+            | OpType::ERF
             | OpType::BOOL
             | OpType::INVERT
             | OpType::AND
             | OpType::FLOAT
             | OpType::DETACH
             | OpType::CUMSUM
+            | OpType::SQRT
+            | OpType::RSQRT
+            | OpType::RECIPROCAL
+            | OpType::NEG
              => {
                 // let activations = vec![OpType::ELU, OpType::RELU, OpType::GELU, OpType::SIGMOID, OpType::TANH];
                 // let inplace = if self.params.contains_key("inplace") {self.params["inplace"]=="True"} else {false};
@@ -1218,7 +1231,7 @@ impl Operator {
             if params.contains_key("keepdims") {
                 params["keepdims"] = params["keepdims"].to_lowercase();
             }
-        } else if self.op_type == OpType::GELU {
+        } else if self.op_type == OpType::GELU || self.op_type == OpType::ERF {
             if params.contains_key("approximate") {
                 params["approximate"] = params["approximate"].to_lowercase();
             }

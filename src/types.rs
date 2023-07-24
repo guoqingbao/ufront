@@ -126,7 +126,10 @@ pub enum OpType {
     DIVIDE,
     POW,
     MEAN,
+    SQRT,
     RSQRT,
+    RECIPROCAL,
+    NEG,
     SIN,
     COS,
     INPUT,
@@ -169,6 +172,7 @@ pub enum OpType {
     TENSOR,
     MATMUL,
     CLIP,
+    ERF,
     BOOL,
     INVERT,
     AND,
@@ -207,7 +211,10 @@ impl OpType {
             OpType::DIVIDE => "divide",
             OpType::POW => "pow",
             OpType::MEAN => "mean",
+            OpType::SQRT => "sqrt",
             OpType::RSQRT => "rsqrt",
+            OpType::RECIPROCAL => "reciprocal",
+            OpType::NEG => "neg",
             OpType::SIN => "sin",
             OpType::COS => "cos",
             OpType::INPUT => "input",
@@ -250,6 +257,7 @@ impl OpType {
             OpType::TENSOR => "tensor",
             OpType::MATMUL => "matmul",
             OpType::CLIP => "clip",
+            OpType::ERF => "erf",
             OpType::BOOL => "bool",
             OpType::INVERT => "invert",
             OpType::AND => "And",
@@ -289,7 +297,10 @@ impl OpType {
             "divide" => OpType::DIVIDE,
             "pow" => OpType::POW,
             "mean" => OpType::MEAN,
+            "sqrt" => OpType::SQRT,
             "rsqrt" => OpType::RSQRT,
+            "reciprocal" => OpType::RECIPROCAL,
+            "neg" => OpType::NEG,
             "sin" => OpType::SIN,
             "cos" => OpType::COS,
             "input" => OpType::INPUT,
@@ -331,6 +342,7 @@ impl OpType {
             "tensor" => OpType::TENSOR,
             "matmul" => OpType::MATMUL,
             "clip" => OpType::CLIP,
+            "erf" => OpType::ERF,
             "bool" => OpType::BOOL,
             "invert" => OpType::INVERT,
             "And" => OpType::AND,
@@ -430,6 +442,8 @@ pub enum PoolType {
     POOL_MAX = 30,
     POOL_AVG,
     POOL_ADAPTIVE,
+    POOL_ADAPTIVE_MAX,
+    POOL_ADAPTIVE_AVG
 }
 
 #[pymethods]
@@ -439,6 +453,8 @@ impl PoolType {
             PoolType::POOL_MAX => 30,
             PoolType::POOL_AVG => 31,
             PoolType::POOL_ADAPTIVE => 32,
+            PoolType::POOL_ADAPTIVE_MAX => 33,
+            PoolType::POOL_ADAPTIVE_AVG => 34,
         }
     }
 
@@ -448,6 +464,8 @@ impl PoolType {
             30 => PoolType::POOL_MAX,
             31 => PoolType::POOL_AVG,
             32 => PoolType::POOL_ADAPTIVE,
+            33 => PoolType::POOL_ADAPTIVE_MAX,
+            34 => PoolType::POOL_ADAPTIVE_AVG,
             _ => {
                 panic!("Not supported type!");
             }

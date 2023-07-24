@@ -98,3 +98,19 @@ class SimpleCNN(nn.Module):
     y = self.flat1(y)
     y = self.relu(self.linear1(y))
     return self.linear2(y)
+  
+class TestCNN(nn.Module):
+  def __init__(self):
+    super().__init__()
+    self.conv = nn.Conv2d(3, 32, 3, 4, bias=False)
+    self.pool = nn.AvgPool2d(2)
+    self.batch_norm = nn.BatchNorm2d(32)
+    self.linear = nn.Linear(32, 10, bias=False)
+    self.flat = nn.Flatten()
+    self.relu = nn.ReLU()
+
+  def forward(self, x):
+    x = self.flat(self.batch_norm(self.pool(self.conv(x))))
+    
+    x = self.linear(x)
+    return self.relu(x)

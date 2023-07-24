@@ -961,6 +961,21 @@ impl Model {
     }
 
     #[pyo3(signature = (**kwds))]
+    pub fn sqrt(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
+        self.handle_operator(OpType::SQRT, kwds)
+    }
+
+    #[pyo3(signature = (**kwds))]
+    pub fn reciprocal(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
+        self.handle_operator(OpType::RECIPROCAL, kwds)
+    }
+
+    #[pyo3(signature = (**kwds))]
+    pub fn neg(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
+        self.handle_operator(OpType::NEG, kwds)
+    }
+
+    #[pyo3(signature = (**kwds))]
     pub fn floor_divide(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::FLOOR_DIVIDE, kwds)
     }
@@ -1134,5 +1149,10 @@ impl Model {
     #[pyo3(signature = (**kwds))]
     pub fn clip(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
         self.handle_operator(OpType::CLIP, kwds)
+    }
+
+    #[pyo3(signature = (**kwds))]
+    pub fn erf(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
+        self.handle_operator(OpType::ERF, kwds)
     }
 }

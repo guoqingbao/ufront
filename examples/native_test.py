@@ -1,15 +1,16 @@
 
 import ufront
 import numpy as np;
-from ufront import OpType, PoolType, LossType, MetricsType, Optimizer
+from ufront import OpType, DataType, PoolType, LossType, MetricsType, Optimizer
 
 model = ufront.Model()
 batch_size = 1
 
 input = np.ones((batch_size,3,32,32), dtype=np.float32)
 
-tensor_input1 = ufront.Tensor(input, name="input1")
-tensor_input2 = ufront.Tensor(input, name="input2")
+tensor_input1 = ufront.Tensor(np_tensor=input, dtype=DataType.Float, name="input1")
+tensor_input2 = ufront.Tensor(np_tensor=input, dtype=DataType.Float, name="input2")
+model.input(tensors=[tensor_input1, tensor_input2], num_of_inputs=2)
 
 x = model.conv2d(input=tensor_input1, out_channels=32, kernel=[3, 3], stride=[1, 1], pad=[0, 0], groups=1)
 x1 = model.relu(input=x.get_output(0))

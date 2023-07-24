@@ -8,48 +8,60 @@ from torch_def import SimpleCNN, ComplexCNN
 from torchvision.models import resnet18, resnet50, squeezenet1_1, regnet_x_32gf, maxvit_t, shufflenet_v2_x1_5, inception_v3, mobilenet_v3_small, efficientnet_v2_s, densenet121, convnext_small
 from torchvision import models
 import onnxsim
-import numpy as np
 import iree.compiler as ireec
 from iree import runtime
-import tensorflow as tf #tensorflow cpu
+from urllib.request import urlopen
+import json
+from PIL import Image
 
-def decode_result(result):
-  return tf.keras.applications.resnet50.decode_predictions(result, top=5)[0]
-    
 def load_read_image():
-    content_path = tf.keras.utils.get_file(
-    'YellowLabradorLooking_new.jpg',
-    'https://storage.googleapis.com/download.tensorflow.org/example_images/YellowLabradorLooking_new.jpg')
+    url = 'https://storage.googleapis.com/download.tensorflow.org/example_images/YellowLabradorLooking_new.jpg'
+    response = urlopen(url)
+    img = Image.open(io.BytesIO(response.read()))
+    image = np.array(img.resize((224, 224)), dtype=np.float32)
+    image = image[np.newaxis, :]
+    clast_image = image/ 255.0
+    return clast_image, np.moveaxis(clast_image, -1, 1)
 
-    image = tf.io.read_file(content_path)
-    image = tf.image.decode_image(image, channels=3)
-    image = tf.image.resize(image, (224, 224))
-    image = image[tf.newaxis, :]
-    return np.moveaxis(image.numpy(), -1, 1)/ 255.0
+def decode_result(preds, top=5):
+    if len(preds.shape) != 2 or preds.shape[1] != 1000:
+        raise ValueError(
+            "`decode_predictions` expects "
+            "a batch of predictions "
+            "(i.e. a 2D array of shape (samples, 1000)). "
+            "Found array with shape: " + str(preds.shape)
+        )
+    url = "https://raw.githubusercontent.com/raghakot/keras-vis/master/resources/imagenet_class_index.json"
+
+    response = urlopen(url)
+    data_json = json.loads(response.read())
+    results = []
+    for pred in preds:
+        top_indices = pred.argsort()[-top:][::-1]
+        result = [tuple(data_json[str(i)]) + (pred[i],) for i in top_indices]
+        result.sort(key=lambda x: x[2], reverse=True)
+        results.append(result)
+    return results
 
 if __name__ == "__main__":
     batch_size = 1
-    GPU = True #if NV GPU and driver available
-    input = load_read_image()
+    GPU = False
+    input_last, input = load_read_image()
+    input = np.vstack([input, input])
+    # net = resnet18(weights="DEFAULT")
 
-    # torch_model = ComplexCNN()
-    # torch_model = resnet18(pretrained=True)
-    # torch_model = resnet50(pretrained=True)
-    # torch_model = squeezenet1_1(pretrained=True)
-    # torch_model = regnet_x_32gf(pretrained=True)
-    # torch_model = mobilenet_v3_small(pretrained=True)
-    torch_model = densenet121(pretrained=True)
-    # torch_model = models.vision_transformer.vit_b_16(weights=True)
-    # torch_model = inception_v3(pretrained=True) #training=TrainingMode.EVAL important!
-    # torch_model = shufflenet_v2_x1_5(pretrained=False) 
-    # torch_model = efficientnet_v2_s(pretrained=False) 
-    # torch_model = convnext_small(pretrained=False) #not supported at the moment 
-    # torch_model = models.swin_transformer.swin_t(weights=None) #not supported at the moment 
-    torch_model.train(False) 
+    net = resnet50(weights="DEFAULT")
+    # net = densenet121(weights="DEFAULT")
+    # net = inception_v3(weights="DEFAULT", dropout=0.0) 
+    # net = squeezenet1_1(weights="DEFAULT")
+    # net = shufflenet_v2_x1_5(weights="DEFAULT")
+    # net = mobilenet_v3_small(weights="DEFAULT", dropout=0.0)
+    # net = models.vision_transformer.vit_b_16(weights="DEFAULT") 
+    net.eval()
 
     f = io.BytesIO()
-    model_name = torch_model.__class__.__name__ #"ComplexCNN"
-    torch.onnx.export(model=torch_model, args=(torch.from_numpy(input)), f=f, export_params=True, 
+    model_name = net.__class__.__name__ 
+    torch.onnx.export(model=net, args=(torch.from_numpy(input)), f=f, export_params=True, #do_constant_folding=True,
                       training=TrainingMode.EVAL if model_name=="Inception3" else TrainingMode.TRAINING, opset_version=17)
     onnx_model = onnx.load_model_from_string(f.getvalue())
 
@@ -60,11 +72,7 @@ if __name__ == "__main__":
     #operators can also be managed by python side (each operator here corresponding to an operator in the Rust computation graph)
     output_tensors = model(inputs=[input])
 
-    #The output of the model (forward pass have not been triggered at the moment!)
-    # if model_name not in ["MaxVit", "SwinTransformer", "VisionTransformer", "MultiHeadAttention"]:
-    #   output = model.softmax(input=output_tensors[0], name="softmax_out")
-    #   print(output.shape)
-    
+    output = model.softmax(input=output_tensors[0], name="softmax_out")
 
     #The Rust frontend will build computation graph and initialize temporary inputs and outputs for each operator
     # total_memory = 0
@@ -80,36 +88,16 @@ if __name__ == "__main__":
     #This will trigger model compilation, i.e., convert Rust computation graph to a unified high-level IR and lower it to TOSA IR
     model.compile(optimizer={"type":"sgd", "lr":"0.01", "momentum":"0", "nesterov":"False", "weight_decay":"0"},
                          loss='sparse_categorical_crossentropy', metrics=['accuracy', 'sparse_categorical_crossentropy'])
-    print("\r\n\r\n")
-
-    # for operator in operators:
-    #   print(operator.ir) #show ir for each operator
-    print("Pytorch: ", decode_result(torch_model.forward(torch.from_numpy(input)).detach().numpy()))
 
     print("\r\n\r\nIR for ", model_name)
     # for operator in model.operators:
     #   print(operator.ir)
       
-    # for operator in operators:
-    #   print(operator.ir) #show ir for each operator
     modelir= model.dump_ir()
-    # print(modelir)
-
-    # import pathlib
-    # path = str(pathlib.Path(__file__).parent.resolve()) + "/output_ir/onnx_" + model_name + ".ir"
-    # f = open(path, "w")
-    # f.write(modelir)
-    # f.close()
-
+    with open("onnx_vit.mlir", "w") as f:
+        f.write(modelir)
     tosa_ir= model.dump_tosa_ir()
-    # f = open("onnx_resnet50.mlir", "w")
-    # f.write(tosa_ir)
-    # f.close()
-    #This will be supported later
-    #model.forward()
-    
-    #This will be supported later
-    #model.backward()
+
     print("Compiling TOSA model...")
     if GPU:
         binary = ireec.compile_str(tosa_ir,

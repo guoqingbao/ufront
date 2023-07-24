@@ -79,5 +79,7 @@ docs/_build/
 .onnx/
 test.py
 *.whl
+*.mlir
+totosa.py
 examples/llm.py
 examples/output_ir/torch_chatglm-6b.ir

@@ -33,13 +33,13 @@ def numpy_to_ufront_dtype(numpy_dtype):
         return DataType.Double
     elif numpy_dtype in (np.int32, "int32", "int"):
         return DataType.Int32
-    elif numpy_dtype in (np.int64, np.long, "int64", "long"):
+    elif numpy_dtype in (np.int64, "int64", "long"):
         return DataType.Int64
     elif numpy_dtype in (np.float16, np.half, "float16", "half"):
         return DataType.Half
-    elif numpy_dtype.name == "bfloat16":
+    elif hasattr(numpy_dtype, "name") and numpy_dtype.name == "bfloat16":
         return DataType.BHalf
-    elif numpy_dtype in (np.bool, "bool", "BOOL", "boolean", "Boolean"):
+    elif numpy_dtype in (bool, "bool", "BOOL", "boolean", "Boolean"):
         return DataType.Bool
     else:
         assert 0, f"Unknown dtype: {numpy_dtype}"
@@ -56,6 +56,6 @@ def ufront_to_numpy_dtype(ff_dtype):
     elif ff_dtype == DataType.Half:
         return np.float16
     elif ff_dtype == DataType.Bool:
-        return np.bool
+        return bool
     else:
         assert 0, f"Unknown dtype: {ff_dtype}"
