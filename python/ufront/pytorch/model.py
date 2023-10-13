@@ -903,35 +903,40 @@ class EmbeddingNode(ModuleNode):
         self._ir_string = IR_DELIMITER.join(s)
 
     def __call__(self, umodel, node_to_output):
+        weight = None
         input_tensor = node_to_output[self.innodes[0].name]
         if self.module != None:
             num_embeddings = self.module.num_embeddings
             embedding_dim = self.module.embedding_dim
             assert type(num_embeddings) is int
             assert type(embedding_dim) is int
-            return umodel.embedding(
-                input=input_tensor,
-                num_embeddings=num_embeddings,
-                embedding_dim=embedding_dim,
-                # aggr=AggrMode.AGGR_MODE_NONE,
-                name=self.name,
-            )
+
+            requires_grad = self.module.weight.requires_grad
+            weight = self.module.weight.detach().numpy() if requires_grad \
+                else self.module.weight.numpy()
         elif len(self.innodes) > 1:
             weight = node_to_output[self.innodes[1].name]
-            if type(weight) != Tensor:
-                weight_op = umodel.parameter(np_tensor=weight, dtype=numpy_to_ufront_dtype(weight.dtype), requires_grad=True, name=self.name + "_weight")
-
             num_embeddings = weight.shape[0]
             embedding_dim = weight.shape[1]
+
+        if type(weight) == np.ndarray or weight != None:
+            if type(weight) != Tensor:
+                weight_op = umodel.parameter(np_tensor=weight, dtype=numpy_to_ufront_dtype(weight.dtype), requires_grad=True, name=self.name + "_weight")
             return umodel.embedding(
                 input=input_tensor,
+                weight=weight_op.get_output(0) if type(weight) != Tensor else weight,
                 num_embeddings=num_embeddings,
                 embedding_dim=embedding_dim,
-                weight=weight_op.get_output(0) if type(weight) != Tensor else weight,
-                # aggr=AggrMode.AGGR_MODE_NONE,
                 name=self.name,
             )
         else:
+            # return umodel.embedding(
+            #     input=input_tensor,
+            #     num_embeddings=num_embeddings,
+            #     embedding_dim=embedding_dim,
+            #     # aggr=AggrMode.AGGR_MODE_NONE,
+            #     name=self.name,
+            # )
             assert 0, "Invalid argument for embedding, missing weight or num_embeddings & embedding_dim!"
 
 class MultiheadAttentionNode(ModuleNode):
@@ -1096,6 +1101,8 @@ class FunctionNode(Node):
                 return ScalarAddNode(node, FunctionNode.ScalarPosition.LEFT)
             elif FunctionNode.is_elemwise_op(node):
                 return AddNode(node)
+            elif len(node.args) == 2 and type(node.args[0]) == torch.fx.graph.Node and type(node.args[1]) == tuple:
+                return AddNodePython(node)
             else:
                 assert 0, "Unknown `add()` usage with `innodes`: " \
                     f"{node.innodes}"
@@ -1134,10 +1141,12 @@ class FunctionNode(Node):
             return DetachNode(node)
         elif name.startswith("cumsum"):
             return CumsumNode(node)
-        elif name.startswith("arange"):
+        elif name.find("arange") >= 0: #name.startswith("arange"):
             return ArangeNode(node)
         elif name.startswith("less") or name.startswith("lt"):
             return LessNode(node)
+        elif name.startswith("erf"):
+            return ErfNode(node)
         elif name.find("truediv") >= 0: return ScalarTrueDivNode(node)
         elif name.find("cat") == 0: return ConcatNode(node)
         elif name.find("split") >= 0: return SplitChunkNode(node, OpType.SPLIT)
@@ -1403,6 +1412,26 @@ class AddNode(FunctionNode):
         res = umodel.add(x=input_tensor1, y=input_tensor2, name=self.name)
         return res
 
+class AddNodePython(FunctionNode):
+    def __init__(self, node):
+        super().__init__(node)
+        self.op_type = OpType.ADD
+        self.assert_num_args(2, Comparator.EQ)
+
+    def parse(self):
+        s = [self.name]
+        s.append(self.parse_inoutnodes(self.innodes))
+        s.append(self.parse_inoutnodes(self.outnodes))
+        s.append(self.op_type.as_str())
+        self._ir_string = IR_DELIMITER.join(s)
+
+    def __call__(self, umodel, node_to_output):
+        input_tensor1 = node_to_output[self.innodes[0].name]
+        if type(self.innodes[1]) == tuple or type(self.innodes[1]) == list:
+            input_tensor2 = list(self.innodes[1])
+        else:
+            input_tensor2 = node_to_output[self.innodes[1].name]
+        return input_tensor1 + input_tensor2
 
 class ScalarSubNode(FunctionNode):
     def __init__(self, node, scalar_pos):
@@ -1607,7 +1636,7 @@ class GetItemNode(FunctionNode):
             type(input_tensor) is tuple, \
             f"Expected list or tuple but got {type(input_tensor)}"
         index = self.innodes[1]
-        assert type(index) is int
+        # assert type(index) is int
         return input_tensor[index]
 
     @staticmethod
@@ -1819,7 +1848,9 @@ class ArangeNode(FunctionNode):
 
     def __call__(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return umodel.arange(start=0, end=input_tensor, step=1, name=self.name)
+        np_tensor = np.arange(start=0, stop=input_tensor, step=1, dtype=np.int64)
+        return umodel.parameter(np_tensor=np_tensor, dtype=numpy_to_ufront_dtype(np_tensor.dtype), requires_grad=False, name=self.name)
+        # return umodel.arange(start=0, end=input_tensor, step=1, name=self.name)
 
         
                       
@@ -1908,7 +1939,11 @@ class GetAttrNode(FunctionNode):
             return input_tensor.dims
         if attr == "device":
             return "cpu"
-        elif attr in ["float", "bool", "double", "int"]:
+        
+        if hasattr(self, "function") and self.function == "size":
+            return input_tensor.shape[attr]
+
+        if attr in ["float", "bool", "double", "int"]:
             return umodel.cast(input_tensor, to=attr)
         else:
             return getattr(input_tensor, attr)
@@ -1973,7 +2008,8 @@ class ExpandNode(FunctionNode):
         shapes = self.innodes[1:]
         for i in range(len(shapes)):
             if hasattr(shapes[i], "name"):
-                output_shape.append(node_to_output[shapes[i].name])
+                output_shape = node_to_output[shapes[i].name].shape
+                break
             elif type(shapes[i]) == str:
                 output_shape.append(node_to_output[shapes[i]])
             elif type(shapes[i]) == int:
@@ -2079,7 +2115,23 @@ class PermuteNode(FunctionNode):
             assert type(dim) is int
         return umodel.transpose(input=input_tensor, perms=list(perms), name=self.name)
 
+class ErfNode(FunctionNode):
+    def __init__(self, node):
+        super().__init__(node)
+        self.op_type = OpType.ERF
+        self.assert_num_args(1, Comparator.EQ)
 
+    def parse(self):
+        s = [self.name]
+        s.append(self.parse_inoutnodes(self.innodes))
+        s.append(self.parse_inoutnodes(self.outnodes))
+        s.append(self.op_type.as_str())
+        self._ir_string = IR_DELIMITER.join(s)
+
+    def __call__(self, umodel, node_to_output):
+        input_tensor = node_to_output[self.innodes[0].name]
+        return umodel.erf(input=input_tensor, name=self.name)
+    
 class SoftmaxFNode(FunctionNode):
     def __init__(self, node):
         super().__init__(node)
@@ -2620,7 +2672,7 @@ class InputNode(Node):
         self._ir_string = IR_DELIMITER.join(s)
 
     def __call__(self, input_tensors, input_index):
-        return input_tensors[input_index]
+        return input_tensors[input_index] if input_index < len(input_tensors) else None
 
 
 class OutputNode(Node):
@@ -2813,7 +2865,7 @@ class UFrontTorch():
         graph = []
         for fx_node in traced_graph.nodes:
             # if fx_node.op == "placeholder":
-            #     print(fx_node.op, " : ", fx_node.name)
+                # print(fx_node.op, " : ", fx_node.name)
             if fx_node.op == "output":
                 node = OutputNode(fx_node)
             elif fx_node.op == "placeholder":
@@ -2962,8 +3014,9 @@ class UFrontTorch():
                 print(f"{node.ir_string}")
             if isinstance(node, InputNode):
                 node_output = node(input_tensors, input_index)
-                inputs_nodes.append(node_output)
-                input_index += 1
+                if node_output:
+                    inputs_nodes.append(node_output)
+                    input_index += 1
             elif isinstance(node, OutputNode):
                 node(self.ufront_model, node_to_output, output_tensors)
                 node_output = None

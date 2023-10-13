@@ -22,7 +22,7 @@ lib64/
 parts/
 sdist/
 var/
-chatglm_q/
+# chatglm_q/
 # include/
 man/
 venv/
@@ -81,5 +81,5 @@ test.py
 *.whl
 *.mlir
 totosa.py
-examples/llm.py
-examples/output_ir/torch_chatglm-6b.ir
+# examples/llm.py
+# examples/output_ir/torch_chatglm-6b.ir

@@ -521,7 +521,7 @@ impl Model {
                         let np_tensor = para.get_item("np_tensor");
                         match np_tensor {
                             Some(v) => {
-                                tensor.set_ndarray(v);
+                                tensor.set_ndarray_with_type(v, dtype);
                                 if op.add_input(&tensor).is_ok() {
                                     op.calculate_output();
                                 }

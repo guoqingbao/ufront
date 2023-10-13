@@ -136,6 +136,12 @@ impl Operator {
                 shape: shape,
                 data_buffer: DataBuffer::CPUDataBuffer(Buffer::new::<i32>(sz, None)),
             }
+        } 
+        else if typeid == TypeId::of::<i64>() {
+            TensorU {
+                shape: shape,
+                data_buffer: DataBuffer::CPUDataBuffer(Buffer::new::<i64>(sz, None)),
+            }
         } else {
             panic!("Invalid type! {:?}", typeid);
         }
@@ -494,7 +500,7 @@ impl Operator {
                 } 
 
                 let length = (end - start) / step;
-                let output_shape = vec![1, length];
+                let output_shape = vec![length];
 
                 let sz: usize = output_shape.iter().product();
                 let tensor = Operator::empty_tensor(TypeId::of::<i32>(), sz, output_shape.clone());
@@ -521,7 +527,8 @@ impl Operator {
                         let sz: usize = output_shape.iter().product();
                         let tensor = Operator::empty_tensor(v.data_buffer.get_type_id(), sz, output_shape.clone());
 
-                        self.add_output(tensor, Some(self.inputs[0].dtype));
+                        // self.add_output(tensor, Some(self.inputs[0].dtype));
+                        self.add_output(tensor, Some(DataType::Float)); //input i64, output f32
                         info!(
                             "Output tensor with shape {:?} created within Rust for operator {:?}!",
                             output_shape,

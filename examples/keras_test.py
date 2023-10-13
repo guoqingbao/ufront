@@ -14,6 +14,26 @@ from totosa import translate
 import onnx
 import io
 
+import torch
+def mse(y_true, y_pred):
+    return torch.mean((y_true - y_pred) ** 2)
+
+def rmse(y_true, y_pred):
+    return torch.sqrt(mse(y_true, y_pred))
+
+def mae(y_true, y_pred):
+    return torch.mean(torch.abs(y_true - y_pred))
+
+# also known as cod
+def r_square(y_true, y_pred):
+    y_mean = torch.mean(y_true)
+    ss_tot = torch.sum((y_true - y_mean) ** 2)
+    ss_res = torch.sum((y_true - y_pred) ** 2)
+    return 1 - ss_res / ss_tot
+
+def mpe(y_true, y_pred):
+    return torch.mean((y_true - y_pred) / y_true) * 100
+
 def decode_result(result):
   return tf.keras.applications.resnet50.decode_predictions(result, top=5)[0]
     
@@ -27,10 +47,28 @@ def load_read_image():
     image = tf.image.resize(image, (224, 224))
     image = image[tf.newaxis, :]
     clast_image = image.numpy()/ 255.0
+    clast_image = clast_image.astype(np.float32)
     return clast_image, np.moveaxis(clast_image, -1, 1)
 
+from urllib.request import urlopen
+import json
+from PIL import Image
+
+# def load_read_image():
+#     url = 'https://storage.googleapis.com/download.tensorflow.org/example_images/YellowLabradorLooking_new.jpg'
+#     response = urlopen(url)
+#     img = Image.open(io.BytesIO(response.read()))
+#     image = np.array(img.resize((224, 224)), dtype=np.float32)
+#     image = image[np.newaxis, :]
+#     mean = (0.485, 0.456, 0.406)
+#     std = (0.229, 0.224, 0.225)
+#     clast_image = image/ 255.0
+#     clast_image = (clast_image - mean) / std #normlization 
+#     clast_image = clast_image.astype(np.float32)
+#     return clast_image, np.moveaxis(clast_image, -1, 1)
+
 if __name__ == "__main__":
-    GPU = False
+    GPU = True
     input_last, input = load_read_image()
     backend.set_image_data_format('channels_first')
     tf.keras.backend.set_floatx('float32')
@@ -52,12 +90,12 @@ if __name__ == "__main__":
     # base_model = Xception(weights=None, include_top=True, input_shape=input.shape[1:])
     # base_model = MobileNetV2(weights=None, include_top=True, input_shape=input.shape[1:])
     # base_model = MobileNetV3Small(weights=None, include_top=True, input_shape=input.shape[1:])
-    base_model = DenseNet121(weights=None, include_top=True, input_shape=input.shape[1:])
+    # base_model = DenseNet121(weights=None, include_top=True, input_shape=input.shape[1:])
     # base_model = InceptionV3(weights=None, include_top=True, input_shape=input.shape[1:])
     # base_model = VGG16(weights=None, include_top=True, input_shape=input.shape[1:])
 
     # base_model = SqueezeNet_11(input_shape=input.shape[1:], nb_classes=1000, channel_first=True)
-    # base_model = ShuffleNet(include_top=True, pooling='avg', input_shape=input.shape[1:])
+    base_model = ShuffleNet(include_top=True, pooling='avg', input_shape=input.shape[1:])
 
     # translate(base_model, "./tf.model", "./tf.mlir", batch_size=1)
     # weights_channel_last = base_model.get_weights()
@@ -87,11 +125,11 @@ if __name__ == "__main__":
     #     f.write(modelir)
     tosa_ir= model.dump_tosa_ir()
 
-    # import pathlib
-    # # path = str(pathlib.Path(__file__).parent.resolve()) + "/output_ir/keras_" + model_name + ".ir"
-    # f = open("resnet18_ufront.mlir", "w")
-    # f.write(tosa_ir)
-    # f.close()
+    import pathlib
+    path = str(pathlib.Path(__file__).parent.resolve()) + "/output_ir/keras_" + model_name + ".ir"
+    f = open(path, "w")
+    f.write(modelir)
+    f.close()
     
 
     # import onnxruntime
@@ -114,7 +152,7 @@ if __name__ == "__main__":
                         input_type=ireec.InputType.TOSA)
         module = runtime.load_vm_flatbuffer(binary,backend="llvm-cpu") 
 
-    ufront_ret = module.forward(input).to_host()
+    ufront_ret = module.forward(input).to_host() 
     print("\nUFront: ", decode_result(ufront_ret))
 
     backend.set_image_data_format('channels_last')
@@ -123,9 +161,9 @@ if __name__ == "__main__":
     # base_model = ResNet50V2(weights=None, include_top=True) # with batch norm
     # base_model = MobileNetV3Small(weights=None, include_top=True, input_shape=sp)
     # base_model = MobileNetV2(weights=None, include_top=True, input_shape=sp)
-    base_model = DenseNet121(weights=None, include_top=True, input_shape=sp)
+    # base_model = DenseNet121(weights=None, include_top=True, input_shape=sp)
     # base_model = ResNet18(classes=1000, input_shape=sp)
-    # base_model = ShuffleNet(include_top=True, input_shape=sp)
+    base_model = ShuffleNet(include_top=True, pooling='avg',  input_shape=sp)
     # base_model = SqueezeNet_11(input_shape=sp, nb_classes=1000, channel_first=False)
     # base_model = InceptionV3(weights=None, include_top=True, input_shape=sp)
     # base_model = vit.vit_b16(image_size=224, activation='relu', pretrained=False, include_top=True, pretrained_top=False, channel_first=False)
@@ -136,3 +174,7 @@ if __name__ == "__main__":
     dif = ufront_ret - ret
     mae = np.mean(abs(dif))
     print("Model: ", model_name, ", MAE with Tensorflow: ", mae)
+
+    print("RMSE:", rmse(torch.Tensor(ret), torch.Tensor(ufront_ret)).numpy())
+    print("COD:", r_square(torch.Tensor(ret), torch.Tensor(ufront_ret)).numpy())
+    print("MPE:", mpe(torch.Tensor(ret), torch.Tensor(ufront_ret)).numpy(), "%")

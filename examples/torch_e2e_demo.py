@@ -20,7 +20,11 @@ def load_read_image():
     img = Image.open(io.BytesIO(response.read()))
     image = np.array(img.resize((224, 224)), dtype=np.float32)
     image = image[np.newaxis, :]
+    mean = (0.485, 0.456, 0.406)
+    std = (0.229, 0.224, 0.225)
     clast_image = image/ 255.0
+    clast_image = (clast_image - mean) / std #normlization 
+    clast_image = clast_image.astype(np.float32)
     return clast_image, np.moveaxis(clast_image, -1, 1)
 
 def decode_result(preds, top=5):
@@ -47,15 +51,16 @@ if __name__ == "__main__":
     batch_size = 1
     GPU = False
     input_last, input = load_read_image()
-    input = np.vstack([input, input])
-    # net = resnet18(weights="DEFAULT")
+
+    # input = np.vstack([input, input])
+    net = resnet18(weights="DEFAULT")
 
     # net = resnet50(weights="DEFAULT")
     # net = densenet121(weights="DEFAULT")
     # net = inception_v3(weights="DEFAULT", dropout=0.0) 
     # net = squeezenet1_1(weights="DEFAULT")
     # net = shufflenet_v2_x1_5(weights="DEFAULT")
-    net = mobilenet_v3_small(weights="DEFAULT", dropout=0.0)
+    # net = mobilenet_v3_small(weights="DEFAULT", dropout=0.0)
     # net = models.vision_transformer.vit_b_16(weights="DEFAULT") 
     net.eval()
 

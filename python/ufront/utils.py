@@ -31,7 +31,7 @@ def numpy_to_ufront_dtype(numpy_dtype):
         return DataType.Float
     elif numpy_dtype in (np.float64, np.double, "float64", "double"):
         return DataType.Double
-    elif numpy_dtype in (np.int32, "int32", "int"):
+    elif numpy_dtype in (np.int32, "int32"):
         return DataType.Int32
     elif numpy_dtype in (np.int64, "int64", "long"):
         return DataType.Int64
