@@ -30,12 +30,13 @@ pip install maturin[patchelf] #for packaging dependencies
 ```sh
 apt update && apt install -y wget cmake ninja-build gnupg #C++ build tools
 apt install zlib1g zlib1g-dev #zlib
-apt install libomp-16-dev #openmp
 
 #LLVM-16 for Ubuntu 20.04, you may change this for Ubuntu 22.04 or 18.04 (see https://apt.llvm.org/)
 echo "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-16 main" >> /etc/apt/sources.list && \
     echo "deb-src http://apt.llvm.org/focal/ llvm-toolchain-focal-16 main" >> /etc/apt/sources.list && \
     wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add
+
+apt install libomp-16-dev #openmp
 
 apt update && apt install -y clang-16 lldb-16 lld-16 libmlir-16-dev mlir-16-tools #LLVM/MLIR version 16
 ```
@@ -65,6 +66,7 @@ python torch_e2e_demo.py #make sure torch-cpu installed
 maturin build --release -i python3.8 #for python3.8
 maturin build --release -i python3.9 #for python3.9
 maturin build --release -i python3.10 #for python3.10
+maturin build --release -i python3.11 #for python3.11
 ```
 
 

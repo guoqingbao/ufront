@@ -4,8 +4,12 @@ from .ufront import (OpType, ActiMode, AggrMode, PoolType, Tensor, DataType, Par
 try:
     import onnx
 except:
-    print("You need to first install onnx package before using onnx models!")
+    print("You need to first install onnx package before compiling onnx models!")
 
+try:
+    import torch
+except:
+    print("You need to first install pytorch package before compiling pytorch models!")
 
 def list_product(lst):
     return reduce(lambda x, y: x*y, lst)
@@ -25,6 +29,24 @@ def onnx_to_ufront_dtype(datatype):
         return DataType.Bool
     else:
         assert 0, "Unsupported datatype"
+
+def torch_to_ufront_dtype(torch_dtype):
+    if torch_dtype == torch.float32:
+        return DataType.Float
+    elif torch_dtype == torch.float64:
+        return DataType.Double
+    elif torch_dtype == torch.int32:
+        return DataType.Int32
+    elif torch_dtype == torch.int64:
+        return DataType.Int64
+    elif torch_dtype == torch.half:
+        return DataType.Half
+    elif torch_dtype == torch.bfloat16:
+        return DataType.BHalf
+    elif torch_dtype == torch.bool:
+        return DataType.Bool
+    else:
+        assert 0, f"Unknown dtype: {torch_dtype}"
 
 def numpy_to_ufront_dtype(numpy_dtype):
     if numpy_dtype in (np.float32, "float32", "float"):

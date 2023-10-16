@@ -298,7 +298,7 @@ impl Operator {
         // }
     }
 
-    pub fn calculate_output(&mut self) {
+    pub fn calculate_output(&mut self, para: &PyDict) {
         info!("Operator::calculate_output for {:?}", self.op_type);
         if self.op_type!=OpType::ARANGE { //arange has no inputs
             assert!(!self.inputs.is_empty());
@@ -597,7 +597,12 @@ impl Operator {
                         
                         if OpType::LESS == self.op_type {
                             self.add_output(tensor, Some(DataType::Bool));
-                        } else {
+                        } 
+                        else if OpType::CAST == self.op_type {
+                            let dtype = para.get_item("dtype").unwrap().extract::<DataType>().unwrap();
+                            self.add_output(tensor, Some(dtype));
+                        }
+                        else {
                             self.add_output(tensor, Some(self.inputs[0].dtype));
                         }
                     }
@@ -605,7 +610,6 @@ impl Operator {
                         panic!("Invalid inputs!");
                     }
                 }
-                // }
             }
             OpType::MULTIPLY => {
                 match (&self.inputs[0].tensor, &self.inputs[1].tensor) {
@@ -1182,6 +1186,12 @@ impl Operator {
                         DataBuffer::CPUDataBuffer(data) => {
                             if self.outputs[0].dtype == DataType::Float {
                                 params.insert("initializer".to_string(), format!("{:?}", data.as_ptr::<f32>()));
+                            } else if self.outputs[0].dtype == DataType::Int64 {
+                                params.insert("initializer".to_string(), format!("{:?}", data.as_ptr::<i64>()));
+                            } else if self.outputs[0].dtype == DataType::Int32 {
+                                params.insert("initializer".to_string(), format!("{:?}", data.as_ptr::<i32>()));
+                            } else if self.outputs[0].dtype == DataType::BHalf {
+                                params.insert("initializer".to_string(), format!("{:?}", data.as_ptr::<bf16>()));
                             } else {
                                 params.insert("initializer".to_string(), format!("{:?}", data.as_ptr::<f16>()));
                             }
@@ -1564,11 +1574,11 @@ impl PyOperator {
         }
     }
 
-    pub fn calculate_output(&mut self) {
+    pub fn calculate_output(&mut self, para: &PyDict) {
         if self.raw_ptr > 0 {
             unsafe {
                 let operator = std::mem::transmute::<u64, *mut Operator>(self.raw_ptr);
-                (*operator).calculate_output();
+                (*operator).calculate_output(para);
             }
         } else {
             panic!("Input not added to the graph!");

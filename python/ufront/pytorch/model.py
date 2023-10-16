@@ -26,7 +26,7 @@ import io
 
 from ..ufront import (OpType, ActiMode, AggrMode, PoolType, Tensor, DataType, ParamSyncType, Initializer)
 from ..ufront import Model, PyOperator, Tensor, Optimizer, LossType, MetricsType, WeightType #Rust frontend
-from ..utils import list_product, onnx_to_ufront_dtype, numpy_to_ufront_dtype, ufront_to_numpy_dtype
+from ..utils import list_product, onnx_to_ufront_dtype, numpy_to_ufront_dtype, ufront_to_numpy_dtype, torch_to_ufront_dtype
 
 try:
     import torch
@@ -2130,7 +2130,7 @@ class ErfNode(FunctionNode):
 
     def __call__(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return umodel.erf(input=input_tensor, name=self.name)
+        return umodel.erf(input=input_tensor, approximate=True, name=self.name)
     
 class SoftmaxFNode(FunctionNode):
     def __init__(self, node):
@@ -2205,7 +2205,13 @@ class ToNode(FunctionNode):
 
     def __call__(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return input_tensor
+        if hasattr(self, "kwargs") and "dtype" in self.kwargs:
+            dtype = self.kwargs["dtype"]
+        elif len(self.innodes) > 1 and type(self.innodes[1]) == torch.dtype:
+            dtype = self.innodes[1]
+        else:
+            assert 0, "Invalid dtype to cast!"
+        return umodel.cast(input=input_tensor, dtype=torch_to_ufront_dtype(dtype))
 
 
 class PowNode(FunctionNode):

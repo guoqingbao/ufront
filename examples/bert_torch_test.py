@@ -1,9 +1,10 @@
 # import torch, torchtext
 from ufront.pytorch.model import UFrontTorch 
-
+import iree.compiler as ireec
+from iree import runtime
 from bert import BertModel, BertConfig
 import torch
-
+GPU = True
 input_ids = torch.LongTensor([[31, 51, 99], [15, 5, 0]])
 input_mask = torch.LongTensor([[1, 1, 1], [1, 1, 0]])
 token_type_ids = torch.LongTensor([[0, 0, 1], [0, 1, 0]])
@@ -43,4 +44,27 @@ f.close()
 print("\r\n\r\nIR for ", model.model.__class__.__name__, " generated: ", path)
 
 print("Compiling TOSA model...")
-# tosa_ir= model.dump_tosa_ir()
+tosa_ir= model.dump_tosa_ir()
+
+print(len(tosa_ir))
+
+# f = open("bert.tosa.mlir", "w")
+# f.write(tosa_ir)
+# f.close()
+
+print("Compiling Binary...")
+
+if GPU:
+    binary = ireec.compile_str(tosa_ir,
+                    target_backends=["cuda"], 
+                    input_type=ireec.InputType.TOSA)
+    module = runtime.load_vm_flatbuffer(binary, driver="cuda")
+else:
+    binary = ireec.compile_str(tosa_ir,
+                    target_backends=["llvm-cpu"], 
+                    input_type=ireec.InputType.TOSA)
+    module = runtime.load_vm_flatbuffer(binary,backend="llvm-cpu") 
+
+ufront_ret = module.forward(input_ids, token_type_ids, input_mask).to_host()
+
+print(ufront_ret.shape)

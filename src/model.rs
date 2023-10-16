@@ -412,7 +412,7 @@ impl Model {
                                         );
                                     }
                                 }
-                                op.calculate_output();
+                                op.calculate_output(para);
                             }
                             _ => {
                                 panic! {"Not a valid input type!"};
@@ -430,7 +430,7 @@ impl Model {
                         match (x, y) {
                             (Ok(v1), Ok(v2)) => {
                                 if op.add_input(&v1).is_ok() && op.add_input(&v2).is_ok() {
-                                    op.calculate_output();
+                                    op.calculate_output(para);
                                 }
                             }
                             _ => {
@@ -486,7 +486,7 @@ impl Model {
                                                 && op.add_input(&wo).is_ok()
                                                 && op.add_input(&bo).is_ok()
                                                 {
-                                                    op.calculate_output();
+                                                    op.calculate_output(para);
                                                 }
                                             }
                                             _ => {
@@ -495,7 +495,7 @@ impl Model {
                                         }
                                     }
                                     else {
-                                        op.calculate_output();
+                                        op.calculate_output(para);
                                     }
                                 }
                             }
@@ -523,7 +523,7 @@ impl Model {
                             Some(v) => {
                                 tensor.set_ndarray_with_type(v, dtype);
                                 if op.add_input(&tensor).is_ok() {
-                                    op.calculate_output();
+                                    op.calculate_output(para);
                                 }
                             }
                             _ => {panic! {"Invalid tensor argument!"};}
@@ -546,7 +546,7 @@ impl Model {
                                 if op.add_input(&input1).is_ok()
                                     && op.add_input(&mask1).is_ok()
                                 {
-                                    op.calculate_output();
+                                    op.calculate_output(para);
                                 }
                             }
                             _ => {
@@ -574,7 +574,7 @@ impl Model {
                                                     match (ret3, ret4) {
                                                         (Ok(v3), Ok(v4)) => {
                                                             if op.add_input(&v3).is_ok() && op.add_input(&v4).is_ok() {
-                                                                op.calculate_output();
+                                                                op.calculate_output(para);
                                                             }
                                                         }
                                                         _ => {
@@ -582,7 +582,7 @@ impl Model {
                                                         }
                                                     }
                                                 } else {
-                                                    op.calculate_output();
+                                                    op.calculate_output(para);
                                                 }
                                             }
                                         }
@@ -591,7 +591,7 @@ impl Model {
                                         }
                                     }
                                 } else {
-                                    op.calculate_output();
+                                    op.calculate_output(para);
                                 }
                             }
                         }
@@ -614,7 +614,7 @@ impl Model {
                                                         match ret1 {
                                                             Ok(v1) => {
                                                                 if op.add_input(&v1).is_ok() {
-                                                                    op.calculate_output();
+                                                                    op.calculate_output(para);
                                                                 }
                                                             }
                                                             _ => {
@@ -622,7 +622,7 @@ impl Model {
                                                             }
                                                         }
                                                     } else {
-                                                        op.calculate_output();
+                                                        op.calculate_output(para);
                                                     }
                                                 }
                                             }
@@ -631,7 +631,7 @@ impl Model {
                                             }
                                         }
                                     } else {
-                                        op.calculate_output();
+                                        op.calculate_output(para);
                                     }
                                 }
                             }
@@ -640,7 +640,7 @@ impl Model {
                             }
                         }
                 } else if op_type == OpType::ARANGE { //arange has no inputs
-                    op.calculate_output();
+                    op.calculate_output(para);
                 }
 
                 Python::with_gil(|py| Py::new(py, op).unwrap())
