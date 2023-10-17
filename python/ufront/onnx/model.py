@@ -743,6 +743,8 @@ class ONNXModel(object):
             output_shape = input.shape
             output_shape = output_shape[0:axis] + output_shape[axis+1:]
             return self.umodel.slice_tensor(input=input, output_shape=list(output_shape), axis=[axis], start=[start], end=[start+1], name=node.name)
+        elif type(start) == np.ndarray and type(input) == list:
+            return [input[i] for i in list(start)]
         else:
             assert 0, "Multidimentional gather not supported!"
     
@@ -804,6 +806,9 @@ class ONNXModel(object):
         return self.handleMultiHeadAttention(node, node_to_output)  
     
     def handleself_attention(self, node, node_to_output):
+        return self.handleMultiHeadAttention(node, node_to_output) 
+    
+    def handleattention(self, node, node_to_output):
         return self.handleMultiHeadAttention(node, node_to_output) 
     
     def handleHardSigmoid(self, node, node_to_output):
@@ -905,7 +910,7 @@ class ONNXModel(object):
         self.process_initializer(self.inputs, self.model.graph.initializer)
 
         self._fusion()
-        op_fusion = ["MultiHeadDotProductAttention", "embeddings", "LayerNorm", "self_attention", "Gelu", "Dense"] if self.transformer else []
+        op_fusion = ["MultiHeadDotProductAttention", ("attention", "output/Add"), "embeddings", "LayerNorm", "self_attention", "Gelu", "Dense"] if self.transformer else []
         for f in op_fusion:
             self._fusion_layer(f)
 
@@ -993,6 +998,10 @@ class ONNXModel(object):
             flag = flag_found
 
     def _fusion_layer(self, name):
+        stop_node = None
+        if type(name) == tuple:
+            stop_node = name[1]
+            name = name[0]
         target_idx = 1
         REMOVED = []
         while True:
@@ -1001,11 +1010,17 @@ class ONNXModel(object):
             is_target = False
             matmul_weight_for_dense = None
             for node in self.model.graph.node:
-                if node.name.find("/"+name) >= 0:
+                if node.name.find("/"+name) >= 0 \
+                    and (not stop_node or name.find(stop_node) == -1): #for not standard fusion pattern
                     flag_found = True
                     if not is_target:
                         is_target = True
                         target_input = node.input
+
+                    if name == "embeddings" and node.name.find("/embedding_lookup") >= 0 and len(target_input) < 2:
+                        node.input.insert(1, target_input[0])
+                        target_input = node.input #tensorflow embedding weights
+
                     target_output = node.output
                     if name == "Dense" and node.op_type == "MatMul":
                         matmul_weight_for_dense = node.input[1:]
