@@ -440,9 +440,9 @@ class ONNXModel(object):
             if len(node.input) > 2:
                 bias = node_to_output[node.input[2]]
                 bias_op = self.umodel.parameter(np_tensor=bias, dtype=numpy_to_ufront_dtype(bias.dtype), requires_grad=True, name=node.input[2])
-                return self.umodel.dense(input=input, weight=weight_op.get_output(0), bias=bias_op.get_output(0), out_dim=dim, name=node.name)
+                return self.umodel.dense(input=input, weight=weight_op.get_output(0), bias=bias_op.get_output(0), out_dim=dim, weight_transposed=False, name=node.name)
             else:
-                return self.umodel.dense(input=input, weight=weight_op.get_output(0), out_dim=dim, name=node.name)
+                return self.umodel.dense(input=input, weight=weight_op.get_output(0), out_dim=dim, weight_transposed=False, name=node.name)
 
 
     def handleMaxPool(self, node, node_to_output):
@@ -479,6 +479,10 @@ class ONNXModel(object):
 
         return self.umodel.gelu(input=input1 if type(input1)==Tensor else input2, approximate=True, name=node.name)
     
+    def handleTanh(self, node, node_to_output):
+        input1 = node_to_output[node.input[0]]
+        return self.umodel.tanh(input=input1, name=node.name)
+
     def handlePad(self, node, node_to_output):
         input = node_to_output[node.input[0]]
         output = input
@@ -501,16 +505,31 @@ class ONNXModel(object):
         return self.umodel.reshape(input=input, shape=list(shape), name=node.name)
     
     def handleCast(self, node, node_to_output):
-        # TODO: add cast
-        input = node_to_output[node.input[0]]
-        return input
-        
-    def handleUnsqueeze(self, node, node_to_output):
-        # TODO: add unsqueeze
         input = node_to_output[node.input[0]]
         attribute = {x.name: x for x in node.attribute}
-        axes = attribute["axes"].ints
-        return input
+        if hasattr(attribute, "dtype"):
+            dtype = attribute["dtype"]
+        elif len(node.input) > 1 and type(node.input[1]) == np.dtype:
+            dtype = node.input[1]
+        else:
+            assert 0, "Invalid dtype to cast!"
+        return self.umodel.cast(input=input, dtype=numpy_to_ufront_dtype(dtype), name=node.name)
+        
+    def handleUnsqueeze(self, node, node_to_output):
+        input = node_to_output[node.input[0]]
+        attribute = {x.name: x for x in node.attribute}
+        if hasattr(attribute, "axes"):
+            axes = attribute["axes"].ints
+        elif len(node.input) > 1:
+            axes = node_to_output[node.input[1]]
+        else:
+            assert 0, "Invalid unsqueeze call!"
+
+        shape = list(input.shape)
+        shape.insert(axes, 1)
+        return self.umodel.reshape(
+            input=input, shape=list(shape), name=node.name,
+        )
 
     def unpack_rawdata(self, raw_data, data_type, shape, name):
         if len(shape) > 0:
@@ -566,23 +585,6 @@ class ONNXModel(object):
         return start
 
     def handleMatMul(self, node, node_to_output):
-        # input1 = node_to_output[node.input[0]]
-        # if node.input[1] in self.inputs:
-        #     input2 = self.inputs[node.input[1]]
-        # elif node.input[1] in node_to_output:
-        #     input2 = node_to_output[node.input[1]]
-        # else:
-        #     assert 0, "Unable to obtain input2!"
-        
-        # if type(input1) ==Tensor and type(input2) == Tensor:
-        #     if len(input1.shape) < 3 and len(input2.shape) < 3:
-        #         return self.umodel.matmul(x = input1, y=input2, name=node.name)
-        #     else:
-        #         return self.umodel.batch_matmul(x = input1, y=input2, name=node.name)
-        # else:
-        #     dim = input2.shape[1]
-        #     return self.umodel.dense(input = input1, out_dim=dim, use_bias=False, name=node.name)
-
         input1 = node_to_output[node.input[0]]
         if node.input[1] in node_to_output:
             input2 = node_to_output[node.input[1]]
@@ -767,7 +769,7 @@ class ONNXModel(object):
             weight_shape = [input_tensor.shape[-1]]
             eps=0.000001
 
-        return self.umodel.layer_norm(input=input_tensor, normalized_shape=weight_shape, 
+        return self.umodel.layer_norm(input=input_tensor, normalized_shape=list(weight_shape), 
                                   eps=eps, elementwise_affine=True, name=node.name)
     
     def handleLayerNorm(self, node, node_to_output):
@@ -794,6 +796,7 @@ class ONNXModel(object):
             num_heads=num_heads,
             dropout=dropout,
             batch_first=batch_first,
+            weight_transposed=False,
             name=node.name,
         )
 
@@ -821,6 +824,25 @@ class ONNXModel(object):
         input = node_to_output[node.input[0]]
         return self.umodel.erf(input=input, approximate=True, name=node.name)
     
+    def handleembeddings(self, node, node_to_output):
+        weight = node_to_output[node.input[0]]
+        input = node_to_output[node.input[1]]
+        num_embeddings = weight.shape[0]
+        embedding_dim = weight.shape[1]
+
+        if type(weight) != Tensor:
+            assert type(weight) == np.ndarray, "The given input is not an ndarray!"
+            weight_op = self.umodel.parameter(np_tensor=weight, dtype=numpy_to_ufront_dtype(weight.dtype), requires_grad=True, name=node.input[0])
+            weight = weight_op.get_output(0)
+        
+        return self.umodel.embedding(
+            input=input,
+            weight=weight,
+            num_embeddings=num_embeddings,
+            embedding_dim=embedding_dim,
+            name=node.name,
+        )
+        
     def process_initializer(self, inputs, initializer):
         # print("Processing initializer...")
         for item in initializer:
@@ -848,35 +870,24 @@ class ONNXModel(object):
     def apply(self, input_tensors):
         node_to_output = OrderedDict()
         inputs_nodes = []
+        if type(input_tensors) != list and type(input_tensors) != dict:
+            assert 0, "Not a valid input type!"
+
         for i in range(len(self.model.graph.input)):
             input = self.model.graph.input[i]
-            if input.name.find("input") >=0 or (i==0 and input.name.find("x") >=0):
-                if type(input_tensors) == list:
-                    input_tensor = input_tensors[i]
-                    if type(input_tensor) != Tensor:
-                        input1 = np.ones(shape=input_tensor.shape, dtype=input_tensor.dtype)
-                        input1[:] = input_tensor
-                        input_tensor = Tensor(np_tensor=input1, dtype=numpy_to_ufront_dtype(input1.dtype), name=input.name) # convert to Rust f32 tensor
-                    self.inputs[input.name] = input_tensor
-                    inputs_nodes.append(input_tensor)
-                elif type(input_tensors) == dict:
-                    input_tensor = input_tensors[input.name]
-                    if type(input_tensor) != Tensor:
-                        input1 = np.ones(shape=input_tensor.shape, dtype=input_tensor.dtype)
-                        input1[:] = input_tensor
-                        input_tensor = Tensor(np_tensor=input1, dtype=numpy_to_ufront_dtype(input1.dtype), name=input.name) # convert to Rust f32 tensor
-                    self.inputs[input.name] = input_tensor
-                    inputs_nodes.append(input_tensor)
-                else:
-                    assert 0, "Not a valid input type!"
+            if input.name.find("input") >=0 or (i==0 and input.name.find("x") >=0) or input.name.find("onnx::") >=0:
+                input_tensor = input_tensors[i] if type(input_tensors) == list else input_tensors[input.name]
+                if type(input_tensor) != Tensor:
+                    dtype=input_tensor.dtype
+                    if input_tensor.__module__ == "torch":
+                        dtype = input_tensor.numpy().dtype
+                    input1 = np.ones(shape=input_tensor.shape, dtype=dtype)
+                    input1[:] = input_tensor
+                    inputname = input.name.replace("::", "") # "::" not valid in MLIR for name
+                    input_tensor = Tensor(np_tensor=input1, dtype=numpy_to_ufront_dtype(input1.dtype), name=inputname) # convert to Rust f32 tensor
+                self.inputs[input.name] = input_tensor
+                inputs_nodes.append(input_tensor)
             elif input.name.find(".weight") < 0 and input.name.find(".bias") < 0 and input.name.find("onnx::") < 0:
-                    # item = input.type
-                    # # datatype = onnx_to_ufront_dtype(item.data_type)
-                    # # if len(item.raw_data) > 0:
-                    # #     inputs[input.name] = self.unpack_rawdata(item.raw_data, datatype, item.dims)
-                    # # else:
-                    # dims = [x.dim_value for x in item.tensor_type.shape.dim]
-                    # # print(input.name, ": ", dims)
                     self.inputs[input.name] = self.convert_to_tensor(input)
                     if input.name =="class_token" or input.name =="encoder.pos_embedding":
                         operator = self.addTensor(self.inputs[input.name].ndarray, True, input.name)
@@ -894,22 +905,12 @@ class ONNXModel(object):
         self.process_initializer(self.inputs, self.model.graph.initializer)
 
         self._fusion()
-        op_fusion = ["MultiHeadDotProductAttention", "LayerNorm", "self_attention", "Gelu", "Dense"] if self.transformer else []
+        op_fusion = ["MultiHeadDotProductAttention", "embeddings", "LayerNorm", "self_attention", "Gelu", "Dense"] if self.transformer else []
         for f in op_fusion:
             self._fusion_layer(f)
 
-        # print("\r\n")
         outputs = OrderedDict()
         
-        # self.node_value_info = OrderedDict()
-        # # print(self.model.graph.value_info)
-        # for info in self.model.graph.value_info:
-        #     self.node_value_info[info.name] = info.type
-        # for i in range(3):
-        #     item = self.model.graph.initializer[i]
-        #     print(item.dims, " ", item.data_type, " ", item.name, ": ", len(item.raw_data))
-
-
         for output in self.model.graph.output:
             outputs[output.name] = output
 
@@ -923,7 +924,6 @@ class ONNXModel(object):
             if hasattr(self, handler_name):
                 handler = getattr(self, handler_name)
                 operator = handler(node, node_to_output)
-                
                 if type(operator) == PyOperator:
                     self.operators.append(operator)
                     if node.op_type == "Split":
@@ -954,6 +954,7 @@ class ONNXModel(object):
             return self.operators[-1]
         else:
             return None
+        
     def _fusion(self):
         flag = True
         dense_idx = 1
@@ -990,12 +991,9 @@ class ONNXModel(object):
                     break
                 idx += 1
             flag = flag_found
-        
-    
 
     def _fusion_layer(self, name):
         target_idx = 1
-        
         REMOVED = []
         while True:
             idx = 0
@@ -1003,29 +1001,22 @@ class ONNXModel(object):
             is_target = False
             matmul_weight_for_dense = None
             for node in self.model.graph.node:
-     
-                if node.name.find("/"+name) > 0:
+                if node.name.find("/"+name) >= 0:
                     flag_found = True
                     if not is_target:
                         is_target = True
                         target_input = node.input
-
                     target_output = node.output
                     if name == "Dense" and node.op_type == "MatMul":
                         matmul_weight_for_dense = node.input[1:]
-                    # self.model.graph.node.remove(node)
                     node.name = "#REMOVED"
                     REMOVED.append(node)
-
                 else:
                     if is_target:
                         is_target = False
                         if name == "Dense" and matmul_weight_for_dense != None:
                             target_input.extend(list(matmul_weight_for_dense))
                             node = onnx.helper.make_node(name, inputs=target_input, outputs=target_output, name="Ext"+name+"_"+str(target_idx))
-                            # new_attr = onnx.helper.make_attribute("weight_shape", list(self.inputs[matmul_weight_for_dense].shape))
-                            # node.attribute.append(new_attr)
-                        # else:
                         node = onnx.helper.make_node(name, inputs=target_input, outputs=target_output, name="Ext"+name+"_"+str(target_idx))
 
                         self.model.graph.node.insert(idx, node)
@@ -1055,37 +1046,6 @@ class ONNXModelKeras(ONNXModel):
             else:
                 tensor = ONNXTensor(initializer.name, initializer.dims, 2)
                 self.inputs[initializer.name] = tensor
-        
-    # def handleMatMul(self, node, node_to_output):
-    #     input = node_to_output[node.input[0]]
-    #     dim = self.inputs[node.input[1]].dims[1]
-    #     return self.umodel.dense(input = input, out_dim=dim, use_bias=False, name=node.name)
-        
-    # def handleTranspose(self, node, node_to_output):
-    #     input_tensor = node_to_output[node.input[0]]
-
-    #     attribute = {x.name: x for x in node.attribute}
-    #     perms = attribute["perm"].ints
-
-    #     perms = node_to_output[node.input[1]] #TODO
-
-    #     return self.umodel.transpose(
-    #         input=input_tensor, perms=perms, name=node.name,
-    #     )
-    
-        
-    # def handleReshape(self, node, node_to_output):
-    #     input_tensor = node_to_output[node.input[0]]
-    #     shape = node_to_output[node.input[1]]
-    #     valid_shape = list(filter(lambda x: x > 0, shape))
-
-    #     for i in range(len(shape)):
-    #         if shape[i] == -1:
-    #             shape[i] = list_product(input_tensor.shape) // list_product(valid_shape)
-    #             break
-
-    #     return self.umodel.reshape(input=input_tensor, shape=list(shape), name=node.name)
-
     #TODO fix constant
     def _create_initializer_tensor(self, ffconfig, input):
         if len(input.dims) == 1:

@@ -2,9 +2,13 @@
 from ufront.pytorch.model import UFrontTorch 
 import iree.compiler as ireec
 from iree import runtime
-from torch_bert import BertModel, BertConfig
+from bert import BertModel, BertConfig
 import torch
 import time
+from ufront.onnx.model import ONNXModel, ONNXModelKeras, UFrontONNX
+from torch.onnx import TrainingMode
+import onnx
+import io
 GPU = False
 input_ids = torch.LongTensor([[31, 51, 99], [15, 5, 0]])
 input_mask = torch.LongTensor([[1, 1, 1], [1, 1, 0]])
@@ -17,7 +21,18 @@ net = BertModel(config=config)
 net.eval()
 # all_encoder_layers, pooled_output = net(input_ids, token_type_ids, input_mask)
 t1_start = time.perf_counter()
-model = UFrontTorch(net, batch_size=1, pass_weights=True) # convert torch model to ufront model
+
+f = io.BytesIO()
+model_name = net.__class__.__name__ 
+torch.onnx.export(model=net, args=(input_ids, input_mask, token_type_ids), f=f, export_params=True, #do_constant_folding=True,
+                    training=TrainingMode.EVAL if model_name=="Inception3" else TrainingMode.TRAINING, opset_version=17)
+onnx_model = onnx.load_model_from_string(f.getvalue())
+
+# transformer = True if model_name in ["MaxVit", "SwinTransformer", "VisionTransformer", "MultiHeadAttention"] else False
+model = UFrontONNX(onnx_model=onnx_model, batch_size=1, simplify=True, pass_weights=True, transformer=True)
+
+
+# model = UFrontTorch(net, batch_size=1, pass_weights=True) # convert torch model to ufront model
 #This will trigger Rust frontend for actual model conversion and graph building
 #operators can also be managed by python side (each operator here corresponding to an operator in the Rust computation graph)
 output_tensors = model(inputs = [input_ids, token_type_ids, input_mask])
@@ -30,17 +45,16 @@ output_tensors = model(inputs = [input_ids, token_type_ids, input_mask])
 model.compile(optimizer={"type":"sgd", "lr":"0.01", "momentum":"0", "nesterov":"False", "weight_decay":"0"},
                     loss='sparse_categorical_crossentropy', metrics=['accuracy', 'sparse_categorical_crossentropy'])
 
-# modelir = model.dump_ir()
+modelir = model.dump_ir()
 
 # print(modelir)
 
-# import pathlib
-# path = str(pathlib.Path(__file__).parent.resolve()) + "/output_ir/torch_" + model.model.__class__.__name__ + ".ir"
-# path = str(pathlib.Path(__file__).parent.resolve()) + "/output_ir/torch_Resnet18.ir"
+import pathlib
+path = str(pathlib.Path(__file__).parent.resolve()) + "/output_ir/onnx_BertModel.ir"
 
-# f = open(path, "w")
-# f.write(modelir)
-# f.close()
+f = open(path, "w")
+f.write(modelir)
+f.close()
 
 # print("\r\n\r\nIR for ", model.model.__class__.__name__, " generated: ", path)
 

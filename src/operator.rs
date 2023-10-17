@@ -1172,6 +1172,9 @@ impl Operator {
             if params.contains_key("batch_first") {
                 params["batch_first"] = params["batch_first"].to_lowercase();
             }
+            if params.contains_key("weight_transposed") {
+                params["weight_transposed"] = params["weight_transposed"].to_lowercase();
+            }
         } else if self.op_type == OpType::PARAMETER || self.op_type == OpType::TENSOR {
             // params.remove("dtype");
             params.remove("np_tensor");
@@ -1255,6 +1258,10 @@ impl Operator {
         } else if self.op_type == OpType::DROPOUT {
             if params.contains_key("training") {
                 params["training"] = params["training"].to_lowercase();
+            }
+        } else if self.op_type == OpType::LINEAR {
+            if params.contains_key("weight_transposed") {
+                params["weight_transposed"] = params["weight_transposed"].to_lowercase();
             }
         }
 

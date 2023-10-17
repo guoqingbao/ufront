@@ -1,0 +1,459 @@
+func.func @forward(%input.1: tensor<2x3xi64>, %input.5: tensor<2x3xi64>, %onnxUnsqueeze_2: tensor<2x3xi64>) -> tensor<2x768xf32>  { 
+	%1="ufront.reshape"(%onnxUnsqueeze_2){shape=[2, 1, 3]}:(tensor<2x3xi64>) -> tensor<2x1x3xi64>
+	%2="ufront.reshape"(%1){shape=[2, 1, 1, 3]}:(tensor<2x1x3xi64>) -> tensor<2x1x1x3xi64>
+	%3="ufront.cast"(%2){dtype="Float"}:(tensor<2x1x1x3xi64>) -> tensor<2x1x1x3xf32>
+	%4="ufront.ssub"(%3){scalar=1.0}:(tensor<2x1x1x3xf32>) -> tensor<2x1x1x3xf32>
+	%5="ufront.smultiply"(%4){scalar=-10000.0}:(tensor<2x1x1x3xf32>) -> tensor<2x1x1x3xf32>
+	%6="ufront.parameter"(){dtype="Float", initializer="0x7f4577c26010", requires_grad=true}:() -> tensor<32000x768xf32>
+	%7="ufront.embedding"(%input.1, %6){embedding_dim=768, num_embeddings=32000}:(tensor<2x3xi64>, tensor<32000x768xf32>) -> tensor<2x3x768xf32>
+	%8="ufront.parameter"(){dtype="Float", initializer="0x55c160c49f40", requires_grad=true}:() -> tensor<768x768xf32>
+	%9="ufront.linear"(%7, %8){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%10="ufront.parameter"(){dtype="Float", initializer="0x55c160a09f30", requires_grad=true}:() -> tensor<768x768xf32>
+	%11="ufront.linear"(%7, %10){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%12="ufront.parameter"(){dtype="Float", initializer="0x55c16f88a160", requires_grad=true}:() -> tensor<768x768xf32>
+	%13="ufront.linear"(%7, %12){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%14="ufront.reshape"(%9){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%15="ufront.transpose"(%14){perms=[0, 2, 1, 3]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x3x64xf32>
+	%16="ufront.reshape"(%11){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%17="ufront.reshape"(%13){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%18="ufront.transpose"(%17){perms=[0, 2, 1, 3]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x3x64xf32>
+	%19="ufront.transpose"(%16){perms=[0, 2, 3, 1]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x64x3xf32>
+	%20="ufront.batch_matmul"(%15, %19):(tensor<2x12x3x64xf32>, tensor<2x12x64x3xf32>) -> tensor<2x12x3x3xf32>
+	%21="ufront.struediv"(%20){scalar=8.0}:(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%22="ufront.add"(%21, %5):(tensor<2x12x3x3xf32>, tensor<2x1x1x3xf32>) -> tensor<2x12x3x3xf32>
+	%23="ufront.softmax"(%22):(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%24="ufront.dropout"(%23){rate=0.1, seed=0, training=false}:(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%25="ufront.batch_matmul"(%24, %18):(tensor<2x12x3x3xf32>, tensor<2x12x3x64xf32>) -> tensor<2x12x3x64xf32>
+	%26="ufront.transpose"(%25){perms=[0, 2, 1, 3]}:(tensor<2x12x3x64xf32>) -> tensor<2x3x12x64xf32>
+	%27="ufront.reshape"(%26){shape=[2, 3, 768]}:(tensor<2x3x12x64xf32>) -> tensor<2x3x768xf32>
+	%28="ufront.parameter"(){dtype="Float", initializer="0x55c16fd0a180", requires_grad=true}:() -> tensor<768x768xf32>
+	%29="ufront.linear"(%27, %28){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%30="ufront.dropout"(%29){rate=0.1, seed=0, training=false}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%31="ufront.add"(%30, %7):(tensor<2x3x768xf32>, tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%32="ufront.layer_norm"(%31){elementwise_affine=true, eps=0.000001, normalized_shape=[768], operand_segment_sizes=array<i32:1, 0, 0>}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%33="ufront.parameter"(){dtype="Float", initializer="0x55c172c4a1c0", requires_grad=true}:() -> tensor<768x3072xf32>
+	%34="ufront.linear"(%32, %33){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x3072xf32>) -> tensor<2x3x3072xf32>
+	%35="ufront.smultiply"(%34){scalar=0.5}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%36="ufront.struediv"(%34){scalar=1.4142135}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%37="ufront.erf"(%36){approximate=true}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%38="ufront.sadd"(%37){scalar=0.0001}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%39="ufront.multiply"(%35, %38):(tensor<2x3x3072xf32>, tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%40="ufront.parameter"(){dtype="Float", initializer="0x55c17600a220", requires_grad=true}:() -> tensor<3072x768xf32>
+	%41="ufront.linear"(%39, %40){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x3072xf32>, tensor<3072x768xf32>) -> tensor<2x3x768xf32>
+	%42="ufront.dropout"(%41){rate=0.1, seed=0, training=false}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%43="ufront.add"(%42, %32):(tensor<2x3x768xf32>, tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%44="ufront.layer_norm"(%43){elementwise_affine=true, eps=0.000001, normalized_shape=[768], operand_segment_sizes=array<i32:1, 0, 0>}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%45="ufront.parameter"(){dtype="Float", initializer="0x55c17018a1a0", requires_grad=true}:() -> tensor<768x768xf32>
+	%46="ufront.linear"(%44, %45){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%47="ufront.parameter"(){dtype="Float", initializer="0x55c17354a1d0", requires_grad=true}:() -> tensor<768x768xf32>
+	%48="ufront.linear"(%44, %47){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%49="ufront.parameter"(){dtype="Float", initializer="0x55c17720a240", requires_grad=true}:() -> tensor<768x768xf32>
+	%50="ufront.linear"(%44, %49){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%51="ufront.reshape"(%46){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%52="ufront.transpose"(%51){perms=[0, 2, 1, 3]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x3x64xf32>
+	%53="ufront.reshape"(%48){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%54="ufront.reshape"(%50){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%55="ufront.transpose"(%54){perms=[0, 2, 1, 3]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x3x64xf32>
+	%56="ufront.transpose"(%53){perms=[0, 2, 3, 1]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x64x3xf32>
+	%57="ufront.batch_matmul"(%52, %56):(tensor<2x12x3x64xf32>, tensor<2x12x64x3xf32>) -> tensor<2x12x3x3xf32>
+	%58="ufront.struediv"(%57){scalar=8.0}:(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%59="ufront.add"(%58, %5):(tensor<2x12x3x3xf32>, tensor<2x1x1x3xf32>) -> tensor<2x12x3x3xf32>
+	%60="ufront.softmax"(%59):(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%61="ufront.dropout"(%60){rate=0.1, seed=0, training=false}:(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%62="ufront.batch_matmul"(%61, %55):(tensor<2x12x3x3xf32>, tensor<2x12x3x64xf32>) -> tensor<2x12x3x64xf32>
+	%63="ufront.transpose"(%62){perms=[0, 2, 1, 3]}:(tensor<2x12x3x64xf32>) -> tensor<2x3x12x64xf32>
+	%64="ufront.reshape"(%63){shape=[2, 3, 768]}:(tensor<2x3x12x64xf32>) -> tensor<2x3x768xf32>
+	%65="ufront.parameter"(){dtype="Float", initializer="0x55c17768a260", requires_grad=true}:() -> tensor<768x768xf32>
+	%66="ufront.linear"(%64, %65){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%67="ufront.dropout"(%66){rate=0.1, seed=0, training=false}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%68="ufront.add"(%67, %44):(tensor<2x3x768xf32>, tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%69="ufront.layer_norm"(%68){elementwise_affine=true, eps=0.000001, normalized_shape=[768], operand_segment_sizes=array<i32:1, 0, 0>}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%70="ufront.parameter"(){dtype="Float", initializer="0x55c178aca290", requires_grad=true}:() -> tensor<768x3072xf32>
+	%71="ufront.linear"(%69, %70){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x3072xf32>) -> tensor<2x3x3072xf32>
+	%72="ufront.smultiply"(%71){scalar=0.5}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%73="ufront.struediv"(%71){scalar=1.4142135}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%74="ufront.erf"(%73){approximate=true}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%75="ufront.sadd"(%74){scalar=0.0001}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%76="ufront.multiply"(%72, %75):(tensor<2x3x3072xf32>, tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%77="ufront.parameter"(){dtype="Float", initializer="0x55c1793ca2a0", requires_grad=true}:() -> tensor<3072x768xf32>
+	%78="ufront.linear"(%76, %77){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x3072xf32>, tensor<3072x768xf32>) -> tensor<2x3x768xf32>
+	%79="ufront.dropout"(%78){rate=0.1, seed=0, training=false}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%80="ufront.add"(%79, %69):(tensor<2x3x768xf32>, tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%81="ufront.layer_norm"(%80){elementwise_affine=true, eps=0.000001, normalized_shape=[768], operand_segment_sizes=array<i32:1, 0, 0>}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%82="ufront.parameter"(){dtype="Float", initializer="0x55c17864a270", requires_grad=true}:() -> tensor<768x768xf32>
+	%83="ufront.linear"(%81, %82){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%84="ufront.parameter"(){dtype="Float", initializer="0x55c17a5ca2c0", requires_grad=true}:() -> tensor<768x768xf32>
+	%85="ufront.linear"(%81, %84){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%86="ufront.parameter"(){dtype="Float", initializer="0x55c17aa4a2e0", requires_grad=true}:() -> tensor<768x768xf32>
+	%87="ufront.linear"(%81, %86){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%88="ufront.reshape"(%83){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%89="ufront.transpose"(%88){perms=[0, 2, 1, 3]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x3x64xf32>
+	%90="ufront.reshape"(%85){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%91="ufront.reshape"(%87){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%92="ufront.transpose"(%91){perms=[0, 2, 1, 3]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x3x64xf32>
+	%93="ufront.transpose"(%90){perms=[0, 2, 3, 1]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x64x3xf32>
+	%94="ufront.batch_matmul"(%89, %93):(tensor<2x12x3x64xf32>, tensor<2x12x64x3xf32>) -> tensor<2x12x3x3xf32>
+	%95="ufront.struediv"(%94){scalar=8.0}:(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%96="ufront.add"(%95, %5):(tensor<2x12x3x3xf32>, tensor<2x1x1x3xf32>) -> tensor<2x12x3x3xf32>
+	%97="ufront.softmax"(%96):(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%98="ufront.dropout"(%97){rate=0.1, seed=0, training=false}:(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%99="ufront.batch_matmul"(%98, %92):(tensor<2x12x3x3xf32>, tensor<2x12x3x64xf32>) -> tensor<2x12x3x64xf32>
+	%100="ufront.transpose"(%99){perms=[0, 2, 1, 3]}:(tensor<2x12x3x64xf32>) -> tensor<2x3x12x64xf32>
+	%101="ufront.reshape"(%100){shape=[2, 3, 768]}:(tensor<2x3x12x64xf32>) -> tensor<2x3x768xf32>
+	%102="ufront.parameter"(){dtype="Float", initializer="0x55c17ba0a2f0", requires_grad=true}:() -> tensor<768x768xf32>
+	%103="ufront.linear"(%101, %102){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%104="ufront.dropout"(%103){rate=0.1, seed=0, training=false}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%105="ufront.add"(%104, %81):(tensor<2x3x768xf32>, tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%106="ufront.layer_norm"(%105){elementwise_affine=true, eps=0.000001, normalized_shape=[768], operand_segment_sizes=array<i32:1, 0, 0>}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%107="ufront.parameter"(){dtype="Float", initializer="0x55c17c30a330", requires_grad=true}:() -> tensor<768x3072xf32>
+	%108="ufront.linear"(%106, %107){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x3072xf32>) -> tensor<2x3x3072xf32>
+	%109="ufront.smultiply"(%108){scalar=0.5}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%110="ufront.struediv"(%108){scalar=1.4142135}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%111="ufront.erf"(%110){approximate=true}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%112="ufront.sadd"(%111){scalar=0.0001}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%113="ufront.multiply"(%109, %112):(tensor<2x3x3072xf32>, tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%114="ufront.parameter"(){dtype="Float", initializer="0x55c17cc0a340", requires_grad=true}:() -> tensor<3072x768xf32>
+	%115="ufront.linear"(%113, %114){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x3072xf32>, tensor<3072x768xf32>) -> tensor<2x3x768xf32>
+	%116="ufront.dropout"(%115){rate=0.1, seed=0, training=false}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%117="ufront.add"(%116, %106):(tensor<2x3x768xf32>, tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%118="ufront.layer_norm"(%117){elementwise_affine=true, eps=0.000001, normalized_shape=[768], operand_segment_sizes=array<i32:1, 0, 0>}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%119="ufront.parameter"(){dtype="Float", initializer="0x55c17be8a310", requires_grad=true}:() -> tensor<768x768xf32>
+	%120="ufront.linear"(%118, %119){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%121="ufront.parameter"(){dtype="Float", initializer="0x55c17de0a360", requires_grad=true}:() -> tensor<768x768xf32>
+	%122="ufront.linear"(%118, %121){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%123="ufront.parameter"(){dtype="Float", initializer="0x55c17e28a380", requires_grad=true}:() -> tensor<768x768xf32>
+	%124="ufront.linear"(%118, %123){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%125="ufront.reshape"(%120){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%126="ufront.transpose"(%125){perms=[0, 2, 1, 3]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x3x64xf32>
+	%127="ufront.reshape"(%122){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%128="ufront.reshape"(%124){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%129="ufront.transpose"(%128){perms=[0, 2, 1, 3]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x3x64xf32>
+	%130="ufront.transpose"(%127){perms=[0, 2, 3, 1]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x64x3xf32>
+	%131="ufront.batch_matmul"(%126, %130):(tensor<2x12x3x64xf32>, tensor<2x12x64x3xf32>) -> tensor<2x12x3x3xf32>
+	%132="ufront.struediv"(%131){scalar=8.0}:(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%133="ufront.add"(%132, %5):(tensor<2x12x3x3xf32>, tensor<2x1x1x3xf32>) -> tensor<2x12x3x3xf32>
+	%134="ufront.softmax"(%133):(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%135="ufront.dropout"(%134){rate=0.1, seed=0, training=false}:(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%136="ufront.batch_matmul"(%135, %129):(tensor<2x12x3x3xf32>, tensor<2x12x3x64xf32>) -> tensor<2x12x3x64xf32>
+	%137="ufront.transpose"(%136){perms=[0, 2, 1, 3]}:(tensor<2x12x3x64xf32>) -> tensor<2x3x12x64xf32>
+	%138="ufront.reshape"(%137){shape=[2, 3, 768]}:(tensor<2x3x12x64xf32>) -> tensor<2x3x768xf32>
+	%139="ufront.parameter"(){dtype="Float", initializer="0x55c17f24a390", requires_grad=true}:() -> tensor<768x768xf32>
+	%140="ufront.linear"(%138, %139){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%141="ufront.dropout"(%140){rate=0.1, seed=0, training=false}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%142="ufront.add"(%141, %118):(tensor<2x3x768xf32>, tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%143="ufront.layer_norm"(%142){elementwise_affine=true, eps=0.000001, normalized_shape=[768], operand_segment_sizes=array<i32:1, 0, 0>}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%144="ufront.parameter"(){dtype="Float", initializer="0x55c17fb4a3d0", requires_grad=true}:() -> tensor<768x3072xf32>
+	%145="ufront.linear"(%143, %144){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x3072xf32>) -> tensor<2x3x3072xf32>
+	%146="ufront.smultiply"(%145){scalar=0.5}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%147="ufront.struediv"(%145){scalar=1.4142135}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%148="ufront.erf"(%147){approximate=true}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%149="ufront.sadd"(%148){scalar=0.0001}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%150="ufront.multiply"(%146, %149):(tensor<2x3x3072xf32>, tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%151="ufront.parameter"(){dtype="Float", initializer="0x55c18044a3e0", requires_grad=true}:() -> tensor<3072x768xf32>
+	%152="ufront.linear"(%150, %151){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x3072xf32>, tensor<3072x768xf32>) -> tensor<2x3x768xf32>
+	%153="ufront.dropout"(%152){rate=0.1, seed=0, training=false}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%154="ufront.add"(%153, %143):(tensor<2x3x768xf32>, tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%155="ufront.layer_norm"(%154){elementwise_affine=true, eps=0.000001, normalized_shape=[768], operand_segment_sizes=array<i32:1, 0, 0>}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%156="ufront.parameter"(){dtype="Float", initializer="0x55c17f6ca3b0", requires_grad=true}:() -> tensor<768x768xf32>
+	%157="ufront.linear"(%155, %156){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%158="ufront.parameter"(){dtype="Float", initializer="0x55c18164a400", requires_grad=true}:() -> tensor<768x768xf32>
+	%159="ufront.linear"(%155, %158){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%160="ufront.parameter"(){dtype="Float", initializer="0x55c181aca420", requires_grad=true}:() -> tensor<768x768xf32>
+	%161="ufront.linear"(%155, %160){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%162="ufront.reshape"(%157){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%163="ufront.transpose"(%162){perms=[0, 2, 1, 3]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x3x64xf32>
+	%164="ufront.reshape"(%159){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%165="ufront.reshape"(%161){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%166="ufront.transpose"(%165){perms=[0, 2, 1, 3]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x3x64xf32>
+	%167="ufront.transpose"(%164){perms=[0, 2, 3, 1]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x64x3xf32>
+	%168="ufront.batch_matmul"(%163, %167):(tensor<2x12x3x64xf32>, tensor<2x12x64x3xf32>) -> tensor<2x12x3x3xf32>
+	%169="ufront.struediv"(%168){scalar=8.0}:(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%170="ufront.add"(%169, %5):(tensor<2x12x3x3xf32>, tensor<2x1x1x3xf32>) -> tensor<2x12x3x3xf32>
+	%171="ufront.softmax"(%170):(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%172="ufront.dropout"(%171){rate=0.1, seed=0, training=false}:(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%173="ufront.batch_matmul"(%172, %166):(tensor<2x12x3x3xf32>, tensor<2x12x3x64xf32>) -> tensor<2x12x3x64xf32>
+	%174="ufront.transpose"(%173){perms=[0, 2, 1, 3]}:(tensor<2x12x3x64xf32>) -> tensor<2x3x12x64xf32>
+	%175="ufront.reshape"(%174){shape=[2, 3, 768]}:(tensor<2x3x12x64xf32>) -> tensor<2x3x768xf32>
+	%176="ufront.parameter"(){dtype="Float", initializer="0x55c182a8a430", requires_grad=true}:() -> tensor<768x768xf32>
+	%177="ufront.linear"(%175, %176){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%178="ufront.dropout"(%177){rate=0.1, seed=0, training=false}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%179="ufront.add"(%178, %155):(tensor<2x3x768xf32>, tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%180="ufront.layer_norm"(%179){elementwise_affine=true, eps=0.000001, normalized_shape=[768], operand_segment_sizes=array<i32:1, 0, 0>}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%181="ufront.parameter"(){dtype="Float", initializer="0x55c18338a470", requires_grad=true}:() -> tensor<768x3072xf32>
+	%182="ufront.linear"(%180, %181){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x3072xf32>) -> tensor<2x3x3072xf32>
+	%183="ufront.smultiply"(%182){scalar=0.5}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%184="ufront.struediv"(%182){scalar=1.4142135}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%185="ufront.erf"(%184){approximate=true}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%186="ufront.sadd"(%185){scalar=0.0001}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%187="ufront.multiply"(%183, %186):(tensor<2x3x3072xf32>, tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%188="ufront.parameter"(){dtype="Float", initializer="0x55c183c8a480", requires_grad=true}:() -> tensor<3072x768xf32>
+	%189="ufront.linear"(%187, %188){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x3072xf32>, tensor<3072x768xf32>) -> tensor<2x3x768xf32>
+	%190="ufront.dropout"(%189){rate=0.1, seed=0, training=false}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%191="ufront.add"(%190, %180):(tensor<2x3x768xf32>, tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%192="ufront.layer_norm"(%191){elementwise_affine=true, eps=0.000001, normalized_shape=[768], operand_segment_sizes=array<i32:1, 0, 0>}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%193="ufront.parameter"(){dtype="Float", initializer="0x55c182f0a450", requires_grad=true}:() -> tensor<768x768xf32>
+	%194="ufront.linear"(%192, %193){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%195="ufront.parameter"(){dtype="Float", initializer="0x55c184e8a4a0", requires_grad=true}:() -> tensor<768x768xf32>
+	%196="ufront.linear"(%192, %195){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%197="ufront.parameter"(){dtype="Float", initializer="0x55c18530a4c0", requires_grad=true}:() -> tensor<768x768xf32>
+	%198="ufront.linear"(%192, %197){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%199="ufront.reshape"(%194){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%200="ufront.transpose"(%199){perms=[0, 2, 1, 3]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x3x64xf32>
+	%201="ufront.reshape"(%196){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%202="ufront.reshape"(%198){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%203="ufront.transpose"(%202){perms=[0, 2, 1, 3]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x3x64xf32>
+	%204="ufront.transpose"(%201){perms=[0, 2, 3, 1]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x64x3xf32>
+	%205="ufront.batch_matmul"(%200, %204):(tensor<2x12x3x64xf32>, tensor<2x12x64x3xf32>) -> tensor<2x12x3x3xf32>
+	%206="ufront.struediv"(%205){scalar=8.0}:(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%207="ufront.add"(%206, %5):(tensor<2x12x3x3xf32>, tensor<2x1x1x3xf32>) -> tensor<2x12x3x3xf32>
+	%208="ufront.softmax"(%207):(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%209="ufront.dropout"(%208){rate=0.1, seed=0, training=false}:(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%210="ufront.batch_matmul"(%209, %203):(tensor<2x12x3x3xf32>, tensor<2x12x3x64xf32>) -> tensor<2x12x3x64xf32>
+	%211="ufront.transpose"(%210){perms=[0, 2, 1, 3]}:(tensor<2x12x3x64xf32>) -> tensor<2x3x12x64xf32>
+	%212="ufront.reshape"(%211){shape=[2, 3, 768]}:(tensor<2x3x12x64xf32>) -> tensor<2x3x768xf32>
+	%213="ufront.parameter"(){dtype="Float", initializer="0x55c1862ca4d0", requires_grad=true}:() -> tensor<768x768xf32>
+	%214="ufront.linear"(%212, %213){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%215="ufront.dropout"(%214){rate=0.1, seed=0, training=false}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%216="ufront.add"(%215, %192):(tensor<2x3x768xf32>, tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%217="ufront.layer_norm"(%216){elementwise_affine=true, eps=0.000001, normalized_shape=[768], operand_segment_sizes=array<i32:1, 0, 0>}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%218="ufront.parameter"(){dtype="Float", initializer="0x55c186bca510", requires_grad=true}:() -> tensor<768x3072xf32>
+	%219="ufront.linear"(%217, %218){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x3072xf32>) -> tensor<2x3x3072xf32>
+	%220="ufront.smultiply"(%219){scalar=0.5}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%221="ufront.struediv"(%219){scalar=1.4142135}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%222="ufront.erf"(%221){approximate=true}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%223="ufront.sadd"(%222){scalar=0.0001}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%224="ufront.multiply"(%220, %223):(tensor<2x3x3072xf32>, tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%225="ufront.parameter"(){dtype="Float", initializer="0x55c1874ca520", requires_grad=true}:() -> tensor<3072x768xf32>
+	%226="ufront.linear"(%224, %225){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x3072xf32>, tensor<3072x768xf32>) -> tensor<2x3x768xf32>
+	%227="ufront.dropout"(%226){rate=0.1, seed=0, training=false}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%228="ufront.add"(%227, %217):(tensor<2x3x768xf32>, tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%229="ufront.layer_norm"(%228){elementwise_affine=true, eps=0.000001, normalized_shape=[768], operand_segment_sizes=array<i32:1, 0, 0>}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%230="ufront.parameter"(){dtype="Float", initializer="0x55c18674a4f0", requires_grad=true}:() -> tensor<768x768xf32>
+	%231="ufront.linear"(%229, %230){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%232="ufront.parameter"(){dtype="Float", initializer="0x55c1886ca540", requires_grad=true}:() -> tensor<768x768xf32>
+	%233="ufront.linear"(%229, %232){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%234="ufront.parameter"(){dtype="Float", initializer="0x55c188b4a560", requires_grad=true}:() -> tensor<768x768xf32>
+	%235="ufront.linear"(%229, %234){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%236="ufront.reshape"(%231){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%237="ufront.transpose"(%236){perms=[0, 2, 1, 3]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x3x64xf32>
+	%238="ufront.reshape"(%233){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%239="ufront.reshape"(%235){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%240="ufront.transpose"(%239){perms=[0, 2, 1, 3]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x3x64xf32>
+	%241="ufront.transpose"(%238){perms=[0, 2, 3, 1]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x64x3xf32>
+	%242="ufront.batch_matmul"(%237, %241):(tensor<2x12x3x64xf32>, tensor<2x12x64x3xf32>) -> tensor<2x12x3x3xf32>
+	%243="ufront.struediv"(%242){scalar=8.0}:(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%244="ufront.add"(%243, %5):(tensor<2x12x3x3xf32>, tensor<2x1x1x3xf32>) -> tensor<2x12x3x3xf32>
+	%245="ufront.softmax"(%244):(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%246="ufront.dropout"(%245){rate=0.1, seed=0, training=false}:(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%247="ufront.batch_matmul"(%246, %240):(tensor<2x12x3x3xf32>, tensor<2x12x3x64xf32>) -> tensor<2x12x3x64xf32>
+	%248="ufront.transpose"(%247){perms=[0, 2, 1, 3]}:(tensor<2x12x3x64xf32>) -> tensor<2x3x12x64xf32>
+	%249="ufront.reshape"(%248){shape=[2, 3, 768]}:(tensor<2x3x12x64xf32>) -> tensor<2x3x768xf32>
+	%250="ufront.parameter"(){dtype="Float", initializer="0x55c189b0a570", requires_grad=true}:() -> tensor<768x768xf32>
+	%251="ufront.linear"(%249, %250){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%252="ufront.dropout"(%251){rate=0.1, seed=0, training=false}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%253="ufront.add"(%252, %229):(tensor<2x3x768xf32>, tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%254="ufront.layer_norm"(%253){elementwise_affine=true, eps=0.000001, normalized_shape=[768], operand_segment_sizes=array<i32:1, 0, 0>}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%255="ufront.parameter"(){dtype="Float", initializer="0x55c18a40a5b0", requires_grad=true}:() -> tensor<768x3072xf32>
+	%256="ufront.linear"(%254, %255){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x3072xf32>) -> tensor<2x3x3072xf32>
+	%257="ufront.smultiply"(%256){scalar=0.5}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%258="ufront.struediv"(%256){scalar=1.4142135}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%259="ufront.erf"(%258){approximate=true}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%260="ufront.sadd"(%259){scalar=0.0001}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%261="ufront.multiply"(%257, %260):(tensor<2x3x3072xf32>, tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%262="ufront.parameter"(){dtype="Float", initializer="0x55c18ad0a5c0", requires_grad=true}:() -> tensor<3072x768xf32>
+	%263="ufront.linear"(%261, %262){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x3072xf32>, tensor<3072x768xf32>) -> tensor<2x3x768xf32>
+	%264="ufront.dropout"(%263){rate=0.1, seed=0, training=false}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%265="ufront.add"(%264, %254):(tensor<2x3x768xf32>, tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%266="ufront.layer_norm"(%265){elementwise_affine=true, eps=0.000001, normalized_shape=[768], operand_segment_sizes=array<i32:1, 0, 0>}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%267="ufront.parameter"(){dtype="Float", initializer="0x55c189f8a590", requires_grad=true}:() -> tensor<768x768xf32>
+	%268="ufront.linear"(%266, %267){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%269="ufront.parameter"(){dtype="Float", initializer="0x55c18bf0a5e0", requires_grad=true}:() -> tensor<768x768xf32>
+	%270="ufront.linear"(%266, %269){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%271="ufront.parameter"(){dtype="Float", initializer="0x55c18c38a600", requires_grad=true}:() -> tensor<768x768xf32>
+	%272="ufront.linear"(%266, %271){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%273="ufront.reshape"(%268){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%274="ufront.transpose"(%273){perms=[0, 2, 1, 3]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x3x64xf32>
+	%275="ufront.reshape"(%270){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%276="ufront.reshape"(%272){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%277="ufront.transpose"(%276){perms=[0, 2, 1, 3]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x3x64xf32>
+	%278="ufront.transpose"(%275){perms=[0, 2, 3, 1]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x64x3xf32>
+	%279="ufront.batch_matmul"(%274, %278):(tensor<2x12x3x64xf32>, tensor<2x12x64x3xf32>) -> tensor<2x12x3x3xf32>
+	%280="ufront.struediv"(%279){scalar=8.0}:(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%281="ufront.add"(%280, %5):(tensor<2x12x3x3xf32>, tensor<2x1x1x3xf32>) -> tensor<2x12x3x3xf32>
+	%282="ufront.softmax"(%281):(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%283="ufront.dropout"(%282){rate=0.1, seed=0, training=false}:(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%284="ufront.batch_matmul"(%283, %277):(tensor<2x12x3x3xf32>, tensor<2x12x3x64xf32>) -> tensor<2x12x3x64xf32>
+	%285="ufront.transpose"(%284){perms=[0, 2, 1, 3]}:(tensor<2x12x3x64xf32>) -> tensor<2x3x12x64xf32>
+	%286="ufront.reshape"(%285){shape=[2, 3, 768]}:(tensor<2x3x12x64xf32>) -> tensor<2x3x768xf32>
+	%287="ufront.parameter"(){dtype="Float", initializer="0x55c18d34a610", requires_grad=true}:() -> tensor<768x768xf32>
+	%288="ufront.linear"(%286, %287){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%289="ufront.dropout"(%288){rate=0.1, seed=0, training=false}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%290="ufront.add"(%289, %266):(tensor<2x3x768xf32>, tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%291="ufront.layer_norm"(%290){elementwise_affine=true, eps=0.000001, normalized_shape=[768], operand_segment_sizes=array<i32:1, 0, 0>}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%292="ufront.parameter"(){dtype="Float", initializer="0x55c18dc4a650", requires_grad=true}:() -> tensor<768x3072xf32>
+	%293="ufront.linear"(%291, %292){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x3072xf32>) -> tensor<2x3x3072xf32>
+	%294="ufront.smultiply"(%293){scalar=0.5}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%295="ufront.struediv"(%293){scalar=1.4142135}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%296="ufront.erf"(%295){approximate=true}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%297="ufront.sadd"(%296){scalar=0.0001}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%298="ufront.multiply"(%294, %297):(tensor<2x3x3072xf32>, tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%299="ufront.parameter"(){dtype="Float", initializer="0x55c18e54a660", requires_grad=true}:() -> tensor<3072x768xf32>
+	%300="ufront.linear"(%298, %299){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x3072xf32>, tensor<3072x768xf32>) -> tensor<2x3x768xf32>
+	%301="ufront.dropout"(%300){rate=0.1, seed=0, training=false}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%302="ufront.add"(%301, %291):(tensor<2x3x768xf32>, tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%303="ufront.layer_norm"(%302){elementwise_affine=true, eps=0.000001, normalized_shape=[768], operand_segment_sizes=array<i32:1, 0, 0>}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%304="ufront.parameter"(){dtype="Float", initializer="0x55c18d7ca630", requires_grad=true}:() -> tensor<768x768xf32>
+	%305="ufront.linear"(%303, %304){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%306="ufront.parameter"(){dtype="Float", initializer="0x55c18f74a680", requires_grad=true}:() -> tensor<768x768xf32>
+	%307="ufront.linear"(%303, %306){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%308="ufront.parameter"(){dtype="Float", initializer="0x55c18fbca6a0", requires_grad=true}:() -> tensor<768x768xf32>
+	%309="ufront.linear"(%303, %308){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%310="ufront.reshape"(%305){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%311="ufront.transpose"(%310){perms=[0, 2, 1, 3]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x3x64xf32>
+	%312="ufront.reshape"(%307){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%313="ufront.reshape"(%309){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%314="ufront.transpose"(%313){perms=[0, 2, 1, 3]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x3x64xf32>
+	%315="ufront.transpose"(%312){perms=[0, 2, 3, 1]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x64x3xf32>
+	%316="ufront.batch_matmul"(%311, %315):(tensor<2x12x3x64xf32>, tensor<2x12x64x3xf32>) -> tensor<2x12x3x3xf32>
+	%317="ufront.struediv"(%316){scalar=8.0}:(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%318="ufront.add"(%317, %5):(tensor<2x12x3x3xf32>, tensor<2x1x1x3xf32>) -> tensor<2x12x3x3xf32>
+	%319="ufront.softmax"(%318):(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%320="ufront.dropout"(%319){rate=0.1, seed=0, training=false}:(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%321="ufront.batch_matmul"(%320, %314):(tensor<2x12x3x3xf32>, tensor<2x12x3x64xf32>) -> tensor<2x12x3x64xf32>
+	%322="ufront.transpose"(%321){perms=[0, 2, 1, 3]}:(tensor<2x12x3x64xf32>) -> tensor<2x3x12x64xf32>
+	%323="ufront.reshape"(%322){shape=[2, 3, 768]}:(tensor<2x3x12x64xf32>) -> tensor<2x3x768xf32>
+	%324="ufront.parameter"(){dtype="Float", initializer="0x55c190b8a6b0", requires_grad=true}:() -> tensor<768x768xf32>
+	%325="ufront.linear"(%323, %324){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%326="ufront.dropout"(%325){rate=0.1, seed=0, training=false}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%327="ufront.add"(%326, %303):(tensor<2x3x768xf32>, tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%328="ufront.layer_norm"(%327){elementwise_affine=true, eps=0.000001, normalized_shape=[768], operand_segment_sizes=array<i32:1, 0, 0>}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%329="ufront.parameter"(){dtype="Float", initializer="0x55c19148a6f0", requires_grad=true}:() -> tensor<768x3072xf32>
+	%330="ufront.linear"(%328, %329){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x3072xf32>) -> tensor<2x3x3072xf32>
+	%331="ufront.smultiply"(%330){scalar=0.5}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%332="ufront.struediv"(%330){scalar=1.4142135}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%333="ufront.erf"(%332){approximate=true}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%334="ufront.sadd"(%333){scalar=0.0001}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%335="ufront.multiply"(%331, %334):(tensor<2x3x3072xf32>, tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%336="ufront.parameter"(){dtype="Float", initializer="0x55c191d8a700", requires_grad=true}:() -> tensor<3072x768xf32>
+	%337="ufront.linear"(%335, %336){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x3072xf32>, tensor<3072x768xf32>) -> tensor<2x3x768xf32>
+	%338="ufront.dropout"(%337){rate=0.1, seed=0, training=false}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%339="ufront.add"(%338, %328):(tensor<2x3x768xf32>, tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%340="ufront.layer_norm"(%339){elementwise_affine=true, eps=0.000001, normalized_shape=[768], operand_segment_sizes=array<i32:1, 0, 0>}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%341="ufront.parameter"(){dtype="Float", initializer="0x55c19100a6d0", requires_grad=true}:() -> tensor<768x768xf32>
+	%342="ufront.linear"(%340, %341){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%343="ufront.parameter"(){dtype="Float", initializer="0x55c192f8a720", requires_grad=true}:() -> tensor<768x768xf32>
+	%344="ufront.linear"(%340, %343){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%345="ufront.parameter"(){dtype="Float", initializer="0x55c19340a740", requires_grad=true}:() -> tensor<768x768xf32>
+	%346="ufront.linear"(%340, %345){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%347="ufront.reshape"(%342){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%348="ufront.transpose"(%347){perms=[0, 2, 1, 3]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x3x64xf32>
+	%349="ufront.reshape"(%344){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%350="ufront.reshape"(%346){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%351="ufront.transpose"(%350){perms=[0, 2, 1, 3]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x3x64xf32>
+	%352="ufront.transpose"(%349){perms=[0, 2, 3, 1]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x64x3xf32>
+	%353="ufront.batch_matmul"(%348, %352):(tensor<2x12x3x64xf32>, tensor<2x12x64x3xf32>) -> tensor<2x12x3x3xf32>
+	%354="ufront.struediv"(%353){scalar=8.0}:(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%355="ufront.add"(%354, %5):(tensor<2x12x3x3xf32>, tensor<2x1x1x3xf32>) -> tensor<2x12x3x3xf32>
+	%356="ufront.softmax"(%355):(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%357="ufront.dropout"(%356){rate=0.1, seed=0, training=false}:(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%358="ufront.batch_matmul"(%357, %351):(tensor<2x12x3x3xf32>, tensor<2x12x3x64xf32>) -> tensor<2x12x3x64xf32>
+	%359="ufront.transpose"(%358){perms=[0, 2, 1, 3]}:(tensor<2x12x3x64xf32>) -> tensor<2x3x12x64xf32>
+	%360="ufront.reshape"(%359){shape=[2, 3, 768]}:(tensor<2x3x12x64xf32>) -> tensor<2x3x768xf32>
+	%361="ufront.parameter"(){dtype="Float", initializer="0x55c1943ca750", requires_grad=true}:() -> tensor<768x768xf32>
+	%362="ufront.linear"(%360, %361){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%363="ufront.dropout"(%362){rate=0.1, seed=0, training=false}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%364="ufront.add"(%363, %340):(tensor<2x3x768xf32>, tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%365="ufront.layer_norm"(%364){elementwise_affine=true, eps=0.000001, normalized_shape=[768], operand_segment_sizes=array<i32:1, 0, 0>}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%366="ufront.parameter"(){dtype="Float", initializer="0x55c194cca790", requires_grad=true}:() -> tensor<768x3072xf32>
+	%367="ufront.linear"(%365, %366){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x3072xf32>) -> tensor<2x3x3072xf32>
+	%368="ufront.smultiply"(%367){scalar=0.5}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%369="ufront.struediv"(%367){scalar=1.4142135}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%370="ufront.erf"(%369){approximate=true}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%371="ufront.sadd"(%370){scalar=0.0001}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%372="ufront.multiply"(%368, %371):(tensor<2x3x3072xf32>, tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%373="ufront.parameter"(){dtype="Float", initializer="0x55c1955ca7a0", requires_grad=true}:() -> tensor<3072x768xf32>
+	%374="ufront.linear"(%372, %373){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x3072xf32>, tensor<3072x768xf32>) -> tensor<2x3x768xf32>
+	%375="ufront.dropout"(%374){rate=0.1, seed=0, training=false}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%376="ufront.add"(%375, %365):(tensor<2x3x768xf32>, tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%377="ufront.layer_norm"(%376){elementwise_affine=true, eps=0.000001, normalized_shape=[768], operand_segment_sizes=array<i32:1, 0, 0>}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%378="ufront.parameter"(){dtype="Float", initializer="0x55c19484a770", requires_grad=true}:() -> tensor<768x768xf32>
+	%379="ufront.linear"(%377, %378){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%380="ufront.parameter"(){dtype="Float", initializer="0x55c1967ca7c0", requires_grad=true}:() -> tensor<768x768xf32>
+	%381="ufront.linear"(%377, %380){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%382="ufront.parameter"(){dtype="Float", initializer="0x55c196c4a7e0", requires_grad=true}:() -> tensor<768x768xf32>
+	%383="ufront.linear"(%377, %382){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%384="ufront.reshape"(%379){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%385="ufront.transpose"(%384){perms=[0, 2, 1, 3]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x3x64xf32>
+	%386="ufront.reshape"(%381){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%387="ufront.reshape"(%383){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%388="ufront.transpose"(%387){perms=[0, 2, 1, 3]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x3x64xf32>
+	%389="ufront.transpose"(%386){perms=[0, 2, 3, 1]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x64x3xf32>
+	%390="ufront.batch_matmul"(%385, %389):(tensor<2x12x3x64xf32>, tensor<2x12x64x3xf32>) -> tensor<2x12x3x3xf32>
+	%391="ufront.struediv"(%390){scalar=8.0}:(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%392="ufront.add"(%391, %5):(tensor<2x12x3x3xf32>, tensor<2x1x1x3xf32>) -> tensor<2x12x3x3xf32>
+	%393="ufront.softmax"(%392):(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%394="ufront.dropout"(%393){rate=0.1, seed=0, training=false}:(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%395="ufront.batch_matmul"(%394, %388):(tensor<2x12x3x3xf32>, tensor<2x12x3x64xf32>) -> tensor<2x12x3x64xf32>
+	%396="ufront.transpose"(%395){perms=[0, 2, 1, 3]}:(tensor<2x12x3x64xf32>) -> tensor<2x3x12x64xf32>
+	%397="ufront.reshape"(%396){shape=[2, 3, 768]}:(tensor<2x3x12x64xf32>) -> tensor<2x3x768xf32>
+	%398="ufront.parameter"(){dtype="Float", initializer="0x55c197c0a7f0", requires_grad=true}:() -> tensor<768x768xf32>
+	%399="ufront.linear"(%397, %398){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%400="ufront.dropout"(%399){rate=0.1, seed=0, training=false}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%401="ufront.add"(%400, %377):(tensor<2x3x768xf32>, tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%402="ufront.layer_norm"(%401){elementwise_affine=true, eps=0.000001, normalized_shape=[768], operand_segment_sizes=array<i32:1, 0, 0>}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%403="ufront.parameter"(){dtype="Float", initializer="0x55c19850a830", requires_grad=true}:() -> tensor<768x3072xf32>
+	%404="ufront.linear"(%402, %403){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x3072xf32>) -> tensor<2x3x3072xf32>
+	%405="ufront.smultiply"(%404){scalar=0.5}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%406="ufront.struediv"(%404){scalar=1.4142135}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%407="ufront.erf"(%406){approximate=true}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%408="ufront.sadd"(%407){scalar=0.0001}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%409="ufront.multiply"(%405, %408):(tensor<2x3x3072xf32>, tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%410="ufront.parameter"(){dtype="Float", initializer="0x55c198e0a840", requires_grad=true}:() -> tensor<3072x768xf32>
+	%411="ufront.linear"(%409, %410){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x3072xf32>, tensor<3072x768xf32>) -> tensor<2x3x768xf32>
+	%412="ufront.dropout"(%411){rate=0.1, seed=0, training=false}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%413="ufront.add"(%412, %402):(tensor<2x3x768xf32>, tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%414="ufront.layer_norm"(%413){elementwise_affine=true, eps=0.000001, normalized_shape=[768], operand_segment_sizes=array<i32:1, 0, 0>}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%415="ufront.parameter"(){dtype="Float", initializer="0x55c19808a810", requires_grad=true}:() -> tensor<768x768xf32>
+	%416="ufront.linear"(%414, %415){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%417="ufront.parameter"(){dtype="Float", initializer="0x55c19a00a860", requires_grad=true}:() -> tensor<768x768xf32>
+	%418="ufront.linear"(%414, %417){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%419="ufront.parameter"(){dtype="Float", initializer="0x55c19a48a880", requires_grad=true}:() -> tensor<768x768xf32>
+	%420="ufront.linear"(%414, %419){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%421="ufront.reshape"(%416){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%422="ufront.transpose"(%421){perms=[0, 2, 1, 3]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x3x64xf32>
+	%423="ufront.reshape"(%418){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%424="ufront.reshape"(%420){shape=[2, 3, 12, 64]}:(tensor<2x3x768xf32>) -> tensor<2x3x12x64xf32>
+	%425="ufront.transpose"(%424){perms=[0, 2, 1, 3]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x3x64xf32>
+	%426="ufront.transpose"(%423){perms=[0, 2, 3, 1]}:(tensor<2x3x12x64xf32>) -> tensor<2x12x64x3xf32>
+	%427="ufront.batch_matmul"(%422, %426):(tensor<2x12x3x64xf32>, tensor<2x12x64x3xf32>) -> tensor<2x12x3x3xf32>
+	%428="ufront.struediv"(%427){scalar=8.0}:(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%429="ufront.add"(%428, %5):(tensor<2x12x3x3xf32>, tensor<2x1x1x3xf32>) -> tensor<2x12x3x3xf32>
+	%430="ufront.softmax"(%429):(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%431="ufront.dropout"(%430){rate=0.1, seed=0, training=false}:(tensor<2x12x3x3xf32>) -> tensor<2x12x3x3xf32>
+	%432="ufront.batch_matmul"(%431, %425):(tensor<2x12x3x3xf32>, tensor<2x12x3x64xf32>) -> tensor<2x12x3x64xf32>
+	%433="ufront.transpose"(%432){perms=[0, 2, 1, 3]}:(tensor<2x12x3x64xf32>) -> tensor<2x3x12x64xf32>
+	%434="ufront.reshape"(%433){shape=[2, 3, 768]}:(tensor<2x3x12x64xf32>) -> tensor<2x3x768xf32>
+	%435="ufront.parameter"(){dtype="Float", initializer="0x55c19b44a890", requires_grad=true}:() -> tensor<768x768xf32>
+	%436="ufront.linear"(%434, %435){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x768xf32>) -> tensor<2x3x768xf32>
+	%437="ufront.dropout"(%436){rate=0.1, seed=0, training=false}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%438="ufront.add"(%437, %414):(tensor<2x3x768xf32>, tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%439="ufront.layer_norm"(%438){elementwise_affine=true, eps=0.000001, normalized_shape=[768], operand_segment_sizes=array<i32:1, 0, 0>}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%440="ufront.parameter"(){dtype="Float", initializer="0x55c19bd4a8d0", requires_grad=true}:() -> tensor<768x3072xf32>
+	%441="ufront.linear"(%439, %440){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x768xf32>, tensor<768x3072xf32>) -> tensor<2x3x3072xf32>
+	%442="ufront.smultiply"(%441){scalar=0.5}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%443="ufront.struediv"(%441){scalar=1.4142135}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%444="ufront.erf"(%443){approximate=true}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%445="ufront.sadd"(%444){scalar=0.0001}:(tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%446="ufront.multiply"(%442, %445):(tensor<2x3x3072xf32>, tensor<2x3x3072xf32>) -> tensor<2x3x3072xf32>
+	%447="ufront.parameter"(){dtype="Float", initializer="0x55c19c64a8e0", requires_grad=true}:() -> tensor<3072x768xf32>
+	%448="ufront.linear"(%446, %447){operand_segment_sizes=array<i32:1, 1, 0>, weight_transposed=false}:(tensor<2x3x3072xf32>, tensor<3072x768xf32>) -> tensor<2x3x768xf32>
+	%449="ufront.dropout"(%448){rate=0.1, seed=0, training=false}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%450="ufront.add"(%449, %439):(tensor<2x3x768xf32>, tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%451="ufront.layer_norm"(%450){elementwise_affine=true, eps=0.000001, normalized_shape=[768], operand_segment_sizes=array<i32:1, 0, 0>}:(tensor<2x3x768xf32>) -> tensor<2x3x768xf32>
+	%452="ufront.slice"(%451){axis=[1], end=[1], output_shape=[2, 768], start=[0]}:(tensor<2x3x768xf32>) -> tensor<2x768xf32>
+	%453="ufront.parameter"(){dtype="Float", initializer="0x55c19b8ca8b0", requires_grad=true}:() -> tensor<768x768xf32>
+	%454="ufront.parameter"(){dtype="Float", initializer="0x55c1486add30", requires_grad=true}:() -> tensor<768xf32>
+	%455="ufront.linear"(%452, %453, %454){operand_segment_sizes=array<i32:1, 1, 1>, weight_transposed=false}:(tensor<2x768xf32>, tensor<768x768xf32>, tensor<768xf32>) -> tensor<2x768xf32>
+	%456="ufront.tanh"(%455):(tensor<2x768xf32>) -> tensor<2x768xf32>
+	return %456: tensor<2x768xf32>
+}

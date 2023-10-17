@@ -264,13 +264,12 @@ class LinearNode(ModuleNode):
         input_tensor = node_to_output[self.innodes[0].name]
         if umodel.weight_type == WeightType.INTERNAL:
             return umodel.dense(
-            input=input_tensor,
-            # weight=operator.get_output(0),
-            out_dim=self.module.out_features,
-            activation=self.acti_mode,
-            use_bias=(self.module.bias is not None),
-            name=self.name,
-            )
+                input=input_tensor,
+                out_dim=self.module.out_features,
+                activation=self.acti_mode,
+                use_bias=(self.module.bias is not None),
+                name=self.name,
+                )
         else:
             requires_grad = self.module.weight.requires_grad
             weight = self.module.weight.detach().numpy() if requires_grad \
@@ -287,6 +286,7 @@ class LinearNode(ModuleNode):
                     bias=bias_op.get_output(0),
                     out_dim=self.module.out_features,
                     activation=self.acti_mode,
+                    weight_transposed=True,
                     name=self.name,
                 )
             else:
@@ -296,6 +296,7 @@ class LinearNode(ModuleNode):
                     out_dim=self.module.out_features,
                     activation=self.acti_mode,
                     use_bias=(self.module.bias is not None),
+                    weight_transposed=True,
                     name=self.name,
                 )
 
@@ -983,6 +984,7 @@ class MultiheadAttentionNode(ModuleNode):
                 num_heads=num_heads,
                 dropout=float(dropout),
                 batch_first=batch_first,
+                weight_transposed=True,
                 name=self.name,
             )
         else:
@@ -1066,6 +1068,7 @@ class MultiheadAttentionNode(ModuleNode):
                 num_heads=num_heads,
                 dropout=float(dropout),
                 batch_first=batch_first,
+                weight_transposed=True,
                 name=self.name,
             )
 
@@ -2211,7 +2214,7 @@ class ToNode(FunctionNode):
             dtype = self.innodes[1]
         else:
             assert 0, "Invalid dtype to cast!"
-        return umodel.cast(input=input_tensor, dtype=torch_to_ufront_dtype(dtype))
+        return umodel.cast(input=input_tensor, dtype=torch_to_ufront_dtype(dtype), name=self.name)
 
 
 class PowNode(FunctionNode):
