@@ -1043,11 +1043,11 @@ class MultiheadAttentionNode(ModuleNode):
             operator_q = umodel.parameter(np_tensor=weight_q, dtype=numpy_to_ufront_dtype(weight_q.dtype), requires_grad=requires_grad_q, name=self.name + "_weight_q")
             operator_k = umodel.parameter(np_tensor=weight_k, dtype=numpy_to_ufront_dtype(weight_k.dtype), requires_grad=requires_grad_k, name=self.name + "_weight_k")
             operator_v = umodel.parameter(np_tensor=weight_v, dtype=numpy_to_ufront_dtype(weight_v.dtype), requires_grad=requires_grad_v, name=self.name + "_weight_v")
+            operator_o = umodel.parameter(np_tensor=weight_o, dtype=numpy_to_ufront_dtype(weight_o.dtype), requires_grad=requires_grad_o, name=self.name + "_weight_o")
+           
             operator_bias_q = umodel.parameter(np_tensor=bias_q, dtype=numpy_to_ufront_dtype(bias_q.dtype), requires_grad=requires_grad_bias, name=self.name + "_bias_q")
             operator_bias_k = umodel.parameter(np_tensor=bias_k, dtype=numpy_to_ufront_dtype(bias_k.dtype), requires_grad=requires_grad_bias, name=self.name + "_bias_k")
             operator_bias_v = umodel.parameter(np_tensor=bias_v, dtype=numpy_to_ufront_dtype(bias_v.dtype), requires_grad=requires_grad_bias, name=self.name + "_bias_v")
-
-            operator_o = umodel.parameter(np_tensor=weight_o, dtype=numpy_to_ufront_dtype(weight_o.dtype), requires_grad=requires_grad_o, name=self.name + "_weight_o")
             operator_bias_o = umodel.parameter(np_tensor=bias_o, dtype=numpy_to_ufront_dtype(bias_o.dtype), requires_grad=requires_grad_bias_o, name=self.name + "_bias_o")
 
             return umodel.multihead_attention(
@@ -1057,11 +1057,11 @@ class MultiheadAttentionNode(ModuleNode):
                 weight_q=operator_q.get_output(0),
                 weight_k=operator_k.get_output(0),
                 weight_v=operator_v.get_output(0),
+                weight_o=operator_o.get_output(0),
+
                 bias_q=operator_bias_q.get_output(0),
                 bias_k=operator_bias_k.get_output(0),
                 bias_v=operator_bias_v.get_output(0),
-
-                weight_o=operator_o.get_output(0),
                 bias_o=operator_bias_o.get_output(0),
 
                 embed_dim=embed_dim,

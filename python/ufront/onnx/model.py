@@ -208,7 +208,13 @@ class ONNXModel(object):
         if allTensors:
             return self.umodel.concat(tensors=inputs, axis=attribute['axis'].i, name=node.name) # tensor concat
         else:
-            return inputs #scalar concat
+            ret = []
+            for input in inputs:
+                if type(input) == list: #corner case [[1, 2], 3]
+                    ret.extend(input)
+                else:
+                    ret.append(input)
+            return ret #scalar concat
         
     def handleExpand(self, node, node_to_output):
         input_tensor = node_to_output[node.input[0]]
@@ -504,16 +510,16 @@ class ONNXModel(object):
                 break
         return self.umodel.reshape(input=input, shape=list(shape), name=node.name)
     
-    def handleCast(self, node, node_to_output):
-        input = node_to_output[node.input[0]]
-        attribute = {x.name: x for x in node.attribute}
-        if hasattr(attribute, "dtype"):
-            dtype = attribute["dtype"]
-        elif len(node.input) > 1 and type(node.input[1]) == np.dtype:
-            dtype = node.input[1]
-        else:
-            assert 0, "Invalid dtype to cast!"
-        return self.umodel.cast(input=input, dtype=numpy_to_ufront_dtype(dtype), name=node.name)
+    # def handleCast(self, node, node_to_output):
+    #     input = node_to_output[node.input[0]]
+    #     attribute = {x.name: x for x in node.attribute}
+    #     if hasattr(attribute, "dtype"):
+    #         dtype = attribute["dtype"]
+    #     elif len(node.input) > 1 and type(node.input[1]) == np.dtype:
+    #         dtype = node.input[1]
+    #     else:
+    #         assert 0, "Invalid dtype to cast!"
+    #     return self.umodel.cast(input=input, dtype=numpy_to_ufront_dtype(dtype), name=node.name)
         
     def handleUnsqueeze(self, node, node_to_output):
         input = node_to_output[node.input[0]]
@@ -778,13 +784,27 @@ class ONNXModel(object):
         return self.handleLayerNormalization(node, node_to_output)
     
     def handleMultiHeadAttention(self, node, node_to_output):
+        # inputs -> [x, weight_v, weight_q, weight_k, weight_o]
         q = node_to_output[node.input[0]]
-        if len(node.input) > 1 and node.input[1] in node_to_output:
+        if len(node.input) > 5 and type(node.input[1]) != np.ndarray:
             k = node_to_output[node.input[1]]
             embed_dim=k[-1]
+            weight_v =  np.array(node_to_output[node.input[2]])
+            weight_q = np.array(node_to_output[node.input[3]])
+            weight_k = np.array(node_to_output[node.input[4]])
+            weight_o = np.array(node_to_output[node.input[5]])
         else:
             embed_dim = q.shape[-1]
+            weight_v =  np.array(node_to_output[node.input[1]])
+            weight_q = np.array(node_to_output[node.input[2]])
+            weight_k = np.array(node_to_output[node.input[3]])
+            weight_o = np.array(node_to_output[node.input[4]])
 
+        operator_q = self.umodel.parameter(np_tensor=weight_q, dtype=numpy_to_ufront_dtype(weight_q.dtype), requires_grad=True, name=node.name + "_weight_q")
+        operator_k = self.umodel.parameter(np_tensor=weight_k, dtype=numpy_to_ufront_dtype(weight_k.dtype), requires_grad=True, name=node.name + "_weight_k")
+        operator_v = self.umodel.parameter(np_tensor=weight_v, dtype=numpy_to_ufront_dtype(weight_v.dtype), requires_grad=True, name=node.name + "_weight_v")
+        operator_o = self.umodel.parameter(np_tensor=weight_o, dtype=numpy_to_ufront_dtype(weight_o.dtype), requires_grad=True, name=node.name + "_weight_o")
+    
         batch_first=True
         dropout=0.0
         
@@ -794,6 +814,17 @@ class ONNXModel(object):
             q=q,
             k=q,
             v=q,
+
+            weight_q=operator_q.get_output(0),
+            weight_k=operator_k.get_output(0),
+            weight_v=operator_v.get_output(0),
+            weight_o=operator_o.get_output(0),
+            # bias_q=operator_bias_q.get_output(0),
+            # bias_k=operator_bias_k.get_output(0),
+            # bias_v=operator_bias_v.get_output(0),
+
+            # bias_o=operator_bias_o.get_output(0),
+            
             embed_dim=embed_dim,
             num_heads=num_heads,
             dropout=dropout,
@@ -828,6 +859,11 @@ class ONNXModel(object):
     def handleErf(self, node, node_to_output):
         input = node_to_output[node.input[0]]
         return self.umodel.erf(input=input, approximate=True, name=node.name)
+    
+    def handlePow(self, node, node_to_output):
+        input = node_to_output[node.input[0]]
+        pow = node_to_output[node.input[1]]
+        return self.umodel.pow(input=input, pow=pow, name=node.name)
     
     def handleembeddings(self, node, node_to_output):
         weight = node_to_output[node.input[0]]
@@ -909,6 +945,9 @@ class ONNXModel(object):
 
         self.process_initializer(self.inputs, self.model.graph.initializer)
 
+        # for node in self.model.graph.node:
+        #     print(node.name)
+
         self._fusion()
         op_fusion = ["MultiHeadDotProductAttention", ("attention", "output/Add"), "embeddings", "LayerNorm", "self_attention", "Gelu", "Dense"] if self.transformer else []
         for f in op_fusion:
@@ -951,8 +990,9 @@ class ONNXModel(object):
                     
         tensor_outputs = []
         for name in outputs.keys():
-             tensor_outputs.append(node_to_output[name])
-        return tensor_outputs
+             if name in node_to_output.keys():
+                tensor_outputs.append(node_to_output[name])
+        return tensor_outputs if len(tensor_outputs) > 0 else node_to_output[next(reversed(node_to_output))]
     
     def get_output_operator(self):
         if len(self.operators) > 0:
@@ -970,6 +1010,7 @@ class ONNXModel(object):
             for node in self.model.graph.node:
                 if node.op_type == 'MatMul' \
                     and node.name.find("/MultiHeadDotProductAttention") < 0  \
+                    and node.name.find("/attention") < 0  \
                     and node.name.find("/self_attention") < 0:
                     output = node.output[0]
                     for add_node in self.model.graph.node:
@@ -1011,21 +1052,40 @@ class ONNXModel(object):
             matmul_weight_for_dense = None
             for node in self.model.graph.node:
                 if node.name.find("/"+name) >= 0 \
-                    and (not stop_node or name.find(stop_node) == -1): #for not standard fusion pattern
-                    flag_found = True
-                    if not is_target:
-                        is_target = True
-                        target_input = node.input
+                    and (not stop_node or node.name.find(stop_node) == -1): #for not standard fusion pattern
 
-                    if name == "embeddings" and node.name.find("/embedding_lookup") >= 0 and len(target_input) < 2:
-                        node.input.insert(1, target_input[0])
-                        target_input = node.input #tensorflow embedding weights
+                    if (name == "attention" and node.name.find("LayerNorm") >0): #do not fuse LayerNorm into multihead_attention
+                        idx += 1
+                        continue
+                    else:
+                        flag_found = True
+                        if not is_target:
+                            is_target = True
+                            target_input = node.input[:]
 
-                    target_output = node.output
-                    if name == "Dense" and node.op_type == "MatMul":
-                        matmul_weight_for_dense = node.input[1:]
-                    node.name = "#REMOVED"
-                    REMOVED.append(node)
+                        if name == "embeddings" and node.name.find("/embedding_lookup") >= 0 and len(target_input) < 2:
+                            node.input.insert(1, target_input[0])
+                            target_input = node.input[:] #tensorflow embedding weights
+                        
+                        if name == "attention" and node.op_type == "MatMul":
+                            # target_input.append()
+                            # print(node.input)
+                            # print("\n*****->", node.name)
+                            for inp in node.input:
+                                if inp in self.inputs.keys():
+                                    if type(self.inputs[inp]) == np.ndarray and inp not in target_input:
+                                        # print(inp, ": ", self.inputs[inp].shape)
+                                        target_input.append(inp) #weights for multihead_attention
+                                #     else:
+                                #         print(inp, ": ", self.inputs[inp])
+                                # else:
+                                #     print("->", inp)
+
+                        target_output = node.output
+                        if name == "Dense" and node.op_type == "MatMul":
+                            matmul_weight_for_dense = node.input[1:]
+                        node.name = "#REMOVED"
+                        REMOVED.append(node)
                 else:
                     if is_target:
                         is_target = False

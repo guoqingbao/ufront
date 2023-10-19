@@ -448,7 +448,6 @@ impl Model {
                         let q = para.get_item("q").unwrap().extract::<PyRef<Tensor>>(); 
                         let k = para.get_item("k").unwrap().extract::<PyRef<Tensor>>(); 
                         let v = para.get_item("v").unwrap().extract::<PyRef<Tensor>>(); 
-
                         match (q, k, v) {
                             (Ok(q1), Ok(k1), Ok(v1)) => {
                                 if op.add_input(&q1).is_ok()
@@ -458,39 +457,49 @@ impl Model {
                                     if para.contains("weight_q").unwrap()
                                     && para.contains("weight_k").unwrap()
                                     && para.contains("weight_v").unwrap()
-                                    && para.contains("bias_q").unwrap()
-                                    && para.contains("bias_k").unwrap()
-                                    && para.contains("bias_v").unwrap()
                                     && para.contains("weight_o").unwrap()
-                                    && para.contains("bias_o").unwrap()
-
                                     {
                                         let weight_q = para.get_item("weight_q").unwrap().extract::<PyRef<Tensor>>(); 
                                         let weight_k = para.get_item("weight_k").unwrap().extract::<PyRef<Tensor>>(); 
                                         let weight_v = para.get_item("weight_v").unwrap().extract::<PyRef<Tensor>>(); 
-                                        let bias_q = para.get_item("bias_q").unwrap().extract::<PyRef<Tensor>>(); 
-                                        let bias_k = para.get_item("bias_k").unwrap().extract::<PyRef<Tensor>>(); 
-                                        let bias_v = para.get_item("bias_v").unwrap().extract::<PyRef<Tensor>>(); 
-
                                         let weight_o = para.get_item("weight_o").unwrap().extract::<PyRef<Tensor>>(); 
-                                        let bias_o = para.get_item("bias_o").unwrap().extract::<PyRef<Tensor>>(); 
-
-                                        match (weight_q, weight_k, weight_v, bias_q, bias_k, bias_v, weight_o, bias_o) {
-                                            (Ok(wq), Ok(wk), Ok(wv), Ok(bq), Ok(bk), Ok(bv), Ok(wo), Ok(bo)) => {
+                                        match (weight_q, weight_k, weight_v, weight_o) {
+                                            (Ok(wq), Ok(wk), Ok(wv), Ok(wo)) => {
                                                 if op.add_input(&wq).is_ok()
                                                 && op.add_input(&wk).is_ok()
                                                 && op.add_input(&wv).is_ok()
-                                                && op.add_input(&bq).is_ok()
-                                                && op.add_input(&bk).is_ok()
-                                                && op.add_input(&bv).is_ok()
                                                 && op.add_input(&wo).is_ok()
-                                                && op.add_input(&bo).is_ok()
                                                 {
-                                                    op.calculate_output(para);
+                                                    if para.contains("bias_q").unwrap()
+                                                    && para.contains("bias_k").unwrap()
+                                                    && para.contains("bias_v").unwrap()
+                                                    && para.contains("bias_o").unwrap() {
+                                                        let bias_q = para.get_item("bias_q").unwrap().extract::<PyRef<Tensor>>(); 
+                                                        let bias_k = para.get_item("bias_k").unwrap().extract::<PyRef<Tensor>>(); 
+                                                        let bias_v = para.get_item("bias_v").unwrap().extract::<PyRef<Tensor>>(); 
+                                                        let bias_o = para.get_item("bias_o").unwrap().extract::<PyRef<Tensor>>(); 
+                                                        match (bias_q, bias_k, bias_v, bias_o) {
+                                                            (Ok(bq), Ok(bk), Ok(bv), Ok(bo)) => {
+                                                                if op.add_input(&bq).is_ok()
+                                                                && op.add_input(&bk).is_ok()
+                                                                && op.add_input(&bv).is_ok()
+                                                                && op.add_input(&bo).is_ok()
+                                                                {
+                                                                    op.calculate_output(para);
+                                                                }
+                                                            }
+                                                            _ => {
+                                                                panic! {"Not the valid bias type for attention!"};
+                                                            }
+                                                        }
+                                                    } else {
+                                                        op.calculate_output(para);
+
+                                                    }
                                                 }
                                             }
                                             _ => {
-                                                panic! {"Not the valid weight type!"};
+                                                panic! {"Not the valid weight type for attention!"};
                                             }
                                         }
                                     }

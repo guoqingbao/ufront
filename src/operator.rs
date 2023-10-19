@@ -571,6 +571,7 @@ impl Operator {
             | OpType::MULTIHEAD_ATTENTION //output shape of multiheaded attention is equal to shape of input "q" (first item in input list) when batch_first=True
             | OpType::CLIP
             | OpType::ERF
+            | OpType::POW
             | OpType::BOOL
             | OpType::INVERT
             | OpType::AND
@@ -1281,10 +1282,10 @@ impl Operator {
             params.remove("weight_q");
             params.remove("weight_k");
             params.remove("weight_v");
+            params.remove("weight_o");
             params.remove("bias_q");
             params.remove("bias_k");
             params.remove("bias_v");
-            params.remove("weight_o");
             params.remove("bias_o");
             
             let mut segment_sizes = vec![0; 12];

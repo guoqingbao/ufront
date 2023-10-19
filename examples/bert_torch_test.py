@@ -6,11 +6,12 @@ from torch_bert import BertModel, BertConfig
 import torch
 import time
 GPU = False
-input_ids = torch.LongTensor([[31, 51, 99], [15, 5, 0]])
-input_mask = torch.LongTensor([[1, 1, 1], [1, 1, 0]])
-token_type_ids = torch.LongTensor([[0, 0, 1], [0, 1, 0]])
+import numpy as np
+input_ids = torch.from_numpy(np.array([[31, 51, 99], [15, 5, 0]], dtype="int32"))
+input_mask = torch.from_numpy(np.array([[1, 1, 1], [1, 1, 0]], dtype="int32"))
+token_type_ids = torch.from_numpy(np.array([[0, 0, 1], [0, 1, 0]], dtype="int32"))
 
-config = BertConfig(vocab_size_or_config_json_file=32000, hidden_size=768,
+config = BertConfig(vocab_size_or_config_json_file=16000, hidden_size=768,
     num_hidden_layers=12, num_attention_heads=12, intermediate_size=3072)
 
 net = BertModel(config=config)
@@ -34,9 +35,8 @@ model.compile(optimizer={"type":"sgd", "lr":"0.01", "momentum":"0", "nesterov":"
 
 # print(modelir)
 
-# import pathlib
-# path = str(pathlib.Path(__file__).parent.resolve()) + "/output_ir/torch_" + model.model.__class__.__name__ + ".ir"
-# path = str(pathlib.Path(__file__).parent.resolve()) + "/output_ir/torch_Resnet18.ir"
+import pathlib
+path = str(pathlib.Path(__file__).parent.resolve()) + "/output_ir/torch_BertModel.ir"
 
 # f = open(path, "w")
 # f.write(modelir)

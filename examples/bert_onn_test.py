@@ -2,7 +2,7 @@
 from ufront.pytorch.model import UFrontTorch 
 import iree.compiler as ireec
 from iree import runtime
-from bert import BertModel, BertConfig
+from torch_bert import BertModel, BertConfig
 import torch
 import time
 from ufront.onnx.model import ONNXModel, ONNXModelKeras, UFrontONNX
@@ -14,7 +14,7 @@ input_ids = torch.LongTensor([[31, 51, 99], [15, 5, 0]])
 input_mask = torch.LongTensor([[1, 1, 1], [1, 1, 0]])
 token_type_ids = torch.LongTensor([[0, 0, 1], [0, 1, 0]])
 
-config = BertConfig(vocab_size_or_config_json_file=32000, hidden_size=768,
+config = BertConfig(vocab_size_or_config_json_file=16000, hidden_size=768,
     num_hidden_layers=12, num_attention_heads=12, intermediate_size=3072)
 
 net = BertModel(config=config)
