@@ -274,6 +274,12 @@ class LinearNode(ModuleNode):
             requires_grad = self.module.weight.requires_grad
             weight = self.module.weight.detach().numpy() if requires_grad \
                 else self.module.weight.numpy()
+            
+            #transpose to standard MLIR weight, this will speedup MLIR optimization process
+            tmp = np.transpose(weight, (1, 0))
+            weight = np.ones(shape=tmp.shape, dtype=tmp.dtype)
+            weight[:] = tmp
+
             operator = umodel.parameter(np_tensor=weight, dtype=numpy_to_ufront_dtype(weight.dtype), requires_grad=requires_grad, name=self.name + "_weight")
             if self.module.bias != None:
                 requires_grad = self.module.bias.requires_grad
@@ -286,7 +292,7 @@ class LinearNode(ModuleNode):
                     bias=bias_op.get_output(0),
                     out_dim=self.module.out_features,
                     activation=self.acti_mode,
-                    weight_transposed=True,
+                    weight_transposed=False, #must indicate this weight satisfy MLIR convention
                     name=self.name,
                 )
             else:
@@ -296,7 +302,7 @@ class LinearNode(ModuleNode):
                     out_dim=self.module.out_features,
                     activation=self.acti_mode,
                     use_bias=(self.module.bias is not None),
-                    weight_transposed=True,
+                    weight_transposed=False,
                     name=self.name,
                 )
 
@@ -1463,7 +1469,7 @@ class ScalarSubNode(FunctionNode):
         input_tensor, scalar = \
             FunctionNode.parse_scalar_op(self, node_to_output)
         return umodel.ssub(
-            input=input_tensor, scalar=scalar, name=self.name,
+            input=input_tensor, scalar=scalar, scalar_position="\""+self.scalar_pos.name + "\"", name=self.name,
         )
 
 
@@ -2011,8 +2017,11 @@ class ExpandNode(FunctionNode):
         shapes = self.innodes[1:]
         for i in range(len(shapes)):
             if hasattr(shapes[i], "name"):
-                output_shape = node_to_output[shapes[i].name].shape
-                break
+                if hasattr(node_to_output[shapes[i].name], "shape"):
+                    output_shape = node_to_output[shapes[i].name].shape
+                    break
+                else:
+                    output_shape.append(node_to_output[shapes[i].name])
             elif type(shapes[i]) == str:
                 output_shape.append(node_to_output[shapes[i]])
             elif type(shapes[i]) == int:

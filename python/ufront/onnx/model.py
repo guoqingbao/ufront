@@ -141,17 +141,17 @@ class ONNXModel(object):
             return self.umodel.subtract(x=input0, y=input1, name=node.name)
         elif type(input0) == Tensor:
             if type(input1) in [float, int, np.float32, np.float64, np.int32, np.int64, np.half]:
-                return self.umodel.ssub(input=input0, scalar=input1, name=node.name)
+                return self.umodel.ssub(input=input0, scalar=input1, scalar_position="\"RIGHT\"", name=node.name)
             else:
                 assert type(input1) == np.ndarray, "The given input is not an ndarray!"
-                return self.umodel.ssub(input=input0, operand=input1.tolist(), name=node.name)
+                return self.umodel.ssub(input=input0, operand=input1.tolist(), scalar_position="\"RIGHT\"", name=node.name)
             
         elif type(input1) == Tensor:
             if type(input0) in [float, int, np.float32, np.float64, np.int32, np.int64, np.half]:
-                return self.umodel.ssub(input=input1, scalar=input0, name=node.name)
+                return self.umodel.ssub(input=input1, scalar=input0, scalar_position="\"LEFT\"", name=node.name)
             else:
                 assert type(input0) == np.ndarray, "The given input is not an ndarray!"
-                return self.umodel.ssub(input=input1, operand=input0.tolist(), name=node.name)   
+                return self.umodel.ssub(input=input1, operand=input0.tolist(), scalar_position="\"LEFT\"", name=node.name)   
         else:
             return input0 - input1
         
@@ -418,7 +418,11 @@ class ONNXModel(object):
     
     def handleNeg(self, node, node_to_output):
         input = node_to_output[node.input[0]]
-        return self.umodel.neg(input=input, name=node.name)
+        return self.umodel.smultiply(
+            input=input, scalar=-1.0, name=node.name
+        )
+        # return self.umodel.neg(input=input, name=node.name)
+
     # def handleGemm(self, node):
     #     input = self.symbol_table[node.input[0]]
     #     dim = self.inputs[node.input[1]].dims[0]
@@ -1067,7 +1071,7 @@ class ONNXModel(object):
                             node.input.insert(1, target_input[0])
                             target_input = node.input[:] #tensorflow embedding weights
                         
-                        if name == "attention" and node.op_type == "MatMul":
+                        if (name == "attention" or name == "MultiHeadDotProductAttention") and node.op_type == "MatMul":
                             # target_input.append()
                             # print(node.input)
                             # print("\n*****->", node.name)

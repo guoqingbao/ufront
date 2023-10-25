@@ -31,9 +31,9 @@ input_ids = np.array([[31, 51, 99], [15, 5, 0]], dtype='int64')
 input_mask = np.array([[1, 1, 1], [1, 1, 0]], dtype='int64')
 token_type_ids = np.array([[0, 0, 1], [0, 1, 0]], dtype='int64')
 
-max_seq_len = 128
-l_input_ids      = keras.layers.Input(shape=(max_seq_len,), dtype='int64')
-l_token_type_ids = keras.layers.Input(shape=(max_seq_len,), dtype='int64')
+max_seq_len = 3
+l_input_ids      = keras.layers.Input(shape=(max_seq_len,), dtype='int64', name="input1")
+l_token_type_ids = keras.layers.Input(shape=(max_seq_len,), dtype='int64', name="input2")
 
 output = l_bert([l_input_ids, l_token_type_ids])          # [batch_size, max_seq_len, hidden_size]
 net = keras.Model(inputs=[l_input_ids, l_token_type_ids], outputs=output)

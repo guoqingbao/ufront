@@ -63,12 +63,16 @@ python torch_e2e_demo.py #make sure torch-cpu installed
 
 #### Build the release package (wheel file)
 ```sh
+maturin build --release -i python3.7 #for python3.7
 maturin build --release -i python3.8 #for python3.8
 maturin build --release -i python3.9 #for python3.9
 maturin build --release -i python3.10 #for python3.10
 maturin build --release -i python3.11 #for python3.11
 ```
-
+#### Install compiler backend & runtime for execution
+```sh
+pip install iree-compiler==20230512.517 iree-runtime==20230512.517 -f https://openxla.github.io/iree/pip-release-links.html
+```
 
 ## Project discription
 1. The objective of this project is to create a **unified frontend** for deep learning computing.
@@ -91,7 +95,6 @@ import numpy as np
 from torchvision.models import resnet18, resnet50, squeezenet1_1, regnet_x_32gf, maxvit_t, shufflenet_v2_x1_5, inception_v3, mobilenet_v3_small, efficientnet_v2_s, densenet121, convnext_small
 import torchvision.models as models
 from ufront.pytorch.model import UFrontTorch 
-# pip install iree-compiler iree-runtime iree-tools-tf -f https://openxla.github.io/iree/pip-release-links.html
 import iree.compiler as ireec
 from iree.compiler import tools
 from iree import runtime
@@ -122,7 +125,9 @@ if __name__ == "__main__":
     # net = shufflenet_v2_x1_5(pretrained=True)
     # net = mobilenet_v3_small(pretrained=True, dropout=0.0)
     # net = models.vision_transformer.vit_b_16(weights=True) 
-    
+    # net = BertModel(config=config) #refer to bert_torch_test.py
+    # net = YOUR Models
+
     net = resnet50(pretrained=True)
     net.train(False) 
     input = load_read_image()

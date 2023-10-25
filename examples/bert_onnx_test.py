@@ -24,8 +24,8 @@ t1_start = time.perf_counter()
 
 f = io.BytesIO()
 model_name = net.__class__.__name__ 
-torch.onnx.export(model=net, args=(input_ids, input_mask, token_type_ids), f=f, export_params=True, #do_constant_folding=True,
-                    training=TrainingMode.EVAL if model_name=="Inception3" else TrainingMode.TRAINING, opset_version=17)
+torch.onnx.export(model=net, args=(input_ids, token_type_ids, input_mask), f=f, export_params=True, do_constant_folding=False,
+                    training=TrainingMode.EVAL, opset_version=17)
 onnx_model = onnx.load_model_from_string(f.getvalue())
 
 # transformer = True if model_name in ["MaxVit", "SwinTransformer", "VisionTransformer", "MultiHeadAttention"] else False
