@@ -13,8 +13,6 @@
 # limitations under the License.
 #
 
-# Revised for Unified Computing Frontend (UFront)
-# Enflame Tech. (ERA)
 from collections import OrderedDict
 import io
 import logging
@@ -58,11 +56,15 @@ class ONNXTensor(object):
 
 class ONNXModel(object):
     const_tensor_idx = 1
-    def __init__(self, onnx_model, umodel=None, simplify = False, pass_weights=False):
+    def __init__(self, onnx_model, umodel=None, simplify = False, pass_weights=False, transformer=False):
         if umodel != None:
             self.umodel = umodel
         else:
             self.umodel = Model()
+        self.transformer = transformer
+
+        self.FUSION_PATTERN = ["MultiHeadDotProductAttention", ("attention", "output/Add"), "embeddings", "LayerNorm", "self_attention", "Gelu", "Dense"] if self.transformer else []
+        self.ATTENTION_PATTERN = ["attention", "MultiHeadDotProductAttention", "self_attention"]
 
         self.umodel.weight_type = WeightType.EXTERNAL if pass_weights else WeightType.INTERNAL
         
@@ -433,8 +435,11 @@ class ONNXModel(object):
     def handleDense(self, node, node_to_output):
         input = node_to_output[node.input[0]]
         attribute = {x.name: x for x in node.attribute}
+        weight_transposed = False
         if "out_dim" in attribute:
             dim = attribute["out_dim"].i 
+        if "weight_transposed" in attribute:
+            weight_transposed = attribute["weight_transposed"].i > 0
         # elif len(node.input) > 1:
         #     weight = node_to_output[node.input[1]]
         #     dim = weight.shape[-2] if weight.shape[-1] == input.shape[1] else weight.shape[-1]
@@ -450,9 +455,9 @@ class ONNXModel(object):
             if len(node.input) > 2:
                 bias = node_to_output[node.input[2]]
                 bias_op = self.umodel.parameter(np_tensor=bias, dtype=numpy_to_ufront_dtype(bias.dtype), requires_grad=True, name=node.input[2])
-                return self.umodel.dense(input=input, weight=weight_op.get_output(0), bias=bias_op.get_output(0), out_dim=dim, weight_transposed=False, name=node.name)
+                return self.umodel.dense(input=input, weight=weight_op.get_output(0), bias=bias_op.get_output(0), out_dim=dim, weight_transposed=weight_transposed, name=node.name)
             else:
-                return self.umodel.dense(input=input, weight=weight_op.get_output(0), out_dim=dim, weight_transposed=False, name=node.name)
+                return self.umodel.dense(input=input, weight=weight_op.get_output(0), out_dim=dim, weight_transposed=weight_transposed, name=node.name)
 
 
     def handleMaxPool(self, node, node_to_output):
@@ -486,8 +491,8 @@ class ONNXModel(object):
         input1 = node_to_output[node.input[0]]
         if len(node.input) > 1:
             input2 = node_to_output[node.input[1]]
-
-        return self.umodel.gelu(input=input1 if type(input1)==Tensor else input2, approximate=True, name=node.name)
+        approximate = input2 if type(input1)==Tensor else input1
+        return self.umodel.gelu(input=input1 if type(input1)==Tensor else input2, approximate=approximate!=0.5, name=node.name)
     
     def handleTanh(self, node, node_to_output):
         input1 = node_to_output[node.input[0]]
@@ -924,7 +929,7 @@ class ONNXModel(object):
                 input_tensor = input_tensors[i] if type(input_tensors) == list else input_tensors[input.name]
                 if type(input_tensor) != Tensor:
                     dtype=input_tensor.dtype
-                    if input_tensor.__module__ == "torch":
+                    if type(input_tensor)!=np.ndarray and input_tensor.__module__ == "torch":
                         dtype = input_tensor.numpy().dtype
                     input1 = np.ones(shape=input_tensor.shape, dtype=dtype)
                     input1[:] = input_tensor
@@ -953,8 +958,7 @@ class ONNXModel(object):
         #     print(node.name)
 
         self._fusion()
-        op_fusion = ["MultiHeadDotProductAttention", ("attention", "output/Add"), "embeddings", "LayerNorm", "self_attention", "Gelu", "Dense"] if self.transformer else []
-        for f in op_fusion:
+        for f in self.FUSION_PATTERN:
             self._fusion_layer(f)
 
         outputs = OrderedDict()
@@ -1034,7 +1038,7 @@ class ONNXModel(object):
                 elif node.op_type == 'Gemm':
                     flag_found = True
                     dim = self.inputs[node.input[1]].shape[0]
-                    dense_node = onnx.helper.make_node('Dense', inputs=node.input, outputs=[node.output[0]], out_dim=dim, name="Dense_"+str(dense_idx))
+                    dense_node = onnx.helper.make_node('Dense', inputs=node.input, outputs=[node.output[0]], out_dim=dim, weight_transposed=True, name="Dense_"+str(dense_idx))
                     dense_idx += 1
                     self.model.graph.node.insert(idx, dense_node)
                     self.model.graph.node.remove(node)
@@ -1071,7 +1075,7 @@ class ONNXModel(object):
                             node.input.insert(1, target_input[0])
                             target_input = node.input[:] #tensorflow embedding weights
                         
-                        if (name == "attention" or name == "MultiHeadDotProductAttention") and node.op_type == "MatMul":
+                        if name in self.ATTENTION_PATTERN and node.op_type == "MatMul":
                             # target_input.append()
                             # print(node.input)
                             # print("\n*****->", node.name)
@@ -1095,7 +1099,7 @@ class ONNXModel(object):
                         is_target = False
                         if name == "Dense" and matmul_weight_for_dense != None:
                             target_input.extend(list(matmul_weight_for_dense))
-                            node = onnx.helper.make_node(name, inputs=target_input, outputs=target_output, name="Ext"+name+"_"+str(target_idx))
+                            # node = onnx.helper.make_node(name, inputs=target_input, outputs=target_output, name="Ext"+name+"_"+str(target_idx))
                         node = onnx.helper.make_node(name, inputs=target_input, outputs=target_output, name="Ext"+name+"_"+str(target_idx))
 
                         self.model.graph.node.insert(idx, node)
@@ -1112,7 +1116,7 @@ class ONNXModel(object):
     
 class ONNXModelKeras(ONNXModel):
     def __init__(self, onnx_model, umodel=None, transformer=False, pass_weights=False):
-        super(ONNXModelKeras, self).__init__(onnx_model=onnx_model, umodel=umodel, pass_weights=pass_weights)
+        super(ONNXModelKeras, self).__init__(onnx_model=onnx_model, umodel=umodel, transformer=transformer, pass_weights=pass_weights)
         self.transformer=transformer
         for node in onnx_model.graph.node:
             if node.name.find("u_front_keras/") != -1:
@@ -1146,10 +1150,10 @@ class UFrontONNX(ONNXModel):
         seq_length=None,
         transformer=False,
         simplify = False,
-        pass_weights = False
+        pass_weights = False,
     ): 
         self.umodel = Model() # Ufront Rust model
-        super(UFrontONNX, self).__init__(onnx_model, self.umodel, simplify, pass_weights)
+        super(UFrontONNX, self).__init__(onnx_model, self.umodel, simplify, pass_weights, transformer=transformer)
         # self.input_names = input_names
         self.batch_size = batch_size
         self.seq_length = seq_length

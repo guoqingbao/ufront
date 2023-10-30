@@ -16,6 +16,14 @@ config = BertConfig(vocab_size_or_config_json_file=16000, hidden_size=768,
 
 net = BertModel(config=config)
 net.eval()
+
+# torch_origin_ret = net(input_ids, token_type_ids, input_mask)[1].detach().numpy()
+t_ret = net(input_ids, token_type_ids, input_mask)
+
+torch_ret = []
+torch_ret.append(t_ret[0].detach().numpy()) #prediction results
+torch_ret.append(t_ret[1].detach().numpy()) #prediction results
+
 # all_encoder_layers, pooled_output = net(input_ids, token_type_ids, input_mask)
 t1_start = time.perf_counter()
 model = UFrontTorch(net, batch_size=1, pass_weights=True) # convert torch model to ufront model
@@ -71,6 +79,12 @@ t2_stop = time.perf_counter()
 
 print("Bert****Ufront->TOSA Time: {:.3f}s, TOSA->Binary Time: {:.3f}s, Total Time: {:.3f}s".format(t1_stop - t1_start, t2_stop - t1_stop, t2_stop - t1_start)) # print performance indicator
 
-ufront_ret = module.forward(input_ids, token_type_ids, input_mask).to_host()
+module_ret = module.forward(input_ids, token_type_ids, input_mask)
+ufront_ret = []
+for ret in module_ret:
+    ufront_ret.append(ret.to_host())
 
-print(ufront_ret.shape)
+dif = torch_ret[1] - ufront_ret[1]
+mae = np.mean(abs(dif))
+print("Model: Bert, MAE with Pytorch: ", mae)
+

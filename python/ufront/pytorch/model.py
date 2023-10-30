@@ -13,9 +13,6 @@
 # limitations under the License.
 #
 
-# Revised for Unified Computing Frontend (UFront)
-# Enflame Tech. (ERA)
-
 from collections import OrderedDict
 from enum import Enum
 from typing import List
@@ -684,7 +681,7 @@ class GeluMNode(ModuleNode):
 
     def __call__(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return umodel.gelu(input=input_tensor, approximate=self.module.approximate!=None, name=self.name)
+        return umodel.gelu(input=input_tensor, approximate=self.module.approximate=="tanh", name=self.name)
 
 
 class LayerNormNode(ModuleNode):
@@ -2539,7 +2536,14 @@ class GeluFNode(FunctionNode):
 
     def __call__(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
-        return umodel.gelu(input=input_tensor, name=self.name)
+        if "approximate" in self.kwargs:
+            approximate = self.kwargs["approximate"] == "tanh"
+        elif len(self.innodes) > 1:
+            approximate = node_to_output[self.innodes[1].name]
+            approximate = approximate == "tanh"
+        else:
+            approximate = False
+        return umodel.gelu(input=input_tensor, approximate=approximate, name=self.name)
 
 
 class AttributeNode(Node):
@@ -2728,6 +2732,7 @@ class OutputNode(Node):
         self._ir_string = IR_DELIMITER.join(s)
 
     def __call__(self, umodel, node_to_output, output_tensors):
+        output_names = []
         for other in self.innodes:
             # Destructively modify `output_tensors`
             if type(other) is immutable_dict:
@@ -2736,6 +2741,7 @@ class OutputNode(Node):
                 if "last_hidden_state" in other:
                     output_tensors[:] += \
                         [node_to_output[other["last_hidden_state"].name]]
+                    output_names.append(other["last_hidden_state"].name)
                 # NOTE: This case targets MT5ForConditionalGeneration
                 elif "logits" in other:
                     # NOTE: Manually add a softmax layer since the model is
@@ -2746,18 +2752,21 @@ class OutputNode(Node):
                         input=logits, name=self.name,
                     )
                     output_tensors[:] += [softmax_logits]
+                    output_names.append(self.name)
             else:
                 if other != None:
                     if type(other) == tuple:
                         kv_cache = []
                         for (k, v) in list(other):
                             kv_cache[:] += [(node_to_output[k.name], node_to_output[v.name])]
+                            output_names.append(v.name)
                         output_tensors[:] += [[kv_cache]]
                     else:
                         output_tensors[:] += [node_to_output[other.name]]
+                        output_names.append(other.name)
                 else:
                     output_tensors.append(other)
-                
+        umodel.output(outputs=output_names)
 
 class UFrontTorch():
     def __init__(

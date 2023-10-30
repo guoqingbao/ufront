@@ -15,7 +15,7 @@ from io import open
 import torch
 from torch import nn
 from torch.nn import CrossEntropyLoss
-
+from functools import partial
 from file_utils import cached_path, WEIGHTS_NAME, CONFIG_NAME
 
 logger = logging.getLogger(__name__)
@@ -116,7 +116,7 @@ def swish(x):
     return x * torch.sigmoid(x)
 
 
-ACT2FN = {"gelu": gelu, "relu": torch.nn.functional.relu, "swish": swish}
+ACT2FN = {"gelu": partial(torch.nn.functional.gelu, approximate="tanh"), "relu": torch.nn.functional.relu, "swish": swish}
 
 
 class BertConfig(object):

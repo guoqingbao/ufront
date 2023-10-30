@@ -122,6 +122,7 @@ pub struct Model {
     ssa_ids: HashMap<String, i32>,
     op_names: Vec<String>,
     op_idx : i32,
+    out_names: Vec<String>,
     #[pyo3(get, set)]
     pub weight_type: WeightType,
 }
@@ -151,6 +152,7 @@ impl Model {
             ssa_ids: HashMap::new(),
             op_names: Vec::new(),
             op_idx: 0,
+            out_names: Vec::new(),
             weight_type: WeightType::INTERNAL,
         }
     }
@@ -308,7 +310,28 @@ impl Model {
         let mut output_shapes = "".to_string();
         let mut last_outname = "".to_string();
 
-        if let Some(op) = &self.graph.operators.last() {
+        if self.out_names.len() > 1 {
+            for op in &self.graph.operators {
+                let name = &op.params["name"];
+                if self.out_names.contains(name) {
+                    for output in &op.outputs {
+                        output_shapes += output.get_ir().as_str();
+                        output_shapes += ", ";
+        
+                        last_outname += "%";
+        
+                        if self.ssa_ids.contains_key(&output.name) {
+                            last_outname += &self.ssa_ids[&output.name].to_string();
+                        } else {
+                            last_outname += output.name.as_str();
+                        }
+        
+                        last_outname += ", ";
+                    }
+                }
+            }
+        }
+        else if let Some(op) = &self.graph.operators.last() {
             for output in &op.outputs {
                 output_shapes += output.get_ir().as_str();
                 output_shapes += ", ";
@@ -334,7 +357,6 @@ impl Model {
             last_outname.pop();
         }
 
-        let header = format! {"func.func @forward({argstr}) -> {output_shapes} "};
 
         // info!("{:?}", self.args);
         let mut op_ir = "".to_string();
@@ -343,8 +365,14 @@ impl Model {
             op_ir += op.dump_ir(Some(&self.ssa_ids)).as_str();
             op_ir += "\n";
         }
-
-        format!("{header} {{ \n{op_ir}\treturn {last_outname}: {output_shapes}\n}}")
+        
+        if self.out_names.len() > 1 {
+            let header = format! {"func.func @forward({argstr}) -> ({output_shapes}) "};
+            format!("{header} {{ \n{op_ir}\treturn {last_outname}: {output_shapes}\n}}")
+        } else {
+            let header = format! {"func.func @forward({argstr}) -> {output_shapes} "};
+            format!("{header} {{ \n{op_ir}\treturn {last_outname}: {output_shapes}\n}}")
+        }
     }
     
     #[pyo3(text_signature = "($self, op_type, args)")]
@@ -393,7 +421,25 @@ impl Model {
                     } else {
                         panic! {"Missing important arguments (tensors?)"};
                     }
-                } else {
+                } else if op_type == OpType::OUTPUT { 
+                    if para.contains("outputs").unwrap() {
+                        let ret = para
+                            .get_item("outputs")
+                            .unwrap()
+                            .extract::<Vec<String>>(); // .downcast::<Tensor>();
+                        match ret {
+                            Ok(outputs) => {
+                                info!("Output: {:?}!", outputs);
+                                for out in outputs {
+                                    self.out_names.insert(0, out);
+                                }
+                            }
+                            _=> {}
+                        }
+        
+                    }
+                }
+                else {
                     self.add_operator(&mut op);
                 }
 
@@ -805,7 +851,10 @@ impl Model {
         self.handle_operator(OpType::INPUT, kwds)
     }
 
-    pub fn output(&self) {}
+    #[pyo3(signature = (**kwds))]
+    pub fn output(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {
+        self.handle_operator(OpType::OUTPUT, kwds)
+    }
 
     #[pyo3(signature = (**kwds))]
     pub fn eq(&mut self, kwds: Option<&PyDict>) -> Py<PyOperator> {

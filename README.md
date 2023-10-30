@@ -74,6 +74,11 @@ maturin build --release -i python3.11 #for python3.11
 pip install iree-compiler==20230512.517 iree-runtime==20230512.517 -f https://openxla.github.io/iree/pip-release-links.html
 ```
 
+For Python3.7, the latest version of IREE is 20230330.474
+```sh
+!pip install iree-compiler==20230330.474 iree-runtime==20230330.474 -f https://openxla.github.io/iree/pip-release-links.html
+```
+
 ## Project discription
 1. The objective of this project is to create a **unified frontend** for deep learning computing.
 
