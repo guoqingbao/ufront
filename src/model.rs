@@ -292,7 +292,7 @@ impl Model {
     }
 
     pub fn dump_ir(&self) -> String {
-        // info!("{:?}", self.argshapes);
+        info!("argshapes {:?}", self.argshapes);
         let mut argstr = "".to_string();
         for arg in self.argshapes.keys() {
             argstr += "%";
@@ -309,44 +309,43 @@ impl Model {
 
         let mut output_shapes = "".to_string();
         let mut last_outname = "".to_string();
+        info!("out_names {:?}", self.out_names);
+        let mut out_shapes = HashMap::<String, String>::new();
+        let mut out_names: Vec<String> = self.out_names.clone();
 
-        if self.out_names.len() > 1 {
+        if out_names.len() > 1 {
             for op in &self.graph.operators {
-                let name = &op.params["name"];
-                if self.out_names.contains(name) {
-                    for output in &op.outputs {
-                        output_shapes += output.get_ir().as_str();
-                        output_shapes += ", ";
-        
-                        last_outname += "%";
-        
-                        if self.ssa_ids.contains_key(&output.name) {
-                            last_outname += &self.ssa_ids[&output.name].to_string();
-                        } else {
-                            last_outname += output.name.as_str();
-                        }
-        
-                        last_outname += ", ";
+                for output in &op.outputs {
+                    if !out_names.contains(&output.name) {
+                        continue;
                     }
+                    info!("output.name {:?}", output.name);
+                    out_shapes.insert(output.name.to_string(), output.get_ir());
                 }
             }
-        }
-        else if let Some(op) = &self.graph.operators.last() {
+        } else if let Some(op) = &self.graph.operators.last() { //use last op's outputs if not specified outputs
             for output in &op.outputs {
-                output_shapes += output.get_ir().as_str();
-                output_shapes += ", ";
-
-                last_outname += "%";
-
-                if self.ssa_ids.contains_key(&output.name) {
-                    last_outname += &self.ssa_ids[&output.name].to_string();
-                } else {
-                    last_outname += output.name.as_str();
-                }
-
-                last_outname += ", ";
+                let name = output.name.to_string();
+                out_names.push(name.to_string());
+                out_shapes.insert(name, output.get_ir());
             }
         }
+        for name_ in &out_names {
+            let name = name_.to_string();
+            last_outname += "%";
+            if self.ssa_ids.contains_key(&name) {
+                last_outname += &self.ssa_ids[&name].to_string();
+            } else {
+                last_outname += name.as_str();
+            }
+            last_outname += ", ";
+
+            output_shapes += out_shapes[&name].as_str();
+            output_shapes += ", ";
+        }
+
+
+        info!("output_shapes {:?}", output_shapes);
         output_shapes = output_shapes.trim().to_string();
         if &output_shapes[output_shapes.len() - 1..] == "," {
             output_shapes.pop();
@@ -431,7 +430,7 @@ impl Model {
                             Ok(outputs) => {
                                 info!("Output: {:?}!", outputs);
                                 for out in outputs {
-                                    self.out_names.insert(0, out);
+                                    self.out_names.push(out);
                                 }
                             }
                             _=> {}

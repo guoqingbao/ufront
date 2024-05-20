@@ -953,6 +953,10 @@ class MultiheadAttentionNode(ModuleNode):
             self.innodes.append(node.kwargs["key"])
         if "value" in node.kwargs:
             self.innodes.append(node.kwargs["value"])
+            
+        if len(self.innodes) == 0: # for Pytorch 2.0+
+            for item in node.args:
+                self.innodes.append(item)
 
         self.innodes = tuple(self.innodes)
         self.op_type = OpType.MULTIHEAD_ATTENTION
@@ -1603,40 +1607,53 @@ class GetItemNode(FunctionNode):
                 s.append(str(sl))
         self._ir_string = IR_DELIMITER.join(s)
 
+    def slice_to_str(self, slices, shape):
+
+        def get_slice_str(slice, axis):
+            if type(slice) == int:
+                return str(slice)
+            else:
+                start, step, stop = 0 if slice.start == None else slice.start,  1 if slice.step == None else slice.step, shape[axis] if slice.stop == None else slice.stop
+                slice_str = "[{}, {}, {}]".format(start, stop - start, step) # start, size, stride
+                return slice_str
+        result_str = "["    
+        axis = 0
+        for slice in list(slices):
+            result_str += get_slice_str(slice, axis)
+            result_str += ","
+            axis += 1
+        result_str = result_str[:len(result_str)-1]
+        result_str += "]"
+        return result_str
+            # if type(slice) == int :
+            #     return [slice, slice + 1, 1], axis
+            # elif slice.start!=None or slice.stop!=None:
+            #     return [0 if slice.start==None else slice.start, shape[axis] if slice.stop == None else slice.stop, 1 if slice.step == None else slice.step], axis
+            # else:
+            #     axis += 1
     def __call__(self, umodel, node_to_output):
         input_tensor = node_to_output[self.innodes[0].name]
+        axis = 0
         if type(input_tensor) is Tensor:
             slices = self.innodes[1]
             if hasattr(slices, "name"):
                 slice_tensor = node_to_output[slices.name]
                 np_slices = slice_tensor.ndarray.astype(ufront_to_numpy_dtype(slice_tensor.dtype))
                 output_shape = np.zeros(shape=input_tensor.shape, dtype=np.float32)[np_slices].shape
+                return umodel.slice_tensor(x=input_tensor, y=slice_tensor, output_shape=list(output_shape), name=self.name)
             else:
                 assert type(slices) is tuple, f"Expected tuple slices but got {type(slices)}"
-                # slice_tensor = list(slices)
                 isEllipsis  = False
                 for slice in slices:
                     if slice is Ellipsis:
                         isEllipsis = True
                         break
-
-                if isEllipsis:
-                    slice_tensor = str(slices)
-                else:
-                    if slices[0] != None:
-                        start, step, stop = slices[0].start,  slices[0].step,  slices[0].stop
-                        slice_tensor = "[[{}, {}, {}], {}]".format(start if start!= None else "\"None\"", step if step!= None else "\"None\"", stop if stop!= None else "\"None\"", slices[1] if slices[1]!= None else "\"None\"")
-                    else:
-                        start, step, stop = slices[1].start,  slices[1].step,  slices[1].stop
-                        slice_tensor = "[{}, [{}, {}, {}]]".format(slices[0] if slices[0]!= None else "\"None\"", start if start!= None else "\"None\"", step if step!= None else "\"None\"", stop if stop!= None else "\"None\"")
-                    
                 output_shape = np.zeros(shape=input_tensor.shape, dtype=np.float32)[slices].shape
-            
-            # print(np.max(slices), " ", np.min(slices), " : ", list(slices))
-            if type(slice_tensor) == Tensor:
-                return umodel.slice_tensor(x=input_tensor, y=slice_tensor, output_shape=list(output_shape), name=self.name)
-            else:
-                return umodel.slice_tensor(input=input_tensor, slices=slice_tensor, output_shape=list(output_shape), name=self.name)
+                if isEllipsis:
+                    slices = str(slices)
+                else:
+                    slices = self.slice_to_str(slices, input_tensor.shape) #start, stop, step
+                return umodel.slice_tensor(input=input_tensor, slices=slices, output_shape=list(output_shape), name=self.name)
 
         assert type(input_tensor) is list or \
             type(input_tensor) is tuple, \
@@ -1731,9 +1748,11 @@ class BatchMatMulNode(FunctionNode):
     def __call__(self, umodel, node_to_output):
         input_tensor1 = node_to_output[self.innodes[0].name]
         input_tensor2 = node_to_output[self.innodes[1].name]
-        return umodel.batch_matmul(
-            x=input_tensor1, y=input_tensor2, name=self.name,
-        )
+
+        if len(input_tensor1.shape) < 3 and len(input_tensor2.shape) < 3:
+            return umodel.matmul(x = input_tensor1, y=input_tensor2, name=self.name)
+        else:
+            return umodel.batch_matmul(x = input_tensor1, y=input_tensor2, name=self.name)
 
 
 class NegNode(FunctionNode):
@@ -2741,7 +2760,7 @@ class OutputNode(Node):
                 if "last_hidden_state" in other:
                     output_tensors[:] += \
                         [node_to_output[other["last_hidden_state"].name]]
-                    output_names.append(other["last_hidden_state"].name)
+                    # output_names.append(other["last_hidden_state"].name)
                 # NOTE: This case targets MT5ForConditionalGeneration
                 elif "logits" in other:
                     # NOTE: Manually add a softmax layer since the model is
@@ -2752,21 +2771,27 @@ class OutputNode(Node):
                         input=logits, name=self.name,
                     )
                     output_tensors[:] += [softmax_logits]
-                    output_names.append(self.name)
+                    # output_names.append(self.name)
             else:
                 if other != None:
                     if type(other) == tuple:
                         kv_cache = []
-                        for (k, v) in list(other):
-                            kv_cache[:] += [(node_to_output[k.name], node_to_output[v.name])]
-                            output_names.append(v.name)
-                        output_tensors[:] += [[kv_cache]]
+                        try:
+                            for (k, v) in list(other): #llm kvcache
+                                kv_cache[:] += [(node_to_output[k.name], node_to_output[v.name])]
+                            output_tensors[:] += [[kv_cache]]
+                        except:
+                            for k in list(other): # packed output (a,b,c...)
+                                output_tensors[:] += [node_to_output[k.name]]
                     else:
                         output_tensors[:] += [node_to_output[other.name]]
-                        output_names.append(other.name)
                 else:
                     output_tensors.append(other)
-        umodel.output(outputs=output_names)
+
+        for tensor in output_tensors:    
+            output_names.append(tensor.name)
+        if len(output_names) > 1: #multiple outputs
+            umodel.output(outputs=output_names)
 
 class UFrontTorch():
     def __init__(
@@ -2911,16 +2936,18 @@ class UFrontTorch():
 
                 if node is None:
                     # if fx_node.name.find("einsum") >=0 or fx_node.name.find("swapaxes") >=0: 
-                    if hasattr(fx_node.target, "__module__") and (fx_node.target.__module__ == "torch.functional" or fx_node.target.__module__=="torch"):
+                    if fx_node.target == 'masked_fill':
+                        node = MaskedFillNode(fx_node)
+                    elif fx_node.target == 'repeat':
+                        node = RepeatNode(fx_node)
+                    elif fx_node.name.find('sigmoid') == 0:
+                        node = SigmoidNode(fx_node, module)
+                    elif hasattr(fx_node.target, "__module__") and (fx_node.target.__module__ == "torch.functional" or fx_node.target.__module__=="torch"):
                         # print(fx_node.target.__module__)
                         node = TorchCallNode(fx_node, self.torch_callback)
                     elif hasattr(fx_node.target, "__module__") and fx_node.target.__module__ == "math":
                         # print(fx_node.target.__module__)
                         node = MathCallNode(fx_node, self.math_callback)
-                    elif fx_node.target == 'masked_fill':
-                        node = MaskedFillNode(fx_node)
-                    elif fx_node.target == 'repeat':
-                        node = RepeatNode(fx_node)
                     else:
                         node = CallNode(fx_node, self.normal_callback)
             else:
@@ -3027,6 +3054,7 @@ class UFrontTorch():
         input_tensors = []
         idx = 1
         for input in inputs:
+            if input == None: continue
             if type(input) == torch.Tensor:
                 input = input.numpy()
             input1 = np.ones(shape=input.shape, dtype=input.dtype)

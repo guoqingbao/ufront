@@ -69,8 +69,9 @@ class ONNXModel(object):
         self.umodel.weight_type = WeightType.EXTERNAL if pass_weights else WeightType.INTERNAL
         
         if type(onnx_model) == str:
-            model = onnx.load(onnx_model)
-        elif simplify:
+            onnx_model = onnx.load(onnx_model)
+        
+        if simplify:
             try:
                     # simply onnx models, for example, merge sub operators in onnx for chunk, remove redundant operators
                     onnx_model_, check = onnxsim.simplify(onnx_model) 
@@ -83,19 +84,15 @@ class ONNXModel(object):
             except:
                     print("Some of the ONNX models requires onnxsim library!")
         
-            model = onnx_model
-        else:
-            model = onnx_model
-
         self.inputs = {}
         self.operators = []
-        for input in model.graph.input:
+        for input in onnx_model.graph.input:
             tensor = ONNXTensor(input.name, input.type.tensor_type.shape.dim, 1)
             self.inputs[input.name] = tensor
         self.outputs = {}
-        for output in model.graph.output:
+        for output in onnx_model.graph.output:
             self.outputs[output.name] = output
-        self.model = model
+        self.model = onnx_model
         self.symbol_table = {}
 
     def handleAdd(self, node, node_to_output):
@@ -225,6 +222,11 @@ class ONNXModel(object):
             operator = self.addTensor(input_tensor, False, node.input[0])
             self.operators.append(operator)
             input_tensor = operator.get_output(0)
+        elif type(input_tensor) != Tensor:
+            input_tensor = np.array([input_tensor]).astype(np.float32)
+            operator = self.addTensor(input_tensor, False, node.input[0])
+            self.operators.append(operator)
+            input_tensor = operator.get_output(0)
 
         return self.umodel.expand(
             input=input_tensor, sizes=output_shape, name=node.name,
@@ -233,15 +235,18 @@ class ONNXModel(object):
     def handleSplit(self, node, node_to_output):
         input = node_to_output[node.input[0]]
         attribute = {x.name: x for x in node.attribute}
+        if 'axis' in attribute:
+            axis = attribute['axis'].i
+        else:
+            axis = 0
 
         if "split" in attribute:
             split = list(attribute['split'].ints)
         elif len(node.input) > 1:
             split = node_to_output[node.input[1]]
-        if 'axis' in attribute:
-            axis = attribute['axis'].i
-        else:
-            axis = 0
+
+        if type(input) == list:
+            return input
         return self.umodel.split(input=input, sizes=list(split), axis=axis, name=node.name)
 
     def handleAveragePool(self, node, node_to_output):
@@ -546,7 +551,7 @@ class ONNXModel(object):
             input=input, shape=list(shape), name=node.name,
         )
 
-    def unpack_rawdata(self, raw_data, data_type, shape, name):
+    def unpack_rawdata(self, raw_data, data_type, shape, name=None):
         if len(shape) > 0:
             length = list_product(shape)
         else:
@@ -571,7 +576,7 @@ class ONNXModel(object):
             output = output[0] #scalar
         elif len(shape) > 1:
             output = output.reshape(shape) # ndarray
-            if name =="class_token" or name =="encoder.pos_embedding":
+            if name != None and (name =="class_token" or name =="encoder.pos_embedding"):
                 weight_op = self.umodel.parameter(np_tensor=output, dtype=numpy_to_ufront_dtype(output.dtype), requires_grad=True, name=name)
                 output = weight_op.get_output(0)
         return output
@@ -582,10 +587,11 @@ class ONNXModel(object):
         data_type = onnx_to_ufront_dtype(tensor.data_type)
         raw_data = tensor.raw_data
         
-        if len(tensor.dims) > 1: #TODO set raw_data array to constant tensor
+        if len(tensor.dims) > 1:
             np_tensor = self.unpack_rawdata(raw_data, data_type, tensor.dims)
-            output = self.umodel.create_tensor(tensor.dims, DataType.Float, True, "constant_tensor" + str(ONNXModel.const_tensor_idx))
-            output.set_ndarray(np_tensor)
+            output = self.addTensor(np_tensor, False, "constant_tensor" + str(ONNXModel.const_tensor_idx))
+            # output = self.umodel.create_tensor(tensor.dims, DataType.Float, True, "constant_tensor" + str(ONNXModel.const_tensor_idx))
+            # output.ndarray = np_tensor
             ONNXModel.const_tensor_idx += 1
         else:
             output = self.unpack_rawdata(raw_data, data_type, tensor.dims)
@@ -741,6 +747,8 @@ class ONNXModel(object):
     
         elif type(input) != list and type(input) != tuple:
             output_shape = input.shape
+            if ends > output_shape[axis]: #exceed the dim size
+                ends = output_shape[axis]
             output_shape[axis] = ends - starts
             if axis == -1:
                 axis = len(input.shape) - 1
@@ -1000,7 +1008,14 @@ class ONNXModel(object):
         for name in outputs.keys():
              if name in node_to_output.keys():
                 tensor_outputs.append(node_to_output[name])
-        return tensor_outputs if len(tensor_outputs) > 0 else node_to_output[next(reversed(node_to_output))]
+
+        tensor_outputs = tensor_outputs if len(tensor_outputs) > 0 else node_to_output[next(reversed(node_to_output))]
+        output_names = []
+        for tensor in tensor_outputs:    
+            output_names.append(tensor.name)
+        if len(output_names) > 1:
+            self.umodel.output(outputs=output_names)
+        return tensor_outputs
     
     def get_output_operator(self):
         if len(self.operators) > 0:
@@ -1115,8 +1130,8 @@ class ONNXModel(object):
 
     
 class ONNXModelKeras(ONNXModel):
-    def __init__(self, onnx_model, umodel=None, transformer=False, pass_weights=False):
-        super(ONNXModelKeras, self).__init__(onnx_model=onnx_model, umodel=umodel, transformer=transformer, pass_weights=pass_weights)
+    def __init__(self, onnx_model, umodel=None, simplify=False, transformer=False, pass_weights=False):
+        super(ONNXModelKeras, self).__init__(onnx_model=onnx_model, umodel=umodel, simplify=simplify, transformer=transformer, pass_weights=pass_weights)
         self.transformer=transformer
         for node in onnx_model.graph.node:
             if node.name.find("u_front_keras/") != -1:

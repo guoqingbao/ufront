@@ -787,3 +787,66 @@ def ResNet18(classes, input_shape, weight_decay=1e-4):
     x = Dense(classes, activation='softmax')(x)
     model = Model(input, x, name='ResNet18')
     return model
+
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM
+from tensorflow.keras import backend as K
+from tensorflow.keras.layers import Layer, RNN
+class LSTMBlockCell(Layer):
+    def __init__(self, units, **kwargs):
+        self.units = units
+        self.state_size = [units, units]
+        super(LSTMBlockCell, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        self.w_xi = self.add_weight(name='w_xi',
+                                    shape=(input_shape[-1], self.units), initializer='uniform')
+        self.w_xf = self.add_weight(name='w_xf',
+                                    shape=(input_shape[-1], self.units), initializer='uniform')
+        self.w_xo = self.add_weight(name='w_xo',
+                                    shape=(input_shape[-1], self.units), initializer='uniform')
+        self.w_xc = self.add_weight(name='w_xc',
+                                    shape=(input_shape[-1], self.units), initializer='uniform')
+        self.w_hi = self.add_weight(name='w_hi',
+                                    shape=(self.units, self.units), initializer='uniform')
+        self.w_hf = self.add_weight(name='w_hf',
+                                    shape=(self.units, self.units), initializer='uniform')
+        self.w_ho = self.add_weight(name='w_ho',
+                                    shape=(self.units, self.units), initializer='uniform')
+        self.w_hc = self.add_weight(name='w_hc',
+                                    shape=(self.units, self.units), initializer='uniform')
+        self.b_i = self.add_weight(name='b_i',
+                                    shape=(1, self.units), initializer='zeros')
+        self.b_f = self.add_weight(name='b_f',
+                                    shape=(1, self.units), initializer='zeros')
+        self.b_o = self.add_weight(name='b_o',
+                                    shape=(1, self.units), initializer='zeros')
+        self.b_c = self.add_weight(name='b_c',
+                                    shape=(1, self.units), initializer='zeros')
+
+        self.built = True
+
+    def call(self, x, states):
+        h, c = states
+        i = K.sigmoid(K.dot(x, self.w_xi) + K.dot(h, self.w_hi) + self.b_i)
+        f = K.sigmoid(K.dot(x, self.w_xf) + K.dot(h, self.w_hf) + self.b_f)
+        o = K.sigmoid(K.dot(x, self.w_xo) + K.dot(h, self.w_ho) + self.b_o)
+
+        c_in = K.tanh(K.dot(x, self.w_xc) + K.dot(h, self.w_hc) + self.b_c)
+        c_n = f * c + i * c_in
+        h_n = o * K.tanh(c_n)
+
+        return h_n, [h_n, c_n]
+
+def KerasLSTM(input_shape, seq_size, hidden_size):
+    h0 = np.zeros((seq_size, hidden_size), dtype=np.float32)
+    c0 = np.zeros((seq_size, hidden_size), dtype=np.float32)
+    state = (K.constant(h0), K.constant(c0))
+
+    input = Input(shape=input_shape)
+    x = input
+    for i in range(16):
+        x, state = LSTMBlockCell(hidden_size)(x, state)
+
+    model = Model(input, x, name='LSTM'+str(seq_size))
+    return model

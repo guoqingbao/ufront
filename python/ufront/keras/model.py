@@ -30,7 +30,7 @@ from ..ufront import Model, PyOperator, Tensor, Optimizer, LossType, MetricsType
 from ..utils import list_product, onnx_to_ufront_dtype, numpy_to_ufront_dtype, ufront_to_numpy_dtype
 
 class BaseModel(object):
-  def __init__(self, inputs, onnx_model, batch_size, transformer, pass_weights):
+  def __init__(self, inputs, onnx_model, batch_size, simplify, transformer, pass_weights):
     self.ufront_model = Model()
     self.transformer=transformer
     self._onnx_model = onnx_model
@@ -38,7 +38,7 @@ class BaseModel(object):
     self._loss = None
     self._metrics = []
     self._label_type = DataType.Float
-    self._my_onnx_model = ONNXModelKeras(self._onnx_model, self.ufront_model, self.transformer, self.pass_weights)
+    self._my_onnx_model = ONNXModelKeras(self._onnx_model, self.ufront_model, simplify, self.transformer, self.pass_weights)
     self._num_samples = 0
     self._input_dataloaders = []
     self._input_dataloaders_dim = []
@@ -293,7 +293,7 @@ class BaseModel(object):
    
 class UFrontKeras(tf_keras_Model):
   def __init__(self, base_model, inputs,
-            batch_size, verbose=False, transformer=False, pass_weights=False):
+            batch_size, verbose=False, simplify=False, transformer=False, pass_weights=False):
     super(UFrontKeras, self).__init__(inputs=base_model.inputs, outputs=base_model.output, name=base_model.name)
     if (isinstance(inputs, list) == False):
       assert 0, "Inputs must be in list format, e.g., [input_tensor1, input_tensor2]"
@@ -305,7 +305,8 @@ class UFrontKeras(tf_keras_Model):
     # onnx_model = onnx.load_model("resnet18.onnx")
     # self._base_model = BaseModel(inputs=input_dict, onnx_model=onnx_model[0], batch_size=batch_size, transformer=transformer, pass_weights=pass_weights)
     self.onnx_model = tf2onnx.convert.from_keras(self, opset=18 if transformer else 17)
-    self._base_model = BaseModel(inputs=input_dict, onnx_model=self.onnx_model[0], batch_size=batch_size, transformer=transformer, pass_weights=pass_weights)
+    # onnx.save_model(self.onnx_model[0], f="Keras_LSTM.onnx")
+    self._base_model = BaseModel(inputs=input_dict, onnx_model=self.onnx_model[0], batch_size=batch_size, simplify=simplify, transformer=transformer, pass_weights=pass_weights)
 
 
   def umodel(self):
