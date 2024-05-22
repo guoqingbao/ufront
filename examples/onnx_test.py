@@ -4,58 +4,25 @@ import numpy as np
 import torch  #pytorch cpu
 import onnx
 from torch.onnx import TrainingMode
-from torch_def import SimpleCNN, ComplexCNN
 from torchvision.models import resnet18, resnet50, squeezenet1_1, regnet_x_32gf, maxvit_t, shufflenet_v2_x1_5, inception_v3, mobilenet_v3_small, efficientnet_v2_s, densenet121, convnext_small
 from torchvision import models
-import onnxsim
 import iree.compiler as ireec
 from iree import runtime
-from urllib.request import urlopen
-import json
-from PIL import Image
-
-def load_read_image():
-    url = 'https://storage.googleapis.com/download.tensorflow.org/example_images/YellowLabradorLooking_new.jpg'
-    response = urlopen(url)
-    img = Image.open(io.BytesIO(response.read()))
-    image = np.array(img.resize((224, 224)), dtype=np.float32)
-    image = image[np.newaxis, :]
-    clast_image = image/ 255.0
-    return clast_image, np.moveaxis(clast_image, -1, 1)
-
-def decode_result(preds, top=5):
-    if len(preds.shape) != 2 or preds.shape[1] != 1000:
-        raise ValueError(
-            "`decode_predictions` expects "
-            "a batch of predictions "
-            "(i.e. a 2D array of shape (samples, 1000)). "
-            "Found array with shape: " + str(preds.shape)
-        )
-    url = "https://raw.githubusercontent.com/raghakot/keras-vis/master/resources/imagenet_class_index.json"
-
-    response = urlopen(url)
-    data_json = json.loads(response.read())
-    results = []
-    for pred in preds:
-        top_indices = pred.argsort()[-top:][::-1]
-        result = [tuple(data_json[str(i)]) + (pred[i],) for i in top_indices]
-        result.sort(key=lambda x: x[2], reverse=True)
-        results.append(result)
-    return results
+from torch_def import load_sample_image, decode_result
 
 if __name__ == "__main__":
     batch_size = 1
     GPU = False
-    input_last, input = load_read_image()
-    input = np.vstack([input, input])
+    input_last, input = load_sample_image()
+    input = np.vstack([input, input]) # batched input
     # net = resnet18(weights="DEFAULT")
 
-    net = resnet50(weights="DEFAULT")
+    # net = resnet50(weights="DEFAULT")
     # net = densenet121(weights="DEFAULT")
     # net = inception_v3(weights="DEFAULT", dropout=0.0) 
     # net = squeezenet1_1(weights="DEFAULT")
     # net = shufflenet_v2_x1_5(weights="DEFAULT")
-    # net = mobilenet_v3_small(weights="DEFAULT", dropout=0.0)
+    net = mobilenet_v3_small(weights="DEFAULT", dropout=0.0)
     # net = models.vision_transformer.vit_b_16(weights="DEFAULT") 
     net.eval()
 
@@ -93,9 +60,7 @@ if __name__ == "__main__":
     # for operator in model.operators:
     #   print(operator.ir)
       
-    modelir= model.dump_ir()
-    with open("onnx_vit.mlir", "w") as f:
-        f.write(modelir)
+    # modelir= model.dump_ir()
     tosa_ir= model.dump_tosa_ir()
 
     print("Compiling TOSA model...")

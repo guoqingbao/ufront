@@ -3054,7 +3054,6 @@ class UFrontTorch():
         input_tensors = []
         idx = 1
         for input in inputs:
-            if input == None: continue
             if type(input) == torch.Tensor:
                 input = input.numpy()
             input1 = np.ones(shape=input.shape, dtype=input.dtype)

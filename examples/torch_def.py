@@ -1,118 +1,32 @@
 import torch
+import io
+import os
+import json
+import pathlib
 import torch.nn as nn
-from torch.onnx import TrainingMode
 import math
+from urllib.request import urlopen
+from PIL import Image
+import numpy as np
 
-class SimpleCNN1(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.features = nn.Sequential(
-            nn.Conv2d(3, 32, 3, 1, 1),
-            nn.ReLU(),
-            nn.Conv2d(32, 32, 3, 1, 1),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2),
-            nn.Conv2d(32, 64, 3, 1, 1),
-            nn.ReLU(),
-            nn.Conv2d(64, 64, 3, 1, 1),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2))
-        self.classifier = nn.Sequential(
-            nn.Linear(4096, 512), 
-            nn.ReLU(),
-            nn.Linear(512, 10),
-            nn.ReLU(),
-            nn.Softmax())
+def mse(y_true, y_pred):
+    return torch.mean((y_true - y_pred) ** 2)
 
-    def forward(self, x):
-        x = self.features(x)
-        x = torch.flatten(x, 1)
-        x = self.classifier(x)
-        return x
+def rmse(y_true, y_pred):
+    return torch.sqrt(mse(y_true, y_pred))
 
+def mae(y_true, y_pred):
+    return torch.mean(torch.abs(y_true - y_pred))
 
-class ComplexCNN(nn.Module):
-  def __init__(self):
-    super().__init__()
-    self.conv1 = nn.Conv2d(3, 32, 3, 1)
-    self.conv2 = nn.Conv2d(64, 64, 3, 1)
-    self.pool1 = nn.MaxPool2d(2, 2)
-    self.conv3 = nn.Conv2d(64, 64, 3, 1)
-    self.conv4 = nn.Conv2d(64, 64, 3, 1)
-    self.pool2 = nn.MaxPool2d(2, 2)
+# also known as cod
+def r_square(y_true, y_pred):
+    y_mean = torch.mean(y_true)
+    ss_tot = torch.sum((y_true - y_mean) ** 2)
+    ss_res = torch.sum((y_true - y_pred) ** 2)
+    return 1 - ss_res / ss_tot
 
-    self.batch_norm = nn.BatchNorm2d(64)
-
-    self.flat1 = nn.Flatten()
-    self.linear1 = nn.Linear(1600, 512)
-    self.linear2 = nn.Linear(512, 10)
-    self.relu = nn.ReLU(inplace=True)
-
-  def forward(self, input1, input2):
-    y1 = self.conv1(input1)
-    y1 = self.relu(y1)
-    y2 = self.conv1(input2)
-    y2 = self.relu(y2)
-    y = torch.cat((y1, y2), 1)
-    (y1, y2) = torch.split(y, [32, 32], dim=1) # split into [32, 32] in axis 1
-    y = torch.cat((y1, y2), 1)
-    y = self.conv2(y)
-    y = self.relu(y)
-    y = self.pool1(y)
-    y = self.conv3(y)
-    y = self.relu(y)
-    y = self.conv4(y)
-    y = self.relu(y)
-    y = self.pool2(y)
-
-    y = self.batch_norm(y)
-
-    y = self.flat1(y)
-    y = self.linear1(y)
-    y = self.relu(y)
-    yo = self.linear2(y)
-    return (yo, y)
-  
-class SimpleCNN(nn.Module):
-  def __init__(self):
-    super().__init__()
-    self.conv1 = nn.Conv2d(3, 32, 3, 1)
-    self.conv2 = nn.Conv2d(64, 64, 3, 1)
-    self.pool1 = nn.MaxPool2d(4, 4)
-    self.batch_norm = nn.BatchNorm2d(64)
-    self.flat1 = nn.Flatten()
-    self.linear1 = nn.Linear(3136, 512)
-    self.linear2 = nn.Linear(512, 10)
-    self.relu = nn.ReLU()
-
-  def forward(self, input1, input2):
-    y1 = self.relu(self.conv1(input1))
-    y2 = self.relu(self.conv1(input2))
-    y = torch.cat((y1, y2), 1)
-    (y1, y2) = torch.split(y, [32, 32], dim=1) # split into [32, 32] in axis 1
-    y = torch.cat((y1, y2), 1)
-    y = self.relu(self.conv2(y))
-    y = self.pool1(y)
-    y = self.batch_norm(y)
-    y = self.flat1(y)
-    y = self.relu(self.linear1(y))
-    return self.linear2(y)
-  
-class TestCNN(nn.Module):
-  def __init__(self):
-    super().__init__()
-    self.conv = nn.Conv2d(3, 32, 3, 4, bias=False)
-    self.pool = nn.AvgPool2d(2)
-    self.batch_norm = nn.BatchNorm2d(32)
-    self.linear = nn.Linear(32, 10, bias=False)
-    self.flat = nn.Flatten()
-    self.relu = nn.ReLU()
-
-  def forward(self, x):
-    x = self.flat(self.batch_norm(self.pool(self.conv(x))))
-    
-    x = self.linear(x)
-    return self.relu(x)
+def mpe(y_true, y_pred):
+    return torch.mean((y_true - y_pred) / y_true) * 100
 
 class SimpleLSTM(nn.Module):
     def __init__(self, input_size, hidden_size, seq_size):
@@ -154,3 +68,45 @@ class SimpleLSTM(nn.Module):
         # reshape from shape (sequence, batch, feature) to (batch, sequence, feature)
         hidden_seq = hidden_seq.transpose(0, 1).contiguous()
         return hidden_seq, (h_t, c_t)
+
+def load_sample_image():
+    url = 'https://storage.googleapis.com/download.tensorflow.org/example_images/YellowLabradorLooking_new.jpg'
+    path = str(pathlib.Path(__file__).parent.resolve()) + "/resources/YellowLabradorLooking_new.jpg"
+    if os.path.exists(path):
+        with open(path, "rb") as f:
+            img = Image.open(io.BytesIO(f.read()))
+    else:
+        response = urlopen(url)
+        img = Image.open(io.BytesIO(response.read()))
+    image = np.array(img.resize((224, 224)), dtype=np.float32)
+    image = image[np.newaxis, :]
+    mean = (0.485, 0.456, 0.406)
+    std = (0.229, 0.224, 0.225)
+    clast_image = image/ 255.0
+    clast_image = (clast_image - mean) / std #normlization 
+    clast_image = clast_image.astype(np.float32)
+    return clast_image, np.moveaxis(clast_image, -1, 1)
+
+def decode_result(preds, top=5):
+    if len(preds.shape) != 2 or preds.shape[1] != 1000:
+        raise ValueError(
+            "`decode_predictions` expects "
+            "a batch of predictions "
+            "(i.e. a 2D array of shape (samples, 1000)). "
+            "Found array with shape: " + str(preds.shape)
+        )
+    url = "https://raw.githubusercontent.com/raghakot/keras-vis/master/resources/imagenet_class_index.json"
+    path = str(pathlib.Path(__file__).parent.resolve()) + "/resources/imagenet_class_index.json"
+    if os.path.exists(path):
+        with open(path) as f:
+            data_json = json.loads(f.read())
+    else:
+        response = urlopen(url)
+        data_json = json.loads(response.read())
+    results = []
+    for pred in preds:
+        top_indices = pred.argsort()[-top:][::-1]
+        result = [tuple(data_json[str(i)]) + (pred[i],) for i in top_indices]
+        result.sort(key=lambda x: x[2], reverse=True)
+        results.append(result)
+    return results

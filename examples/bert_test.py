@@ -5,8 +5,10 @@ from iree import runtime
 from torch_bert import BertModel, BertConfig
 import torch
 import time
-GPU = False
 import numpy as np
+from torch_def import mae, mse, r_square, rmse, mpe
+
+GPU = False
 input_ids = torch.from_numpy(np.array([[31, 51, 99], [15, 5, 0]], dtype="int32"))
 input_mask = torch.from_numpy(np.array([[1, 1, 1], [1, 1, 0]], dtype="int32"))
 token_type_ids = torch.from_numpy(np.array([[0, 0, 1], [0, 1, 0]], dtype="int32"))
@@ -86,5 +88,7 @@ for ret in module_ret:
 
 dif = torch_ret[1] - ufront_ret[1]
 mae = np.mean(abs(dif))
-print("Model: Bert, MAE with Pytorch: ", mae)
-
+print("MAE: ", mae)
+print("RMSE:", rmse(torch.Tensor(torch_ret[1]), torch.Tensor(ufront_ret[1])).numpy())
+print("COD:", r_square(torch.Tensor(torch_ret[1]), torch.Tensor(ufront_ret[1])).numpy())
+print("MPE:", mpe(torch.Tensor(torch_ret[1]), torch.Tensor(ufront_ret[1])).numpy(), "%")

@@ -546,7 +546,11 @@ class ONNXModel(object):
             assert 0, "Invalid unsqueeze call!"
 
         shape = list(input.shape)
-        shape.insert(axes, 1)
+        if type(axes) == list or type(axes) == np.array:
+            for i in range(len(list(axes))):
+                shape.insert(list(axes)[0] + i, 1)
+        else:
+            shape.insert(axes, 1)
         return self.umodel.reshape(
             input=input, shape=list(shape), name=node.name,
         )
@@ -1009,13 +1013,15 @@ class ONNXModel(object):
              if name in node_to_output.keys():
                 tensor_outputs.append(node_to_output[name])
 
-        tensor_outputs = tensor_outputs if len(tensor_outputs) > 0 else node_to_output[next(reversed(node_to_output))]
-        output_names = []
-        for tensor in tensor_outputs:    
-            output_names.append(tensor.name)
-        if len(output_names) > 1:
-            self.umodel.output(outputs=output_names)
-        return tensor_outputs
+        if len(tensor_outputs) > 0:
+            output_names = []
+            for tensor in tensor_outputs:    
+                output_names.append(tensor.name)
+            if len(output_names) > 1:
+                self.umodel.output(outputs=output_names)
+            return tensor_outputs
+        else:
+            return node_to_output[next(reversed(node_to_output))]
     
     def get_output_operator(self):
         if len(self.operators) > 0:
