@@ -5,9 +5,9 @@ Unified MLIR Computing Frontend for Deep Learning
 Convert Pytorch, Tensorflow, Keras, ONNX models to UFront IR and then lower them into standard MLIR dialect (TOSA IR)
 
 ## Project discription
-1. The objective of this project is to create a `unified MLIR frontend` for deep learning computing.
+1. The objective of this project is to create a `Unified MLIR frontend` for deep learning computing.
 
-2. The frontend imports Pytorch, Keras, ONNX (and possiblely Tensorflow) models using the FlexFlow-like python scripts and then translate them into the `Unified High-level IR` based on Rust.
+2. The frontend imports Pytorch, Tensorflow, Keras and ONNX models using the FlexFlow-like python scripts and then translate them into the `Unified High-level IR` based on Rust.
 
 3. The frontend was built based on `Rust` and the Rust computing interfaces were exposed to Python through `PyO3`. 
 
@@ -18,9 +18,7 @@ Convert Pytorch, Tensorflow, Keras, ONNX models to UFront IR and then lower them
 6. In addition to translating Pytorch, Keras, Tensorflow, and ONNX models into the standard MLIR IR (TOSA), the Rust frontend also provide standard computing workflows including operators, forward, and backward (gradient update for training, future work).
 
 ## Citation
-```
 Guoqing Bao, Heng Shi, Chengyi Cui, Yalin Zhang, and Jianguo Yao. 2024. UFront: Toward A Unified MLIR Frontend for Deep Learning. In 39th IEEE/ACM International Conference on Automated Software Engineering (ASE ’24), October 27-November 1, 2024, Sacramento, CA, USA. ACM, New York, NY, USA, 13 pages. https://doi.org/10.1145/3691620.3695002
-```
 
 ## Experiencing UFront without build
 
