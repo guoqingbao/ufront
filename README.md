@@ -1,9 +1,44 @@
 # ufront
-Unified Computing Frontend for Deep Learning 
+Unified MLIR Computing Frontend for Deep Learning 
 
 ## How it works?
 Convert Pytorch, Tensorflow, Keras, ONNX models to UFront IR and then lower them into standard MLIR dialect (TOSA IR)
 
+## Project discription
+1. The objective of this project is to create a `unified MLIR frontend` for deep learning computing.
+
+2. The frontend imports Pytorch, Keras, ONNX (and possiblely Tensorflow) models using the FlexFlow-like python scripts and then translate them into the `Unified High-level IR` based on Rust.
+
+3. The frontend was built based on `Rust` and the Rust computing interfaces were exposed to Python through `PyO3`. 
+
+4. The computing nodes (operators) in the Pytorch, Keras, Tensorflow, and ONNX models can be mapped to Rust computing interfaces, in which the Rust frontend will maintain a high-level `computation graph`.
+
+5. The Rust frontend will then translate the computation graph into `high-level IR` (intermediate representation, sample generated IRs can be found in folder `examples/output_ir`) and then lower it into `TOSA dialect` (a standard IR in MLIR, using the subproject `UFront2TOSA`).
+
+6. In addition to translating Pytorch, Keras, Tensorflow, and ONNX models into the standard MLIR IR (TOSA), the Rust frontend also provide standard computing workflows including operators, forward, and backward (gradient update for training, future work).
+
+## Citation
+```
+Guoqing Bao, Heng Shi, Chengyi Cui, Yalin Zhang, and Jianguo Yao. 2024. UFront: Toward A Unified MLIR Frontend for Deep Learning. In 39th IEEE/ACM International Conference on Automated Software Engineering (ASE ’24), October 27-November 1, 2024, Sacramento, CA, USA. ACM, New York, NY, USA, 13 pages. https://doi.org/10.1145/3691620.3695002
+```
+
+## Experiencing UFront without build
+
+Experiencing UFront on Kaggle (for model compilation, performance comparison, ImageNet inference, accuracy validation, etc.)
+
+Run the anonymous UFront online tests in Kaggle using the links below, **be sure to login** to use full functionality and free GPU (T4x2) resources.
+
+https://www.kaggle.com/code/anomyuser/ufront-test/
+
+https://www.kaggle.com/code/anomyuser/test-torch
+
+https://www.kaggle.com/code/anomyuser/test-tf
+
+**Note**: the results on Kaggle may slightly different from the paper reported because of different CPU and GPU used.
+
+**Important:** Access GPU at no cost or turn on an internet connection. Need to **login** and **Get phone verified** in Kaggle.
+
+**The Internet Connection** in the Kaggle notebook need to be **turned on** to allow package download.
 
 ## How to build?
 
@@ -26,7 +61,7 @@ pip install maturin==0.15.1 #Rust cross-language build tool
 pip install maturin[patchelf] #for packaging dependencies
 ```
 
-#### Install dependencies for subproject
+#### Install dependencies for subproject (UFront2TOSA)
 ```sh
 apt update && apt install -y wget cmake ninja-build gnupg #C++ build tools
 apt install zlib1g zlib1g-dev #zlib
@@ -58,7 +93,7 @@ maturin develop #Debug mode
 ```sh
 cd examples
 python native_test.py
-python torch_e2e_demo.py #make sure torch-cpu installed
+python torch_test.py #make sure torch-cpu installed, other options include onnx_test, keras_test (tf-cpu required), bert_test, etc.
 ```
 
 #### Build the release package (wheel file)
@@ -71,26 +106,14 @@ maturin build --release -i python3.11 #for python3.11
 ```
 #### Install compiler backend & runtime for execution
 ```sh
-pip install iree-compiler==20230512.517 iree-runtime==20230512.517 -f https://openxla.github.io/iree/pip-release-links.html
+pip install iree-compiler==20230815.614 iree-runtime==20230815.614
 ```
 
-For Python3.7, the latest version of IREE is 20230330.474
-```sh
-!pip install iree-compiler==20230330.474 iree-runtime==20230330.474 -f https://openxla.github.io/iree/pip-release-links.html
-```
+Trouble shootings can be found in: https://github.com/guoqingbao/anonyufront
 
-## Project discription
-1. The objective of this project is to create a **unified frontend** for deep learning computing.
 
-2. The frontend imports Pytorch, Keras, ONNX (and possiblely Tensorflow) models using the FlexFlow-like python scripts and then translate them into the **Unified High-level IR** based on Rust.
-
-3. The frontend was built based on **Rust** and the Rust computing interfaces were exposed to python through PyO3. 
-
-4. The computing nodes (operators) in the Pytorch, Keras, Tensorflow, and ONNX models can be mapped to Rust computing interfaces, in which the Rust frontend will maintain a high-level computation graph.
-
-5. The Rust frontend will then translate the high-level graph into IR and then lower it into TOSA dialect (a standard IR for deep learning computing).
-
-6. In addition to translating Pytorch, Keras, Tensorflow, and ONNX models into the standard computing IR (TOSA), the Rust frontend also provide standard computing workflows including operators, forward, backward, gradient update, etc. for training.
+## Supplymentary Material
+Coming soon
 
 ## End-to-end demo
 
