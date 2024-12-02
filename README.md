@@ -4,6 +4,26 @@ Unified MLIR Computing Frontend for Deep Learning
 ## How it works?
 Convert Pytorch, Tensorflow, Keras, ONNX models to UFront IR and then lower them into standard MLIR dialect (TOSA IR)
 
+## Citation
+```
+@inproceedings{10.1145/3691620.3695002,
+author = {Bao, Guoqing and Shi, Heng and Cui, Chengyi and Zhang, Yalin and Yao, Jianguo},
+title = {UFront: Toward A Unified MLIR Frontend for Deep Learning},
+year = {2024},
+isbn = {9798400712487},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/3691620.3695002},
+doi = {10.1145/3691620.3695002},
+booktitle = {Proceedings of the 39th IEEE/ACM International Conference on Automated Software Engineering},
+pages = {255–267},
+numpages = {13},
+keywords = {MLIR, unified frontend, deep learning, compilation},
+location = {Sacramento, CA, USA},
+series = {ASE '24}
+}
+```
+
 ## Project discription
 1. The objective of this project is to create a `Unified MLIR frontend` for deep learning computing.
 
